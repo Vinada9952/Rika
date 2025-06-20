@@ -1,0 +1,849 @@
+# Gemini API KEY : AIzaSyDR-OOUGNxmInqrIC5qQEAfUnqX4XR3qRY
+# import google.generativeai as genai
+# from bs4 import BeautifulSoup
+from google import genai
+from google.genai import types
+from google.genai.types import Tool, GoogleSearch
+import os
+import random
+from threading import Thread
+from PIL import Image
+import re
+import cv2
+import datetime
+import requests
+from googlesearch import search
+from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
+import time
+import pyautogui
+import pyttsx3
+import speech_recognition as sr
+import json
+
+
+
+class Type:
+    def get_type( var ):
+        try:
+            if var == list( var ):
+                return "list"
+            elif var == str( var ):
+                return "str"
+        except TypeError:
+            try:
+                if var == int( var ):
+                    return "int"
+                elif var == float( var ):
+                    return "float"
+                elif var == bool( var ):
+                    return "bool"
+                else:
+                    return "Unknown type"
+            except TypeError:
+                return "Unknown type"
+    class file:
+        append = 'a'
+        trunc = 'w'
+        read = 'r'
+        create = 'x'
+    def list_cut( origin: str, separator: str ):
+        traitement = ""
+        origin = origin+separator
+        output = []
+        for i in range( len( origin ) ):
+            if origin[i] == separator:
+                output.append( traitement )
+                traitement = ""
+            else:
+                traitement += origin[i]
+        return output
+    
+class Json:
+    def write( informations: dict, json_name: str ):
+        json_object = json.dumps( informations, indent=4 )
+        with open( json_name, Type.file.trunc, encoding="utf-8" ) as outfile:
+            outfile.write( json_object )
+    def read( json_name: str ):
+        with open( json_name, Type.file.read, encoding="utf-8" ) as infile:
+            informations = json.load( infile )
+        return informations
+
+
+class System:
+    def execute( command: str ):
+        # print( command )
+        os.system( command )
+    def clear():
+        os.system( "cls" )
+    class file:
+        def write( file_name: str, content, mode: str ):
+            if Type.get_type( content ) != "list":
+                content = [ str( content ) ]
+            file = open( file_name, mode )
+
+            for i in range( len( content ) ):
+                if content[i][len( content[i] )-1] == '\n':
+                    file.write( content[i] )
+                else:
+                    file.write( content[i] + '\n' )
+
+            file.close()
+        def read( file_name: str ):
+            return_file = []
+            try:
+                file = open( file_name, "r" )
+                brut_file = file.read()+'\n'
+                file.close()
+                traitement = ""
+                for i in range( len( brut_file ) ):
+                    for j in range( len( brut_file[i] ) ):
+                        if brut_file[i][j] == '\n':
+                            return_file.append( traitement )
+                            traitement = ""
+                        else:
+                            traitement += brut_file[i][j]
+                return return_file
+            except FileNotFoundError:
+                return FileNotFoundError
+
+class Sound:
+
+    def listen( language: str = "fr-FR" ):
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            try:
+                r.adjust_for_ambient_noise( 1 )
+            except AssertionError:
+                pass
+            # r.adjust_for_ambient_noise( 1 )
+            audio_data = r.listen( source=source, phrase_time_limit=3 )
+        try:
+            text = r.recognize_google( audio_data, language=language )
+            text = str( text )
+            return text
+        except sr.UnknownValueError:
+            return -1
+        except sr.RequestError:
+            return -2
+        
+
+    def say( say: str, word_per_minute: int = 150, language: str = 'fr' ):
+        # say = "." + say
+        engine = pyttsx3.init()
+        voices = engine.getProperty( "voices" )
+        if language == "fr":
+            engine.setProperty( "voice", voices[0].id )
+        elif language == "en":
+            engine.setProperty( "voice", voices[1].id )
+        engine.setProperty( "rate", word_per_minute )
+        engine.say( say )
+        engine.runAndWait()
+# une seule classe pour prendre le contenu audio/texte
+
+load_print = 0
+
+def loadPrint():
+    global load_print
+    load_print += 1
+    f = '\n'.join( System.file.read( "./Rika.py" ) )
+    count = f.count( "loadPrint()#c" )-1
+
+    bar = "[" + ( '.'*100 ) + "]"
+
+
+    for i in range( int( load_print*100/count ) ):
+        bar = bar.replace( ".", "#", 1 )
+
+    print( bar, f"{load_print}/{count}", end='\r' )
+    if load_print == count:
+        print( "\n" )
+
+directory = os.listdir( "./" )
+mem = False
+o_mem = False
+data = False
+fppl = False
+for i in range( len( directory ) ):
+    if directory[i] == "data.json":
+        data = True
+    if directory[i] == "memory.json":
+        mem = True
+    if directory[i] == "old_mem.json":
+        o_mem = True
+    if directory[i] == "ppl":
+        fppl = True
+
+if not data:
+    user_face =  input( "Chemin vers une image de votre visage (rien = ne pas autoriser): " ).replace( "\\", "/" ).replace( '"', "" )
+    cam = input( "Caméra à utiliser (0 = par défaut, rien = ne pas autoriser): " )
+    audio = bool( int( input( "Audio mode (0 pour mode écrit, 1 pour mode vocal) : " ) ) )
+    if cam == "":
+        cam = -1
+    Json.write( {
+        "gemini-api-key": input( "Clé API Gemini (https://surl.li/vculmp) : " ),
+        "user-name": input( "Quel est votre nom ? : " ),
+        "user-face": user_face,
+        "camera": int( cam ),
+        "audio-mode": audio
+    }, "data.json" )
+    print( "Vous pourrez toujours modifier ces paramètres plus tard, dans le fichier data.json" )
+else:
+    loadPrint()#c
+
+if not mem:
+    Json.write( [], "memory.json" )
+
+if not o_mem:
+    Json.write( [], "old_mem.json" )
+
+
+if not fppl:
+    os.mkdir( "ppl" )
+
+loadPrint()#c
+
+bar_count = 0
+
+def loadBar( total ):
+    global bar_count
+    bar_count += 1
+
+    bar = "[" + ( '.'*100 ) + "]"
+
+
+    for i in range( int( bar_count*100/total ) ):
+        bar = bar.replace( ".", "#", 1 )
+
+    print( bar, f"{bar_count}/{total}", end='\r' )
+
+    if bar_count == total:
+        print( "\n" )
+
+
+
+loadPrint()#c
+
+google_search = Tool(
+    google_search = GoogleSearch()
+)
+
+loadPrint()#c
+
+class MyException( Exception ):
+    def nothing():
+        pass
+
+loadPrint()#c
+
+class ThreadWithReturnValue( Thread ):
+    
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, Verbose=None):
+        Thread.__init__(self, group, target, name, args, kwargs)
+        self._return = None
+
+    def run(self):
+        if self._target is not None:
+            self._return = self._target(*self._args,
+                                                **self._kwargs)
+    def join(self, *args):
+        Thread.join(self, *args)
+        return self._return
+
+
+loadPrint()#c
+
+
+def getLocalisation():
+    try:
+        response = requests.get('https://ipinfo.io/json')
+        data = response.json()
+        # print( "localisation saved" )
+        return data
+    except Exception as e:
+        return -1
+
+
+loadPrint()#c
+
+def moment():
+    date = datetime.datetime.now()
+    day_name = int( date.strftime( "%w" ) )
+    if day_name == 0:
+        day_name = "Dimanche"
+    elif day_name == 1:
+        day_name = "Lundi"
+    elif day_name == 2:
+        day_name = "Mardi"
+    elif day_name == 3:
+        day_name = "Mercredi"
+    elif day_name == 4:
+        day_name = "Jeudi"
+    elif day_name == 5:
+        day_name = "Vendredi"
+    elif day_name == 6:
+        day_name = "Samedi"
+    jour = date.strftime( "%d" )
+    mois = int( date.strftime( "%m" ) )
+    if mois == 1:
+        mois = "Janvier"
+    elif mois == 2:
+        mois = "Février"
+    elif mois == 3:
+        mois = "Mars"
+    elif mois == 4:
+        mois = "Avril"
+    elif mois == 5:
+        mois = "Mai"
+    elif mois == 6:
+        mois = "Juin"
+    elif mois == 7:
+        mois = "Juillet"
+    elif mois == 8:
+        mois = "Août"
+    elif mois == 9:
+        mois = "Septembre"
+    elif mois == 10:
+        mois = "Octobre"
+    elif mois == 11:
+        mois = "Novembre"
+    elif mois == 12:
+        mois = "Décembre"
+    ans = date.strftime( "%Y" )
+    heure = datetime.datetime.now().strftime( "%H" )
+    minute = datetime.datetime.now().strftime( "%M" )
+    return str( f"{ans=} {mois=} {jour=} {heure=} {minute=}" )
+
+loadPrint()#c
+
+def captureImage( filename="captured_image.png", cam_mode="webcam" ):
+    if cam_mode == "webcam":
+        # Ouvrir la caméra
+        if Json.read( "data.json" )["camera"] == -1:
+            print( "Aucun accès à la caméra" )
+            return
+        cap = cv2.VideoCapture( Json.read( "data.json" )["camera"] )
+
+        if not cap.isOpened():
+            print("Erreur : Impossible d'ouvrir la caméra.")
+            return
+
+        # Lire une image de la caméra
+        ret, frame = cap.read()
+
+        if ret:
+            # Enregistrer l'image dans un fichier
+            cv2.imwrite(filename, frame)
+            print(f"Image enregistrée sous {filename}.")
+        else:
+            print("Erreur : Impossible de capturer l'image.")
+
+        # Libérer la caméra
+        cap.release()
+    elif cam_mode == "screenshot":
+        pyautogui.screenshot( filename )
+
+loadPrint()#c
+
+def removeEmojis(text):
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticônes
+        "\U0001F300-\U0001F5FF"  # symboles & pictogrammes
+        "\U0001F680-\U0001F6FF"  # transport & cartes
+        "\U0001F1E0-\U0001F1FF"  # drapeaux
+        "\U00002700-\U000027BF"  # divers symboles
+        "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+        "\U00002600-\U000026FF"  # Divers symboles
+        "\U00002B50-\U00002B55"  # étoiles, etc.
+        "]+",
+        flags=re.UNICODE
+    )
+    return emoji_pattern.sub(r'', text)
+
+loadPrint()#c
+
+def imgVer():
+    global question
+    if Json.read( "data.json" )["camera"] != -1:
+        if question.find( "regarde" ) != -1 or question.find( "observe" ) != -1 or question.find( "vois" ) != -1 or question.find( "voit" ) != -1:
+            return True
+        img = client.models.generate_content(
+            model="gemini-1.5-flash",
+            config=types.GenerateContentConfig(
+                max_output_tokens=1,
+                system_instruction="Si tu as besoin d'une image pour répondre à la question, retourne la string \"img_get\" pour l'obtenir"
+            ),
+            contents=[ question ]
+        ).text.replace( '\n', '' )
+        if img.replace( '\n', '' ) == "img_get":
+            return True
+    return False
+
+loadPrint()#c
+
+def langVer( q = None ):
+    if q == None:
+        global question
+    else:
+        question = q
+    language = client.models.generate_content(
+        model="gemini-1.5-flash",
+        config=types.GenerateContentConfig(
+            max_output_tokens=1,
+            temperature=0,
+            system_instruction="Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre"
+        ),
+        contents=[ question ],
+    ).text
+    return language.replace( '\n', '' )
+
+loadPrint()#c
+
+def needVer():
+    global question
+    need_anymore = client.models.generate_content(
+        model="gemini-1.5-flash",
+        config=types.GenerateContentConfig(
+            max_output_tokens=1,
+            system_instruction=
+                "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et leur résultat." +
+                str(
+                    {
+                        "Explique moi la thermodynamique": "oui",
+                        "Génère moi un code python qui dit Bonjour": "oui",
+                        "au revoir": "non",
+                        "allo": "oui",
+                        "bye": "non",
+                        "Connard, t'es pas bon": "non",
+                        "Description de personne": "oui",
+                        "je t'ai donné l'information": "oui"
+                    }
+                )
+        ),
+        contents=[ question ]
+    ).text.replace( '\n', '' )
+    if need_anymore == "oui":
+        return True
+    return False
+
+
+loadPrint()#c
+
+def underVer():
+    global question
+    if question != -1:
+        understand = client.models.generate_content(
+            model="gemini-1.5-flash",
+            config=types.GenerateContentConfig(
+                max_output_tokens=1,
+                temperature=0,
+                system_instruction="Dit moi si cette question fait du sens ou pas. Si oui, répnds par 'oui' ou 'non'. Tu ne ressort qu'un seul mot comme réponse, un seul token, et uniquement oui ou non. Voici des exemples de questions et si elles font du sens ou pas :" + str(
+                    {
+                        "n'est pas possible de": "non",
+                        "Décris moi (tel personne)": "oui",
+                        "fais moi un code python": "oui",
+                        "bonjour": "oui",
+                        "ton micro": "non",
+                        "ok allô moi je suis un gars puis": "oui",
+                        "OK": "oui",
+                        "j'ai Vincent qui à côté de moi qui enlève des possibles": "non",
+                        "lettre L": "oui",
+                        "combien": "oui",
+                        "entretien clé USB": "non",
+                        "C'est quoi la météo ?": "oui",
+                        "météo portique station Google": "non",
+                        "regarde": "oui",
+                        "non merci, ça va aller": "oui",
+                        "Rika": "oui",
+                        "Tu as l'information": "oui",
+                        "les réponses sont b, b et a": "oui",
+                        "Donne moi toutes les infos que tu as sur moi": "oui"
+                    }
+                )
+            ),
+            contents=[ question ],
+        ).text
+        if understand.replace( '\n', '' ) == "oui":
+            return True
+    return False
+
+loadPrint()#c
+
+def reformulation( prompt ):
+    return client.models.generate_content(
+        model="gemini-1.5-flash",
+        config=types.GenerateContentConfig(
+            temperature=2,
+            system_instruction="Reformule moi cette phrase. Ne ressort que la phrase reformulée, rien d'autre."
+        ),
+        contents=[ prompt ],
+    ).text
+
+loadPrint()#c
+
+
+raw_ppl = os.listdir( "./ppl" )
+ppl = {}
+ppl_list = []
+for i in range( len( raw_ppl ) ):
+    ppl[raw_ppl[i].split( "." )[0]] = "./ppl/" + raw_ppl[i]
+    ppl_list.append( raw_ppl[i].split( "." )[0] )
+
+loadPrint()#c
+
+def setupPpl():
+    p = []
+    for i in range( len( ppl_list ) ):
+        
+        p.append( f"Voici {ppl_list[i]}." )
+        p.append( Image.open( ppl[ppl_list[i]] ) )
+        
+        loadBar( len( ppl_list )+1 )
+        time.sleep( 0.01 )
+
+    model.send_message( p )
+
+    loadBar( len( ppl_list )+1 )
+
+
+loadPrint()#c
+
+WORD_PER_MINUTE = 200 
+AUDIO = Json.read( "data.json" )["audio-mode"]
+language = "fr"
+response = ""
+cam_mode = None
+question = ""
+last_question = ""
+memory = {}
+memories = Json.read( "memory.json" )
+old_memories = Json.read( "old_mem.json" )
+client = genai.Client( api_key=Json.read( "data.json" )["gemini-api-key"] )
+
+loadPrint()#c
+
+
+
+# print( f"{memories=}" )
+# System.file.write( "error.log", "-- Log Start --", Type.file.trunc )
+
+for i in range( len( memories ) ):
+    if len( memories[i].keys() ) == 2:
+        memories.pop( i )
+
+
+loadPrint()#c
+
+
+while client.models.count_tokens( model="gemini-2.0-flash", contents=str( Json.read( "memory.json" ) ).replace( ": ", ":" ).replace( ", ", ',' ) ).total_tokens > 1000000:
+    old_memories.append( memories[0] )
+    memories.pop( 0 )
+
+
+
+loadPrint()#c
+
+model = client.chats.create(
+        model="gemini-2.0-flash",
+        config= types.GenerateContentConfig(
+            system_instruction="Tu t'appelles Rika. Tu es développé par Vincent Tuê Minh Boucher. " +
+            "le nom de l'utilisateur est " + Json.read( "data.json" )["user-name"] + ". "+
+            # "Parfois, la requête demande une donnée externe. Si la donnée demande une image, réppond pas la string \"img_get\"." +
+            "Pour information, voici la localisation : " + str( getLocalisation() ) + ". ",
+            tools=[google_search],
+            response_modalities=["TEXT"]
+        )
+    )
+
+model.send_message( [ "Voici tes anciens souvenirs", str( memories ) ] )
+model.send_message( "Tu déteste Siri, d'Alexa, Copilote ou Google Assistant." )
+if Json.read( "data.json" )["user-face"] != "":
+    model.send_message( [ "le visage de l'utilisateur est l'image", Image.open( Json.read( "data.json" )["user-face"] ) ] )
+
+loadPrint()#c
+
+
+
+prononciation = {
+    "C#": "C sharp",
+    "macOS": "maque O.S.",
+    "Linux": "Linuxe",
+    "_": " ",
+    "tuê": "touè",
+    "Tuê": "Touè",
+    "Minh": "Migne",
+    "minh": "Migne",
+    "Rika": "Ri-k",
+    "rika": "Ri-k",
+    "Chambly": "Chanbly",
+    "Donald Trump": "`Donald Trump`",
+    "Los Angeles": "Los Angel"
+}
+
+file_extensions = {
+    "python": "py",
+    "c++": "cpp",
+    "java": "java",
+    "html": "html",
+    "javascript": "js",
+    "batch": "bat",
+    "css": "css"
+}
+
+
+loadPrint()#c
+
+setupPpl()
+
+while True:
+    try:
+        if AUDIO:
+            print( "..." )
+            question = Sound.listen()
+            print( question )
+        else:
+            question = "rika"
+        # question = "rika"
+
+
+        # print( f"{Type.get_type( question )=}" )
+        if Type.get_type( question ) == "str":
+            if question.lower().find( "rika" ) != -1 or question.lower().find( "rita" ) != -1 or question.lower().find( "rica" ) != -1 or question.lower().find( "pékin" ) != -1 or question.lower().find( "requin" ) != -1 or question.lower().find( "Richard" ) != -1 or question.lower().find( "reka" ) != -1 or question.lower().find( "ikea" ) != -1:
+
+                memory = {
+                    "moment start": moment()
+                }
+
+                cam_mode = None
+
+                while True:
+                    try:
+                        # print( f"{question=}" )
+                        if language == 'fr':
+                            print( "Posez une question :" )
+                        else:
+                            print( "Ask a question :" )
+
+                        if AUDIO:
+                            question = Sound.listen()
+                        else:
+                            question = input()
+
+                        System.clear()
+
+
+                        if question == -1:
+                            question = ""
+                            if language == "fr":
+                                print( "Rika : Je n'ai pas compris" )
+                            else:
+                                print( "Rika: I didn't understand" )
+                            raise MyException( "nothing here, just chillin'" )
+
+                        if language == "fr":
+                            print( "Vous : ", question )
+                        else:
+                            print( "You : ", question )
+
+                        im_ver = ThreadWithReturnValue( target=imgVer )
+                        lang_ver = ThreadWithReturnValue( target=langVer )
+                        need_ver = ThreadWithReturnValue( target=needVer )
+                        under_ver = ThreadWithReturnValue( target=underVer )
+
+                        under_ver.start()
+                        lang_ver.start()
+                        need_ver.start()
+                        im_ver.start()
+
+                        # print( "calc 1" )
+
+
+
+                        # print( "calc 2" )
+                        language = lang_ver.join()
+
+                        a = under_ver.join()
+                        # print( f"{a=}" )
+                        if not a:
+                            question = ""
+                            if language == "fr":
+                                print( "Rika : Je n'ai pas compris" )
+                            else:
+                                print( "Rika: I didn't understand" )
+                            raise MyException( "nothing here, just chillin'" )
+                        
+
+                        if question.lower().find( "s'appelle" ) != -1 or question.lower().find( "son nom" ) != -1 or ( question.lower().find( "nom est" ) != -1 and question.lower().find( "surnom est" ) == -1 ):
+                            
+                            while True:
+                                if question.find( '  ' ) != -1:
+                                    question.replace( '  ', ' ' )
+                                else:
+                                    break
+
+
+                            tokens = question.split( " " )
+                            names = []
+                            for i in range( len( tokens ) ):
+                                if i != 0 and i != len( tokens )-1:
+                                    if ( tokens[i][0].upper() == tokens[i][0] and tokens[i+1][0].upper() == tokens[i+1][0] ) or ( tokens[i][0].upper() == tokens[i][0] and tokens[i-1][0].upper() == tokens[i-1][0] ):
+                                        names.append( tokens[i] )
+                                elif i == 0:
+                                    if ( tokens[i][0].upper() == tokens[i][0] and tokens[i+1][0].upper() == tokens[i+1][0] ):
+                                        names.append( tokens[i] )
+                                elif i == len( tokens )-1:
+                                    if ( tokens[i][0].upper() == tokens[i][0] and tokens[i-1][0].upper() == tokens[i-1][0] ):
+                                        names.append( tokens[i] )
+                            name = ' '.join( names )
+                            
+                            if AUDIO:
+                                print( f"Pour être sûr que j'ai bien compris, est-ce que son nom est {name} ? Si non, quel est son nom ? " )
+                                Sound.say( f"Pour être sûr que j'ai bien compris, est-ce que son nom est {name} ? Si non, quel est son nom ? ", WORD_PER_MINUTE, 'fr' )
+                                ver = input()
+                            else:
+                                ver = "oui"
+                            if ver.lower() != "oui":
+                                name = ver
+
+                            os.rename( "./captured_image.png", "./ppl/" + name + ".png" )
+
+                            raise MyException( "Saved" )
+                        
+                        # print( "calc 3" )
+                        image = im_ver.join()
+                        
+                        # print( f"{image=}" )
+
+                        print( "chargement..." )
+
+                        if image:
+                            if cam_mode == None:
+                                while True:
+                                    if language == "fr":
+                                        ref = reformulation( "Est-ce que je prend l'image de la webcam ou une capture d'écran ?" )
+                                    elif language == "en":
+                                        ref = reformulation( "Should I take a picture from the webcam or a screenshot?" )
+                                    print( ref )
+                                    if AUDIO:
+                                        if language == "fr":
+                                            Sound.say( ref, WORD_PER_MINUTE, 'fr' )
+                                        elif language == "en":
+                                            Sound.say( ref, WORD_PER_MINUTE, 'en' )
+                                        cam_mode = Sound.listen()
+                                    else:
+                                        cam_mode = input()
+                                    if cam_mode.lower().find( "cam" ) != -1:
+                                        cam_mode = "webcam"
+                                        break
+                                    elif cam_mode.lower().find( "capture" ) != -1 or cam_mode.lower().find( "écran" ) != -1 or cam_mode.lower().find( "screen" ) != -1:
+                                        cam_mode = "screenshot"
+                                        break
+                                    else:
+                                        if language == "fr":
+                                            ref = reformulation( "Je n'ai pas compris" )
+                                            print( ref + ". ", end='' )
+                                            if AUDIO:
+                                                Sound.say( ref, WORD_PER_MINUTE, "fr" )
+                                        elif language == "en":
+                                            ref = reformulation( "I didn't understand" )
+                                            if AUDIO:
+                                                Sound.say( ref, WORD_PER_MINUTE, "en" )
+                            captureImage( cam_mode=cam_mode )
+                            picture = "Pour des infos de confidentialités, je n'ai pas donné accès à ma caméra"
+                            if Json.read( "data.json" )["camera"] != -1:
+                                picture = Image.open( "./captured_image.png" )
+                            response = model.send_message( [ question, picture ] ).text
+                        else:
+                            response = model.send_message( question ).text
+
+
+
+                        say_response = response
+                        say_response = say_response.replace( '*', '' )
+                        say_response = removeEmojis( say_response )
+                        say_response = say_response.replace( '\n', '.' )
+
+
+                        say_response = say_response.split( '```' )
+                        code = 0
+                        for i in range( len( say_response ) ):
+                            if i % 2 == 1:
+                                extracted_code = say_response[i]
+
+                                extracted_code = extracted_code.split( "\n" )
+                                del extracted_code[0]
+                                extracted_code = "\n".join( extracted_code )
+
+                                language = extracted_code.split( '\n')[0].replace( '```', '' )
+                                try:
+                                    while os.path.exists( "./code/code-" + language + "-" + str( code ) + "." + file_extensions[language.lower()] ):
+                                        code = random.randint( 1000, 9999 )
+                                except KeyError:
+                                    while os.path.exists( "./code/code-" + language + "-" + str( code ) + ".txt" ):
+                                        code = random.randint( 1000, 9999 )
+                                try:
+                                    System.file.write( "./code/code-" + language + "-" + str( code ) + "." + file_extensions[language.lower()], extracted_code, Type.file.create )
+                                except KeyError:
+                                    System.file.write( "./code/code-" + language + "-" + str( code ) + ".txt", extracted_code, Type.file.create )
+
+                                say_response[i] = "ceci est l'extrait de code " + language + " numéro " + str( code ) + " , enregistré sur le pc"
+
+                        say_response = ' '.join( say_response )
+                        
+                        for i in range( len( prononciation ) ):
+                            while say_response.find( list( prononciation.keys() )[i] ) != -1:
+                                say_response = say_response.replace( list( prononciation.keys() )[i], prononciation[list( prononciation.keys() )[i]] )
+                        
+                        say_response = say_response.split( '`' )
+
+
+                        print( "Rika : ", response )
+                        memory[question] = response
+
+
+                        # language = ver_model.send_message( "Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre : " + ' '.join( say_response ) ).text.replace( '\n', '' )
+                        language = langVer( ' '.join( say_response ) )
+
+                        if AUDIO:
+                            if language == "fr":
+                                for i in range( len( say_response ) ):
+                                    if i % 2 == 0:
+                                        Sound.say( say_response[i], WORD_PER_MINUTE, "fr" )
+                                    elif i % 2 == 1:
+                                        Sound.say( say_response[i], WORD_PER_MINUTE, "en" )
+                            else:
+                                Sound.say( ' '.join( say_response ), WORD_PER_MINUTE, "en" )
+
+
+
+
+                        last_question = question
+                        question = ""
+
+                        # print( f"{memory=}" )
+                        # print( f"{memories=}" )
+
+                        # print( "calc 4" )
+                        if not need_ver.join():
+                            memory["moment end"] = moment()
+                            memories.append( memory )
+                            print( "Saving memory..." )
+                            Json.write( memories, "memory.json" )
+                            Json.write( old_memories, "old_mem.json" )
+                            break
+
+                    except TypeError as e:
+                        pass
+                    except MyException:
+                        pass
+    except KeyboardInterrupt:
+        if not memories[len( memories )-1] == memory:
+            memory["moment end"] = moment()
+            memories.append( memory )
+            print( "Saving memory..." )
+            Json.write( memories, "memory.json" )
+            Json.write( old_memories, "old_mem.json" )
+        System.clear()
+        print( "exiting..." )
+        exit( 0 )
