@@ -21,7 +21,6 @@ import speech_recognition as sr
 import json
 
 
-
 class Type:
     def get_type( var ):
         try:
@@ -458,7 +457,8 @@ def underVer():
                         "Rika": "oui",
                         "Tu as l'information": "oui",
                         "les réponses sont b, b et a": "oui",
-                        "Donne moi toutes les infos que tu as sur moi": "oui"
+                        "Donne moi toutes les infos que tu as sur moi": "oui",
+                        "que vois-tu": "oui"
                     }
                 )
             ),
