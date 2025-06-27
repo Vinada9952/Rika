@@ -458,7 +458,8 @@ def underVer():
                         "Tu as l'information": "oui",
                         "les réponses sont b, b et a": "oui",
                         "Donne moi toutes les infos que tu as sur moi": "oui",
-                        "que vois-tu": "oui"
+                        "que vois-tu": "oui",
+                        "Céline": "non"
                     }
                 )
             ),
@@ -536,7 +537,7 @@ for i in range( len( memories ) ):
 loadPrint()#c
 
 
-while client.models.count_tokens( model="gemini-2.0-flash", contents=str( Json.read( "memory.json" ) ).replace( ": ", ":" ).replace( ", ", ',' ) ).total_tokens > 1000000:
+while client.models.count_tokens( model="gemini-2.0-flash", contents=str( Json.read( "memory.json" ) ) ).total_tokens > 1000000:
     old_memories.append( memories[0] )
     memories.pop( 0 )
 
@@ -578,7 +579,8 @@ prononciation = {
     "rika": "Ri-k",
     "Chambly": "Chanbly",
     "Donald Trump": "`Donald Trump`",
-    "Los Angeles": "Los Angel"
+    "Los Angeles": "Los Angel",
+    "DroidCam": "Droïd Came"
 }
 
 file_extensions = {
@@ -730,7 +732,12 @@ while True:
                                             Sound.say( ref, WORD_PER_MINUTE, 'fr' )
                                         elif language == "en":
                                             Sound.say( ref, WORD_PER_MINUTE, 'en' )
-                                        cam_mode = Sound.listen()
+                                        while True:
+                                            cam_mode = Sound.listen()
+                                            if cam_mode == -1 or cam_mode == -2:
+                                                Sound.say( "Je n'ai pas compris", WORD_PER_MINUTE, language )
+                                            else:
+                                                break
                                     else:
                                         cam_mode = input()
                                     if cam_mode.lower().find( "cam" ) != -1:
