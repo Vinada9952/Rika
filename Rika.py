@@ -24,6 +24,49 @@ import shutil
 # une seule classe pour prendre le contenu audio/texte
 # Visual Memory
 
+# home = GoogleHome()
+# home.print_devices()
+# device = home.choose_device( input() )
+
+print( "\n\n\n" )
+
+class System:
+    def execute( command: str ):
+        # print( command )
+        os.system( command )
+    def clear():
+        os.system( "cls" )
+    class file:
+        def write( file_name: str, content, mode: str ):
+            if Type.get_type( content ) != "list":
+                content = [ str( content ) ]
+            file = open( file_name, mode )
+
+            for i in range( len( content ) ):
+                if content[i][len( content[i] )-1] == '\n':
+                    file.write( content[i] )
+                else:
+                    file.write( content[i] + '\n' )
+
+            file.close()
+        def read( file_name: str ):
+            return_file = []
+            try:
+                file = open( file_name, "r" )
+                brut_file = file.read()+'\n'
+                file.close()
+                traitement = ""
+                for i in range( len( brut_file ) ):
+                    for j in range( len( brut_file[i] ) ):
+                        if brut_file[i][j] == '\n':
+                            return_file.append( traitement )
+                            traitement = ""
+                        else:
+                            traitement += brut_file[i][j]
+                return return_file
+            except FileNotFoundError:
+                return FileNotFoundError
+
 load_print = 0
 
 def loadPrint():
@@ -45,9 +88,6 @@ def loadPrint():
 loadPrint()#c
 
 
-home = GoogleHome()
-home.print_devices()
-device = home.choose_device( input() )
 
 ask_model = "gemini-2.0-flash"
 ver_model = "gemini-2.0-flash"
@@ -103,44 +143,6 @@ class Json:
             informations = json.load( infile )
         return informations
 
-loadPrint()#c
-
-class System:
-    def execute( command: str ):
-        # print( command )
-        os.system( command )
-    def clear():
-        os.system( "cls" )
-    class file:
-        def write( file_name: str, content, mode: str ):
-            if Type.get_type( content ) != "list":
-                content = [ str( content ) ]
-            file = open( file_name, mode )
-
-            for i in range( len( content ) ):
-                if content[i][len( content[i] )-1] == '\n':
-                    file.write( content[i] )
-                else:
-                    file.write( content[i] + '\n' )
-
-            file.close()
-        def read( file_name: str ):
-            return_file = []
-            try:
-                file = open( file_name, "r" )
-                brut_file = file.read()+'\n'
-                file.close()
-                traitement = ""
-                for i in range( len( brut_file ) ):
-                    for j in range( len( brut_file[i] ) ):
-                        if brut_file[i][j] == '\n':
-                            return_file.append( traitement )
-                            traitement = ""
-                        else:
-                            traitement += brut_file[i][j]
-                return return_file
-            except FileNotFoundError:
-                return FileNotFoundError
 
 loadPrint()#c
 
@@ -297,7 +299,6 @@ def moment():
 
 loadPrint()#c
 
-cap = cv2.VideoCapture( Json.read( "data.json" )["camera"] )
 
 def captureImage( filename="captured_image.png", cam_mode="webcam" ):
     if cam_mode == "webcam":
@@ -306,6 +307,8 @@ def captureImage( filename="captured_image.png", cam_mode="webcam" ):
             print( "Aucun accès à la caméra" )
             return
 
+        cap = cv2.VideoCapture( Json.read( "data.json" )["camera"] )
+        
         if not cap.isOpened():
             print("Erreur : Impossible d'ouvrir la caméra.")
             return
@@ -452,7 +455,7 @@ def underVer():
             ),
             contents=[ question ],
         ).text
-        System.file.write( 'underVer.txt', f"{question} : {understand}\n" )
+        System.file.write( 'underVer.txt', f"{question} : {understand}\n", 'a' )
         # if understand.replace( '\n', '' ) == "oui":
         #     return True
     return True
@@ -482,21 +485,44 @@ for i in range( len( raw_ppl ) ):
 loadPrint()#c
 
 def setupPpl():
-    p = []
-    for i in range( len( ppl_list ) ):
-        
-        p.append( f"Voici {ppl_list[i]}." )
-        p.append( Image.open( ppl[ppl_list[i]] ) )
-        
+    try:
+        p = []
+        for i in range( len( ppl_list ) ):
+            
+            p.append( f"Voici {ppl_list[i]}." )
+            p.append( Image.open( ppl[ppl_list[i]] ) )
+            
+            loadBar( len( ppl_list )+1 )
+            time.sleep( 0.01 )
+
+        model.send_message( p )
+
         loadBar( len( ppl_list )+1 )
-        time.sleep( 0.01 )
-
-    model.send_message( p )
-
-    loadBar( len( ppl_list )+1 )
+    except ValueError:
+        print( "                                                                                                      \n" )
 
 
 loadPrint()#c
+
+def setupImageMemory():
+    try:
+        img_mem = os.listdir( "./visual-memory" )
+        load = []
+        for i in range( len( img_mem ) ):
+            load.append( "Voici l'image de " + img_mem[i].split( '.' )[0] )
+            load.append( Image.open( "./visual-memory/" + img_mem[i] ) )
+            loadBar( len( img_mem ) + 1 )
+
+        model.send_message( load )
+        
+        loadBar( len( img_mem ) + 1 )
+    except ValueError:
+        print( "                                                                                                                      \n" )
+
+
+
+loadPrint()#c
+
 
 WORD_PER_MINUTE = 200 
 AUDIO = Json.read( "data.json" )["audio-mode"]
@@ -586,6 +612,10 @@ loadPrint()#c
 
 setupPpl()
 
+bar_count = 0
+
+setupImageMemory()
+
 while True:
     try:
         if AUDIO:
@@ -663,43 +693,6 @@ while True:
                                 print( "Rika: I didn't understand" )
                             raise MyException( "nothing here, just chillin'" )
                         
-
-                        if question.lower().find( "s'appelle" ) != -1 or question.lower().find( "son nom" ) != -1 or ( question.lower().find( "nom est" ) != -1 and question.lower().find( "surnom est" ) == -1 ):
-                            
-                            while True:
-                                if question.find( '  ' ) != -1:
-                                    question.replace( '  ', ' ' )
-                                else:
-                                    break
-
-
-                            tokens = question.split( " " )
-                            names = []
-                            for i in range( len( tokens ) ):
-                                if i != 0 and i != len( tokens )-1:
-                                    if ( tokens[i][0].upper() == tokens[i][0] and tokens[i+1][0].upper() == tokens[i+1][0] ) or ( tokens[i][0].upper() == tokens[i][0] and tokens[i-1][0].upper() == tokens[i-1][0] ):
-                                        names.append( tokens[i] )
-                                elif i == 0:
-                                    if ( tokens[i][0].upper() == tokens[i][0] and tokens[i+1][0].upper() == tokens[i+1][0] ):
-                                        names.append( tokens[i] )
-                                elif i == len( tokens )-1:
-                                    if ( tokens[i][0].upper() == tokens[i][0] and tokens[i-1][0].upper() == tokens[i-1][0] ):
-                                        names.append( tokens[i] )
-                            name = ' '.join( names )
-                            
-                            if AUDIO:
-                                print( f"Pour être sûr que j'ai bien compris, est-ce que son nom est {name} ? Si non, quel est son nom ? " )
-                                # home.send_msg( f"Pour être sûr que j'ai bien compris, est-ce que son nom est {name} ? Si non, quel est son nom ? ", device )
-                                Sound.say( f"Pour être sûr que j'ai bien compris, est-ce que son nom est {name} ? Si non, quel est son nom ? ", WORD_PER_MINUTE, 'fr' )
-                                ver = input()
-                            else:
-                                ver = "oui"
-                            if ver.lower() != "oui":
-                                name = ver
-
-                            os.rename( "./captured_image.png", "./ppl/" + name + ".png" )
-
-                            raise MyException( "Saved" )
                         
                         # print( "calc 3" )
                         image = im_ver.join()

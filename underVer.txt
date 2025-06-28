@@ -1,0 +1,13 @@
+Que vois tu ? : oui
+et maintenant ? : oui
+regarde : oui
+Que vois tu ? : oui
+et maintenant ? Qu'es ce que tu vois ? : oui
+regarde : oui
+Peut tu me décrire le plus gros des toutous qui était autour du festin de gauffres ? : oui
+un chat ou un chien ? : oui
+C'est un toutou de mon petit frère, il dit que c'est un chat, donc c'est un chat. il s'appelle Calinou Typouchou badou, mais on l'appelle souvent juste Typouchou : oui
+Et regarde, c'est mon petit frère : oui
+Il s'appelle Matthieu Hoang Nam Boucher, il a 11 ans, sa fête est le 1er novembre et il est né au Canada : oui
+Son surnom est Bob : oui
+Merci, c'est bon : oui
