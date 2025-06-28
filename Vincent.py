@@ -203,10 +203,10 @@ class GoogleHome:
         for i, cc in enumerate( self.devices.chromecasts ):
             print( f"{i + 1}. {cc.cast_info.friendly_name}" )
 
-    def choose_device( self ):
+    def choose_device( self, dev ):
         while True:
             try:
-                choice = int( input() )
+                choice = int( dev )
                 if 1 <= choice <= len( self.devices.chromecasts ):
                     return self.devices.chromecasts[choice - 1]
                 else:

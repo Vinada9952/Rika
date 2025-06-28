@@ -19,7 +19,40 @@ import pyautogui
 import pyttsx3
 import speech_recognition as sr
 import json
+from Vincent import GoogleHome
+# une seule classe pour prendre le contenu audio/texte
+# Visual Memory
 
+load_print = 0
+
+def loadPrint():
+    global load_print
+    load_print += 1
+    f = '\n'.join( System.file.read( "./Rika.py" ) )
+    count = f.count( "loadPrint()#c" )-1
+
+    bar = "[" + ( '.'*100 ) + "]"
+
+
+    for i in range( int( load_print*100/count ) ):
+        bar = bar.replace( ".", "#", 1 )
+
+    print( bar, f"{load_print}/{count}", end='\r' )
+    if load_print == count:
+        print( "\n" )
+
+loadPrint()#c
+
+
+home = GoogleHome()
+home.print_devices()
+device = home.choose_device( input() )
+
+ask_model = "gemini-2.0-flash"
+ver_model = "gemini-2.0-flash"
+
+
+loadPrint()#c
 
 class Type:
     def get_type( var ):
@@ -57,6 +90,8 @@ class Type:
                 traitement += origin[i]
         return output
     
+loadPrint()#c
+
 class Json:
     def write( informations: dict, json_name: str ):
         json_object = json.dumps( informations, indent=4 )
@@ -67,6 +102,7 @@ class Json:
             informations = json.load( infile )
         return informations
 
+loadPrint()#c
 
 class System:
     def execute( command: str ):
@@ -105,6 +141,8 @@ class System:
             except FileNotFoundError:
                 return FileNotFoundError
 
+loadPrint()#c
+
 class Sound:
 
     def listen( language: str = "fr-FR" ):
@@ -137,67 +175,10 @@ class Sound:
         engine.setProperty( "rate", word_per_minute )
         engine.say( say )
         engine.runAndWait()
-# une seule classe pour prendre le contenu audio/texte
-
-load_print = 0
-
-def loadPrint():
-    global load_print
-    load_print += 1
-    f = '\n'.join( System.file.read( "./Rika.py" ) )
-    count = f.count( "loadPrint()#c" )-1
-
-    bar = "[" + ( '.'*100 ) + "]"
 
 
-    for i in range( int( load_print*100/count ) ):
-        bar = bar.replace( ".", "#", 1 )
-
-    print( bar, f"{load_print}/{count}", end='\r' )
-    if load_print == count:
-        print( "\n" )
-
-directory = os.listdir( "./" )
-mem = False
-o_mem = False
-data = False
-fppl = False
-for i in range( len( directory ) ):
-    if directory[i] == "data.json":
-        data = True
-    if directory[i] == "memory.json":
-        mem = True
-    if directory[i] == "old_mem.json":
-        o_mem = True
-    if directory[i] == "ppl":
-        fppl = True
-
-if not data:
-    user_face =  input( "Chemin vers une image de votre visage (rien = ne pas autoriser): " ).replace( "\\", "/" ).replace( '"', "" )
-    cam = input( "Caméra à utiliser (0 = par défaut, rien = ne pas autoriser): " )
-    audio = bool( int( input( "Audio mode (0 pour mode écrit, 1 pour mode vocal) : " ) ) )
-    if cam == "":
-        cam = -1
-    Json.write( {
-        "gemini-api-key": input( "Clé API Gemini (https://surl.li/vculmp) : " ),
-        "user-name": input( "Quel est votre nom ? : " ),
-        "user-face": user_face,
-        "camera": int( cam ),
-        "audio-mode": audio
-    }, "data.json" )
-    print( "Vous pourrez toujours modifier ces paramètres plus tard, dans le fichier data.json" )
-else:
-    loadPrint()#c
-
-if not mem:
-    Json.write( [], "memory.json" )
-
-if not o_mem:
-    Json.write( [], "old_mem.json" )
 
 
-if not fppl:
-    os.mkdir( "ppl" )
 
 loadPrint()#c
 
@@ -315,13 +296,13 @@ def moment():
 
 loadPrint()#c
 
+cap = cv2.VideoCapture( Json.read( "data.json" )["camera"] )
 def captureImage( filename="captured_image.png", cam_mode="webcam" ):
     if cam_mode == "webcam":
         # Ouvrir la caméra
         if Json.read( "data.json" )["camera"] == -1:
             print( "Aucun accès à la caméra" )
             return
-        cap = cv2.VideoCapture( Json.read( "data.json" )["camera"] )
 
         if not cap.isOpened():
             print("Erreur : Impossible d'ouvrir la caméra.")
@@ -368,7 +349,7 @@ def imgVer():
         if question.find( "regarde" ) != -1 or question.find( "observe" ) != -1 or question.find( "vois" ) != -1 or question.find( "voit" ) != -1:
             return True
         img = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model=ver_model,
             config=types.GenerateContentConfig(
                 max_output_tokens=1,
                 system_instruction="Si tu as besoin d'une image pour répondre à la question, retourne la string \"img_get\" pour l'obtenir"
@@ -387,7 +368,7 @@ def langVer( q = None ):
     else:
         question = q
     language = client.models.generate_content(
-        model="gemini-1.5-flash",
+        model=ver_model,
         config=types.GenerateContentConfig(
             max_output_tokens=1,
             temperature=0,
@@ -402,7 +383,7 @@ loadPrint()#c
 def needVer():
     global question
     need_anymore = client.models.generate_content(
-        model="gemini-1.5-flash",
+        model=ver_model,
         config=types.GenerateContentConfig(
             max_output_tokens=1,
             system_instruction=
@@ -433,7 +414,7 @@ def underVer():
     global question
     if question != -1:
         understand = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model=ver_model,
             config=types.GenerateContentConfig(
                 max_output_tokens=1,
                 temperature=0,
@@ -473,7 +454,7 @@ loadPrint()#c
 
 def reformulation( prompt ):
     return client.models.generate_content(
-        model="gemini-1.5-flash",
+        model=ver_model,
         config=types.GenerateContentConfig(
             temperature=2,
             system_instruction="Reformule moi cette phrase. Ne ressort que la phrase reformulée, rien d'autre."
@@ -537,7 +518,7 @@ for i in range( len( memories ) ):
 loadPrint()#c
 
 
-while client.models.count_tokens( model="gemini-2.0-flash", contents=str( Json.read( "memory.json" ) ) ).total_tokens > 1000000:
+while client.models.count_tokens( model=ask_model, contents=str( Json.read( "memory.json" ) ) ).total_tokens > 1000000:
     old_memories.append( memories[0] )
     memories.pop( 0 )
 
@@ -546,7 +527,7 @@ while client.models.count_tokens( model="gemini-2.0-flash", contents=str( Json.r
 loadPrint()#c
 
 model = client.chats.create(
-        model="gemini-2.0-flash",
+        model=ask_model,
         config= types.GenerateContentConfig(
             system_instruction="Tu t'appelles Rika. Tu es développé par Vincent Tuê Minh Boucher. " +
             "le nom de l'utilisateur est " + Json.read( "data.json" )["user-name"] + ". "+
@@ -611,7 +592,7 @@ while True:
 
         # print( f"{Type.get_type( question )=}" )
         if Type.get_type( question ) == "str":
-            if question.lower().find( "rika" ) != -1 or question.lower().find( "rita" ) != -1 or question.lower().find( "rica" ) != -1 or question.lower().find( "pékin" ) != -1 or question.lower().find( "requin" ) != -1 or question.lower().find( "Richard" ) != -1 or question.lower().find( "reka" ) != -1 or question.lower().find( "ikea" ) != -1:
+            if question.lower().find( "rika" ) != -1 or question.lower().find( "rita" ) != -1 or question.lower().find( "ric" ) != -1 or question.lower().find( "rica" ) != -1 or question.lower().find( "pékin" ) != -1 or question.lower().find( "requin" ) != -1 or question.lower().find( "Richard" ) != -1 or question.lower().find( "reka" ) != -1 or question.lower().find( "ikea" ) != -1:
 
                 memory = {
                     "moment start": moment()
@@ -701,6 +682,7 @@ while True:
                             
                             if AUDIO:
                                 print( f"Pour être sûr que j'ai bien compris, est-ce que son nom est {name} ? Si non, quel est son nom ? " )
+                                # home.send_msg( f"Pour être sûr que j'ai bien compris, est-ce que son nom est {name} ? Si non, quel est son nom ? ", device )
                                 Sound.say( f"Pour être sûr que j'ai bien compris, est-ce que son nom est {name} ? Si non, quel est son nom ? ", WORD_PER_MINUTE, 'fr' )
                                 ver = input()
                             else:
@@ -728,14 +710,20 @@ while True:
                                         ref = reformulation( "Should I take a picture from the webcam or a screenshot?" )
                                     print( ref )
                                     if AUDIO:
-                                        if language == "fr":
-                                            Sound.say( ref, WORD_PER_MINUTE, 'fr' )
-                                        elif language == "en":
-                                            Sound.say( ref, WORD_PER_MINUTE, 'en' )
+                                        # home.send_msg( ref, device )
+                                        Sound.say( ref, WORD_PER_MINUTE, language )
                                         while True:
                                             cam_mode = Sound.listen()
                                             if cam_mode == -1 or cam_mode == -2:
-                                                Sound.say( "Je n'ai pas compris", WORD_PER_MINUTE, language )
+                                                # home.send_msg( "Je n'ai pas compris", device )
+                                                if language == "fr":
+                                                    ref = reformulation( "Je n'ai pas compris" )
+                                                    print( ref )
+                                                    Sound.say( "Je n'ai pas compris", WORD_PER_MINUTE, 'fr' )
+                                                elif language == "en":
+                                                    ref = reformulation( "I didn't understand" )
+                                                    print( ref )
+                                                    Sound.say( "I didn't understand", WORD_PER_MINUTE, 'en' )
                                             else:
                                                 break
                                     else:
@@ -752,9 +740,11 @@ while True:
                                             print( ref + ". ", end='' )
                                             if AUDIO:
                                                 Sound.say( ref, WORD_PER_MINUTE, "fr" )
+                                                # home.send_msg( ref, device )
                                         elif language == "en":
                                             ref = reformulation( "I didn't understand" )
                                             if AUDIO:
+                                                # home.send_msg( ref, device )
                                                 Sound.say( ref, WORD_PER_MINUTE, "en" )
                             captureImage( cam_mode=cam_mode )
                             picture = "Pour des infos de confidentialités, je n'ai pas donné accès à ma caméra"
@@ -814,12 +804,14 @@ while True:
 
                         if AUDIO:
                             if language == "fr":
+                                # home.send_msg( ' '.join( say_response ), device )
                                 for i in range( len( say_response ) ):
                                     if i % 2 == 0:
                                         Sound.say( say_response[i], WORD_PER_MINUTE, "fr" )
                                     elif i % 2 == 1:
                                         Sound.say( say_response[i], WORD_PER_MINUTE, "en" )
                             else:
+                                # home.send_msg( ' '.join( say_response ).replace( '`', '' ), device )
                                 Sound.say( ' '.join( say_response ), WORD_PER_MINUTE, "en" )
 
 
