@@ -20,6 +20,7 @@ import pyttsx3
 import speech_recognition as sr
 import json
 from Vincent import GoogleHome
+import shutil
 # une seule classe pour prendre le contenu audio/texte
 # Visual Memory
 
@@ -297,6 +298,7 @@ def moment():
 loadPrint()#c
 
 cap = cv2.VideoCapture( Json.read( "data.json" )["camera"] )
+
 def captureImage( filename="captured_image.png", cam_mode="webcam" ):
     if cam_mode == "webcam":
         # Ouvrir la caméra
@@ -322,6 +324,8 @@ def captureImage( filename="captured_image.png", cam_mode="webcam" ):
         cap.release()
     elif cam_mode == "screenshot":
         pyautogui.screenshot( filename )
+
+    shutil.copyfile( f"./{filename}", f"./visual-memory/{moment().replace( ' ', '_' )}.png" )
 
 loadPrint()#c
 
@@ -382,6 +386,8 @@ loadPrint()#c
 
 def needVer():
     global question
+    if question.find( "regarde" ) != -1 or question.find( "vois" ) != -1 or question.find( "observe" ) != -1:
+        return True
     need_anymore = client.models.generate_content(
         model=ver_model,
         config=types.GenerateContentConfig(
@@ -446,9 +452,10 @@ def underVer():
             ),
             contents=[ question ],
         ).text
-        if understand.replace( '\n', '' ) == "oui":
-            return True
-    return False
+        System.file.write( 'underVer.txt', f"{question} : {understand}\n" )
+        # if understand.replace( '\n', '' ) == "oui":
+        #     return True
+    return True
 
 loadPrint()#c
 
