@@ -389,8 +389,6 @@ loadPrint()#c
 
 def needVer():
     global question
-    if question.find( "regarde" ) != -1 or question.find( "vois" ) != -1 or question.find( "observe" ) != -1:
-        return True
     need_anymore = client.models.generate_content(
         model=ver_model,
         config=types.GenerateContentConfig(
@@ -406,7 +404,10 @@ def needVer():
                         "bye": "non",
                         "Connard, t'es pas bon": "non",
                         "Description de personne": "oui",
-                        "je t'ai donné l'information": "oui"
+                        "je t'ai donné l'information": "oui",
+                        "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
+                        "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
+                        "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui"
                     }
                 )
         ),
