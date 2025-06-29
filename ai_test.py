@@ -1,33 +1,14 @@
-import cv2
-import pyautogui
-
-cap = cv2.VideoCapture( 3 )
+from google import genai
+from google.genai import types
 
 
-def captureImage( filename="captured_image.png", cam_mode="webcam" ):
-    if cam_mode == "webcam":
-        # print( 1 )
-        # Ouvrir la caméra
+client = genai.Client( api_key="AIzaSyDR-OOUGNxmInqrIC5qQEAfUnqX4XR3qRY" )
 
-        if not cap.isOpened():
-            print("Erreur : Impossible d'ouvrir la caméra.")
-            return
+myfile = client.files.upload(file="./request.mp3")
 
-        # Lire une image de la caméra
-        ret, frame = cap.read()
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=[myfile]
+)
 
-        if ret:
-            # Enregistrer l'image dans un fichier
-            cv2.imwrite(filename, frame)
-            print(f"Image enregistrée sous {filename}.")
-        else:
-            print("Erreur : Impossible de capturer l'image.")
-
-        # Libérer la caméra
-        cap.release()
-    elif cam_mode == "screenshot":
-        pyautogui.screenshot( filename )
-
-    # shutil.copyfile( f"./{filename}", f"./visual-memory/{moment().replace( ' ', '_' )}.png" )
-
-captureImage()
+print(response.text)

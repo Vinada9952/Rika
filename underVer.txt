@@ -11,3 +11,20 @@ Et regarde, c'est mon petit frère : oui
 Il s'appelle Matthieu Hoang Nam Boucher, il a 11 ans, sa fête est le 1er novembre et il est né au Canada : oui
 Son surnom est Bob : oui
 Merci, c'est bon : oui
+Décris moi mon frère et donne moi le max d'infos que tu as sur lui : oui
+C'est quoi son apparence physique, donne moi sa description : oui
+Non merci, c'est bon : oui
+Regarde et joue : oui
+regarde : oui
+oui, c'est toi qui joue : oui
+regarde : oui
+regarde : oui
+regarde : oui
+Essaie de gagner ! Tu dois jouer comme un pro ! regarde et joue ! : oui
+tu n'as pas de pion pour e6, regarde : oui
+mais... ce pion est mort : oui
+ce cavalier est déjà bougé, regarde : oui
+regarde, j'ai joué : oui
+Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer : non
+est ce que tu te rappelles d'une partie d'échec que tu jouais ? : non
+regarde dans ta mémoire, tu as surement un plateau d'échec : non

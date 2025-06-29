@@ -89,8 +89,8 @@ loadPrint()#c
 
 
 
-ask_model = "gemini-2.0-flash"
-ver_model = "gemini-2.0-flash"
+ask_model = "gemini-2.5-flash"
+ver_model = "gemini-1.5-flash"
 
 
 loadPrint()#c
