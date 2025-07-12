@@ -28,3 +28,6 @@ regarde, j'ai jouï¿½ : oui
 Tu ne peux pas, sinon tu es en ï¿½chec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer : non
 est ce que tu te rappelles d'une partie d'ï¿½chec que tu jouais ? : non
 regarde dans ta mï¿½moire, tu as surement un plateau d'ï¿½chec : non
+Bonjour : oui
+ça fait longtemps qu'on s'est parlé : oui
+j'était parti en voyage au saguenay et au lac saint jean, je vais te coder une option pour t'envoyer les photos et tu pourrais ensuite voir mes photos : oui

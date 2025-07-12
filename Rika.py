@@ -27,6 +27,7 @@ import shutil
 # home = GoogleHome()
 # home.print_devices()
 # device = home.choose_device( input() )
+# prendre en compte le ClientError, ou trouver une solution
 
 print( "\n\n\n" )
 
