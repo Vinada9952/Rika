@@ -22,12 +22,12 @@ import json
 from Vincent import GoogleHome
 import shutil
 # une seule classe pour prendre le contenu audio/texte
-# Visual Memory
+# prendre en compte le ClientError, ou trouver une solution
+# Upload de fichier
 
 # home = GoogleHome()
 # home.print_devices()
 # device = home.choose_device( input() )
-# prendre en compte le ClientError, ou trouver une solution
 
 print( "\n\n\n" )
 
@@ -92,6 +92,8 @@ loadPrint()#c
 
 ask_model = "gemini-2.5-flash"
 ver_model = "gemini-1.5-flash"
+
+try_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash" ]
 
 
 loadPrint()#c
