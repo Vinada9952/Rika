@@ -95,7 +95,7 @@ loadPrint()#c
 
 
 ask_model = "gemini-2.5-flash"
-ver_model = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash" ]
+ver_model = "gemini-1.5-flash"
 
 
 loadPrint()#c
@@ -385,7 +385,7 @@ def langVer( q = None ):
     language = ""
 
     language = client.models.generate_content(
-        model=ver_model[i],
+        model=ver_model,
         config=types.GenerateContentConfig(
             max_output_tokens=1,
             temperature=0,
@@ -449,52 +449,6 @@ def uploadVer():
         return True
     return False
 
-loadPrint()#c
-
-def underVer():
-    global question
-    if question != -1:
-        understand = client.models.generate_content(
-            model=ver_model,
-            config=types.GenerateContentConfig(
-                max_output_tokens=1,
-                temperature=0,
-                system_instruction="Dit moi si cette question fait du sens ou pas. Si oui, répnds par 'oui' ou 'non'. Tu ne ressort qu'un seul mot comme réponse, un seul token, et uniquement oui ou non. Voici des exemples de questions et si elles font du sens ou pas :" + str(
-                    {
-                        "n'est pas possible de": "non",
-                        "Décris moi (tel personne)": "oui",
-                        "fais moi un code python": "oui",
-                        "bonjour": "oui",
-                        "ton micro": "non",
-                        "ok allô moi je suis un gars puis": "oui",
-                        "OK": "oui",
-                        "j'ai Vincent qui à côté de moi qui enlève des possibles": "non",
-                        "lettre L": "oui",
-                        "combien": "oui",
-                        "entretien clé USB": "non",
-                        "C'est quoi la météo ?": "oui",
-                        "météo portique station Google": "non",
-                        "regarde": "oui",
-                        "non merci, ça va aller": "oui",
-                        "Rika": "oui",
-                        "Tu as l'information": "oui",
-                        "les réponses sont b, b et a": "oui",
-                        "Donne moi toutes les infos que tu as sur moi": "oui",
-                        "que vois-tu": "oui",
-                        "Céline": "non",
-                        "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
-                        "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
-                        "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui",
-                        "Par exemple, est ce que tu es capable de voir ce que je t'ai upload ?": "oui"
-                    }
-                )
-            ),
-            contents=[ question ],
-        ).text
-        System.file.write( 'underVer.txt', f"{question} : {understand}\n", 'a' )
-        # if understand.replace( '\n', '' ) == "oui":
-        #     return True
-    return True
 
 loadPrint()#c
 
@@ -705,9 +659,7 @@ while True:
                         im_ver = ThreadWithReturnValue( target=imgVer )
                         lang_ver = ThreadWithReturnValue( target=langVer )
                         need_ver = ThreadWithReturnValue( target=needVer )
-                        under_ver = ThreadWithReturnValue( target=underVer )
 
-                        under_ver.start()
                         lang_ver.start()
                         need_ver.start()
                         im_ver.start()
@@ -719,15 +671,7 @@ while True:
                         # print( "calc 2" )
                         language = lang_ver.join()
 
-                        a = under_ver.join()
                         # print( f"{a=}" )
-                        if not a:
-                            question = ""
-                            if language == "fr":
-                                print( "Rika : Je n'ai pas compris" )
-                            else:
-                                print( "Rika: I didn't understand" )
-                            raise MyException( "nothing here, just chillin'" )
                         
                         
                         # print( "calc 3" )
