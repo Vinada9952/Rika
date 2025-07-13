@@ -95,9 +95,7 @@ loadPrint()#c
 
 
 ask_model = "gemini-2.5-flash"
-ver_model = "gemini-1.5-flash"
-
-try_models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash" ]
+ver_model = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-flash" ]
 
 
 loadPrint()#c
@@ -384,45 +382,72 @@ def langVer( q = None ):
         global question
     else:
         question = q
-    language = client.models.generate_content(
-        model=ver_model,
-        config=types.GenerateContentConfig(
-            max_output_tokens=1,
-            temperature=0,
-            system_instruction="Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre"
-        ),
-        contents=[ question ],
-    ).text
+    language = ""
+
+
+    for i in range( len( ver_model ) ):
+        try:
+            language = client.models.generate_content(
+                model=ver_model[i],
+                config=types.GenerateContentConfig(
+                    max_output_tokens=1,
+                    temperature=0,
+                    system_instruction="Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre"
+                ),
+                contents=[ question ],
+            ).text
+            break
+        except Exception as e:
+            if str( e ).find( "You exceeded your current quota, please check your plan and billing details" ) != -1:
+                pass
+            else:
+                raise Exception( e )
+
+        
+
     return language.replace( '\n', '' )
 
 loadPrint()#c
 
 def needVer():
     global question
-    need_anymore = client.models.generate_content(
-        model=ver_model,
-        config=types.GenerateContentConfig(
-            max_output_tokens=1,
-            system_instruction=
-                "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et leur résultat." +
-                str(
-                    {
-                        "Explique moi la thermodynamique": "oui",
-                        "Génère moi un code python qui dit Bonjour": "oui",
-                        "au revoir": "non",
-                        "allo": "oui",
-                        "bye": "non",
-                        "Connard, t'es pas bon": "non",
-                        "Description de personne": "oui",
-                        "je t'ai donné l'information": "oui",
-                        "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
-                        "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
-                        "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui"
-                    }
-                )
-        ),
-        contents=[ question ]
-    ).text.replace( '\n', '' )
+
+    need_anymore = ""
+
+    for i in range( len( ver_model ) ):
+        try:
+            need_anymore = client.models.generate_content(
+                model=ver_model,
+                config=types.GenerateContentConfig(
+                    max_output_tokens=1,
+                    system_instruction=
+                        "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et leur résultat." +
+                        str(
+                            {
+                                "Explique moi la thermodynamique": "oui",
+                                "Génère moi un code python qui dit Bonjour": "oui",
+                                "au revoir": "non",
+                                "allo": "oui",
+                                "bye": "non",
+                                "Connard, t'es pas bon": "non",
+                                "Description de personne": "oui",
+                                "je t'ai donné l'information": "oui",
+                                "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
+                                "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
+                                "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui"
+                            }
+                        )
+                ),
+                contents=[ question ]
+            ).text.replace( '\n', '' )
+            break
+        except Exception as e:
+            if str( e ).find( "You exceeded your current quota, please check your plan and billing details" ) != -1:
+                pass
+            else:
+                raise Exception( e )
+
+    
     if need_anymore == "oui":
         return True
     return False
@@ -467,7 +492,11 @@ def underVer():
                         "les réponses sont b, b et a": "oui",
                         "Donne moi toutes les infos que tu as sur moi": "oui",
                         "que vois-tu": "oui",
-                        "Céline": "non"
+                        "Céline": "non",
+                        "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
+                        "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
+                        "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui",
+                        "Par exemple, est ce que tu es capable de voir ce que je t'ai upload ?": "oui"
                     }
                 )
             ),
@@ -719,6 +748,7 @@ while True:
 
                         print( "chargement..." )
 
+                        q = [ question ]
                         if image:
                             if cam_mode == None:
                                 while True:
@@ -768,9 +798,16 @@ while True:
                             picture = "Pour des infos de confidentialités, je n'ai pas donné accès à ma caméra"
                             if Json.read( "data.json" )["camera"] != -1:
                                 picture = Image.open( "./captured_image.png" )
-                            response = model.send_message( [ question, picture ] ).text
-                        else:
-                            response = model.send_message( question ).text
+                            q.append( picture )
+                        
+                        if uploadVer():
+                            uploads = os.listdir( "./uploads" )
+                            for i in range( len( uploads ) ):
+                                q.append( client.files.upload( file="./uploads/"+uploads[i] ) )
+                                os.remove( "./uploads/"+uploads[i] )
+                            os.mkdir( "./uploads" )
+
+                        response = model.send_message( q ).text
 
                         # faire setup la question, et tout envoyer à la même ligne
 
