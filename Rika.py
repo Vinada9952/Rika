@@ -39,15 +39,19 @@ class System:
         os.system( "cls" )
     class file:
         def write( file_name: str, content, mode: str ):
-            if Type.get_type( content ) != "list":
-                content = [ str( content ) ]
             file = open( file_name, mode )
 
-            for i in range( len( content ) ):
-                if content[i][len( content[i] )-1] == '\n':
-                    file.write( content[i] )
+            if Type.get_type( content ) == "list":
+                for i in range( len( content ) ):
+                    if content[i][len( content[i] )-1] == '\n':
+                        file.write( content[i] )
+                    else:
+                        file.write( content[i] + '\n' )
+            elif Type.get_type( content ) == "str":
+                if content[len( content )-1] == '\n':
+                    file.write( content )
                 else:
-                    file.write( content[i] + '\n' )
+                    file.write( content + '\n' )
 
             file.close()
         def read( file_name: str ):
@@ -358,6 +362,7 @@ def imgVer():
     if Json.read( "data.json" )["camera"] != -1:
         if question.find( "regarde" ) != -1 or question.find( "observe" ) != -1 or question.find( "vois" ) != -1 or question.find( "voit" ) != -1:
             return True
+        # try:
         img = client.models.generate_content(
             model=ver_model,
             config=types.GenerateContentConfig(
@@ -368,6 +373,8 @@ def imgVer():
         ).text.replace( '\n', '' )
         if img.replace( '\n', '' ) == "img_get":
             return True
+        # except Exception as e:
+        #     if str( e ).find( "" )
     return False
 
 loadPrint()#c
@@ -420,6 +427,13 @@ def needVer():
         return True
     return False
 
+
+loadPrint()#c
+
+def uploadVer():
+    if len( os.listdir( "./uploads" ) ) != 0:
+        return True
+    return False
 
 loadPrint()#c
 
@@ -758,7 +772,7 @@ while True:
                         else:
                             response = model.send_message( question ).text
 
-
+                        # faire setup la question, et tout envoyer à la même ligne
 
                         say_response = response
                         say_response = say_response.replace( '*', '' )
@@ -776,19 +790,15 @@ while True:
                                 del extracted_code[0]
                                 extracted_code = "\n".join( extracted_code )
 
-                                language = extracted_code.split( '\n')[0].replace( '```', '' )
+                                planguage = extracted_code.split( '\n')[0].replace( '```', '' )
                                 try:
-                                    while os.path.exists( "./code/code-" + language + "-" + str( code ) + "." + file_extensions[language.lower()] ):
+                                    while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
                                         code = random.randint( 1000, 9999 )
                                 except KeyError:
-                                    while os.path.exists( "./code/code-" + language + "-" + str( code ) + ".txt" ):
+                                    while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + ".txt" ):
                                         code = random.randint( 1000, 9999 )
-                                try:
-                                    System.file.write( "./code/code-" + language + "-" + str( code ) + "." + file_extensions[language.lower()], extracted_code, Type.file.create )
-                                except KeyError:
-                                    System.file.write( "./code/code-" + language + "-" + str( code ) + ".txt", extracted_code, Type.file.create )
 
-                                say_response[i] = "ceci est l'extrait de code " + language + " numéro " + str( code ) + " , enregistré sur le pc"
+                                say_response[i] = "extrait de code " + planguage + " numéro " + str( code ) + ", enregistré sur le pc"
 
                         say_response = ' '.join( say_response )
                         

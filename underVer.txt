@@ -31,3 +31,16 @@ regarde dans ta mï¿½moire, tu as surement un plateau d'ï¿½chec : non
 Bonjour : oui
 ça fait longtemps qu'on s'est parlé : oui
 j'était parti en voyage au saguenay et au lac saint jean, je vais te coder une option pour t'envoyer les photos et tu pourrais ensuite voir mes photos : oui
+Rappelle moi demain de t'ajouter l'option pour que je puisse t'uploader des photos : oui
+sinon, peut tu me faire un bout de code python qui permet d'envoyer des fichiers à l'API gemini ? : oui
+Rappelle moi demain pour t'ajouter l'option pour que je puisse t'upload des fichiers et aussi corriger le bug d'écriture de fichier code : oui
+merci : oui
+fais moi un code python qui dit hello world : oui
+fais moi un code python simple qui dit hello world : oui
+Fais moi un code python simple qui dit hello world : oui
+Fais moi un code python simple qui dit hello world : oui
+Fais moi un code python simple qui dit hello world : oui
+Fais moi un code python simple qui dit hello world : oui
+quels sont les risques liés aux tatouages ? : oui
+quelle est la probabilité que les risques arrivent % : oui
+merci : oui
