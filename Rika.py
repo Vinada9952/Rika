@@ -384,26 +384,15 @@ def langVer( q = None ):
         question = q
     language = ""
 
-
-    for i in range( len( ver_model ) ):
-        try:
-            language = client.models.generate_content(
-                model=ver_model[i],
-                config=types.GenerateContentConfig(
-                    max_output_tokens=1,
-                    temperature=0,
-                    system_instruction="Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre"
-                ),
-                contents=[ question ],
-            ).text
-            break
-        except Exception as e:
-            if str( e ).find( "You exceeded your current quota, please check your plan and billing details" ) != -1:
-                pass
-            else:
-                raise Exception( e )
-
-        
+    language = client.models.generate_content(
+        model=ver_model[i],
+        config=types.GenerateContentConfig(
+            max_output_tokens=1,
+            temperature=0,
+            system_instruction="Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre"
+        ),
+        contents=[ question ],
+    ).text
 
     return language.replace( '\n', '' )
 
