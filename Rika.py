@@ -737,8 +737,8 @@ while True:
                             uploads = os.listdir( "./uploads" )
                             for i in range( len( uploads ) ):
                                 q.append( client.files.upload( file="./uploads/"+uploads[i] ) )
+                                shutil.copyfile( f"./uploads/{uploads[i]}", f"./visual-memory/{moment().replace( ' ', '_' )}.png" )
                                 os.remove( "./uploads/"+uploads[i] )
-                            os.mkdir( "./uploads" )
 
                         response = model.send_message( q ).text
 
