@@ -12,14 +12,14 @@ import re
 import cv2
 import datetime
 import requests
-from googlesearch import search
+# from googlesearch import search
 from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
 import time
 import pyautogui
 import pyttsx3
 import speech_recognition as sr
 import json
-from Vincent import GoogleHome
+# from Vincent import GoogleHome
 import shutil
 # une seule classe pour prendre le contenu audio/texte
 # prendre en compte le ClientError, ou trouver une solution
@@ -401,40 +401,31 @@ loadPrint()#c
 def needVer():
     global question
 
-    need_anymore = ""
 
-    for i in range( len( ver_model ) ):
-        try:
-            need_anymore = client.models.generate_content(
-                model=ver_model,
-                config=types.GenerateContentConfig(
-                    max_output_tokens=1,
-                    system_instruction=
-                        "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et leur résultat." +
-                        str(
-                            {
-                                "Explique moi la thermodynamique": "oui",
-                                "Génère moi un code python qui dit Bonjour": "oui",
-                                "au revoir": "non",
-                                "allo": "oui",
-                                "bye": "non",
-                                "Connard, t'es pas bon": "non",
-                                "Description de personne": "oui",
-                                "je t'ai donné l'information": "oui",
-                                "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
-                                "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
-                                "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui"
-                            }
-                        )
-                ),
-                contents=[ question ]
-            ).text.replace( '\n', '' )
-            break
-        except Exception as e:
-            if str( e ).find( "You exceeded your current quota, please check your plan and billing details" ) != -1:
-                pass
-            else:
-                raise Exception( e )
+    need_anymore = client.models.generate_content(
+        model=ver_model,
+        config=types.GenerateContentConfig(
+            max_output_tokens=1,
+            system_instruction=
+                "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et leur résultat." +
+                str(
+                    {
+                        "Explique moi la thermodynamique": "oui",
+                        "Génère moi un code python qui dit Bonjour": "oui",
+                        "au revoir": "non",
+                        "allo": "oui",
+                        "bye": "non",
+                        "Connard, t'es pas bon": "non",
+                        "Description de personne": "oui",
+                        "je t'ai donné l'information": "oui",
+                        "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
+                        "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
+                        "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui"
+                    }
+                )
+        ),
+        contents=[ question ]
+    ).text.replace( '\n', '' )
 
     
     if need_anymore == "oui":
