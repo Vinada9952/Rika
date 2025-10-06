@@ -1,7 +1,10 @@
 import os
 import time
 import subprocess
+from PIL import Image
 import json
+import ollama
+import datetime
 import random
 import pychromecast
 import math
@@ -135,6 +138,8 @@ class System:
         os.system( command )
     def clear():
         os.system( "cls" )
+    def clear_cache():
+        os.system( "rmdir /S /Q __pycache__" )
     class file:
         def write( file_name: str, content, mode: str ):
             if Type.get_type( content ) != "list":
@@ -203,10 +208,10 @@ class GoogleHome:
         for i, cc in enumerate( self.devices.chromecasts ):
             print( f"{i + 1}. {cc.cast_info.friendly_name}" )
 
-    def choose_device( self, dev ):
+    def choose_device( self ):
         while True:
             try:
-                choice = int( dev )
+                choice = int( input() )
                 if 1 <= choice <= len( self.devices.chromecasts ):
                     return self.devices.chromecasts[choice - 1]
                 else:
@@ -329,3 +334,76 @@ class Shell:
 
             pygame.display.flip()
             clock.tick( 30 )
+
+
+class AiModel:
+
+    api_key = "e1156b809dda4345ba41a96cc4dbc00f.vX3py4XQMmdAyPLqNyBmHjkN"
+
+    def get_all_models():
+        models = ollama.list()
+        if models and "models" in models:
+            return [model_info["model"] for model_info in models["models"]]
+        else:
+            raise AiModel.OllamaError( "No Ollama models found locally." )
+    
+    def get_closest_model( model_name: str ):
+        models = AiModel.get_all_models()
+        for model in models:
+            if model.lower().find( model_name.lower() ) != -1:
+                return model
+        raise AiModel.OllamaError( f"No Ollama model found matching '{model_name}'." )
+
+    
+    def ask( prompt, model: str = get_all_models()[0], thinking: bool = False ):
+        try:
+            return ollama.chat( model=model, messages=[prompt.get_prompt], think=thinking )['message']['content']
+        except AttributeError:
+            return ollama.chat( model=model, messages=prompt, think=thinking )['message']['content']
+    
+    class ChatBot:
+        conversation = []
+        model = ""
+        thinking = False
+        def __init__( self, model: str, thinkning: bool = False ):
+            self.model = model
+            self.thinking = thinkning
+        
+        def ask( self, prompt ):
+            self.conversation.append( prompt.get_prompt() )
+            response = ollama.chat( model=self.model, messages=self.conversation, think=self.thinking )
+            model_reply = response['message']['content']
+            self.conversation.append( response["message"] )
+            return model_reply
+
+    class Prompt:
+        message = ""
+        images = []
+        cache = True
+        def __init__( self, message: str, cache: bool = True, images: list = [] ):
+            self.message = message
+            self.cache = cache
+            if cache:
+                os.makedirs( "./__pycache__/aicache", exist_ok=True )
+                if images != []:
+                    for image in images:
+                        timestamp = str( time.time() ).replace( '.', '' )
+                        Image.open( image ).copy().save( "./__pycache__/aicache/" + timestamp + ".png" if image.lower().endswith( '.png' ) else "./__pycache__/aicache" + timestamp + ".jpg" )
+                        self.images.append( "./__pycache__/aicache/" + timestamp + ".png" if image.lower().endswith( '.png' ) else "./__pycache__/aicache/" + timestamp + ".jpg" )
+
+        def load_image( self, image_path: str ):
+            image_path = image_path.replace( '\\', '/' ).replace( '"', '' )
+            if not self.cache:
+                self.images.append( image_path )
+            else:
+                timestamp = str( time.time() ).replace( '.', '' )
+                Image.open( image_path ).copy().save( "./cache/" + timestamp + ".png" if image_path.lower().endswith( '.png' ) else "./cache/" + timestamp + ".jpg" )
+                self.images.append( "./cache/" + timestamp + ".png" if image_path.lower().endswith( '.png' ) else "./cache/" + timestamp + ".jpg" )
+        
+        def get_prompt( self ):
+            return { 'role': 'user', 'content': self.message, 'images': self.images }
+        
+    class OllamaError( Exception ):
+        pass
+
+System.clear()
