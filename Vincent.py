@@ -14,6 +14,7 @@ import speech_recognition as sr
 import pygame
 import pyttsx3
 import socket
+from ollama import web_fetch, web_search
 import socketserver
 
 class Time:
@@ -67,9 +68,8 @@ GREEN = ( 0, 255, 0 )
 BLUE = ( 0, 0, 255 )
 
 
-
 class Type:
-    def get_type( var ):
+    def getType( var ):
         try:
             if var == list( var ):
                 return "list"
@@ -86,7 +86,13 @@ class Type:
                 else:
                     return "Unknown type"
             except TypeError:
-                return "Unknown type"
+                try:
+                    if var.keys():
+                        return "json"
+                except AttributeError:
+                    return "Unknown type"
+                except TypeError:
+                    return "Unknown type"
     class file:
         append = 'a'
         trunc = 'w'
@@ -340,6 +346,9 @@ class AiModel:
 
     api_key = "e1156b809dda4345ba41a96cc4dbc00f.vX3py4XQMmdAyPLqNyBmHjkN"
 
+    def launch():
+        os.system( "ollama serve" )
+
     def get_all_models():
         models = ollama.list()
         if models and "models" in models:
@@ -355,12 +364,66 @@ class AiModel:
         raise AiModel.OllamaError( f"No Ollama model found matching '{model_name}'." )
 
     
-    def ask( prompt, model: str = get_all_models()[0], thinking: bool = False ):
+    def ask( prompt, model: str = get_all_models()[0], thinking: bool = False, web: bool = False ):
+        conversation = []
+        if Type.getType( prompt ) == "list":
+            conversation = prompt
+        elif Type.getType( prompt ) == "json":
+            conversation = [prompt]
+        elif Type.getType( prompt ) == "str":
+            conversation = [{"role": "user", "content": prompt}]
+        else:
+            conversation = [prompt.getPrompt()]
+        
         try:
-            return ollama.chat( model=model, messages=[prompt.get_prompt], think=thinking )['message']['content']
-        except AttributeError:
-            return ollama.chat( model=model, messages=prompt, think=thinking )['message']['content']
-    
+            if web:
+                available_tools = {'web_search': web_search, 'web_fetch': web_fetch}
+                while True:
+                    response = None
+                    try:
+                        response = ollama.chat(
+                            model=model,
+                            messages=conversation,
+                            think=thinking,
+                            tools=[ollama.web_search, ollama.web_fetch]
+                        )
+                        # conversation.append( response["message"] )
+                    except ollama.ResponseError as e:
+                        if str( e ).find( "think" ) != -1:
+                            response = ollama.chat(
+                                model=model,
+                                messages=conversation,
+                                think=False,
+                                tools=[ollama.web_search, ollama.web_fetch]
+                            )
+                        else:
+                            raise ollama.ResponseError( "tools" )
+                        
+
+                    conversation.append( response["message"] )
+
+                    if response.message.tool_calls:
+                        for tool_call in response.message.tool_calls:
+                            function_to_call = available_tools.get(tool_call.function.name)
+                            if function_to_call:
+                                args = tool_call.function.arguments
+                                result = function_to_call(**args)
+                                conversation.append({'role': 'tool', 'content': str(result), 'tool_name': tool_call.function.name})
+                            else:
+                                conversation.append({'role': 'tool', 'content': f'Tool {tool_call.function.name} not found', 'tool_name': tool_call.function.name})
+                    else:
+                        break
+                return conversation[-1]["content"].split( "</think>" )[-1], thinking, web
+            else:
+                response = ollama.chat( model=model, messages=conversation, think=thinking )
+                return response['message']['content'].split( "</think>" )[-1], thinking, web
+        except ollama.ResponseError as e:
+            if str( e ).find( "tools" ) != -1:
+                try:
+                    return ollama.chat( model=model, messages=conversation, think=thinking )['message']['content'].split( "</think>" )[-1], thinking, False
+                except ollama.ResponseError as e:
+                    if str( e ).find( "think" ) != -1:
+                        return ollama.chat( model=model, messages=conversation, think=False )['message']['content'].split( "</think>" )[-1], False, False
     class ChatBot:
         conversation = []
         model = ""
@@ -388,19 +451,20 @@ class AiModel:
                 if images != []:
                     for image in images:
                         timestamp = str( time.time() ).replace( '.', '' )
-                        Image.open( image ).copy().save( "./__pycache__/aicache/" + timestamp + ".png" if image.lower().endswith( '.png' ) else "./__pycache__/aicache" + timestamp + ".jpg" )
+                        Image.open( image ).copy().save( "./__pycache__/aicache/" + timestamp + ".png" if image.lower().endswith( '.png' ) else "./__pycache__/aicache/" + timestamp + ".jpg" )
                         self.images.append( "./__pycache__/aicache/" + timestamp + ".png" if image.lower().endswith( '.png' ) else "./__pycache__/aicache/" + timestamp + ".jpg" )
 
-        def load_image( self, image_path: str ):
+        def loadImage( self, image_path: str ):
             image_path = image_path.replace( '\\', '/' ).replace( '"', '' )
             if not self.cache:
                 self.images.append( image_path )
             else:
                 timestamp = str( time.time() ).replace( '.', '' )
-                Image.open( image_path ).copy().save( "./cache/" + timestamp + ".png" if image_path.lower().endswith( '.png' ) else "./cache/" + timestamp + ".jpg" )
-                self.images.append( "./cache/" + timestamp + ".png" if image_path.lower().endswith( '.png' ) else "./cache/" + timestamp + ".jpg" )
+                img = Image.open( image_path ).copy()
+                img.save( "./__pycache__/aicache/" + timestamp + ".png" if image_path.lower().endswith( '.png' ) else "./__pycache__/aicache/" + timestamp + ".jpg" )
+                self.images.append( "./__pycache__/aicache/" + timestamp + ".png" if image_path.lower().endswith( '.png' ) else "./__pycache__/aicache/" + timestamp + ".jpg" )
         
-        def get_prompt( self ):
+        def getPrompt( self ):
             return { 'role': 'user', 'content': self.message, 'images': self.images }
         
     class OllamaError( Exception ):
