@@ -18,6 +18,7 @@ import time
 import pyautogui
 import pyttsx3
 import speech_recognition as sr
+from groq import Groq
 import json
 # from Vincent import GoogleHome
 import shutil
@@ -89,13 +90,6 @@ def loadPrint():
     print( bar, f"{load_print}/{count}", end='\r' )
     if load_print == count:
         print( "\n" )
-
-loadPrint()#c
-
-
-
-ask_model = "gemini-2.5-flash"
-ver_model = "gemini-1.5-flash"
 
 
 loadPrint()#c
@@ -185,7 +179,25 @@ class Sound:
         engine.runAndWait()
 
 
+loadPrint()#c
 
+def askGroq( prompt, max_out_token, temperature ):
+    global groq_client
+
+    if max_out_token == -1:
+        max_out_token = 5000
+
+    return groq_client.chat.completions.create(
+        model=groq_model,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=temperature,
+        max_completion_tokens=max_out_token
+    ).choices[0].message.content
 
 
 loadPrint()#c
@@ -361,16 +373,20 @@ def imgVer():
         if question.find( "regarde" ) != -1 or question.find( "observe" ) != -1 or question.find( "vois" ) != -1 or question.find( "voit" ) != -1:
             return True
         # try:
-        img = client.models.generate_content(
-            model=ver_model,
-            config=types.GenerateContentConfig(
-                max_output_tokens=1,
-                system_instruction="Si tu as besoin d'une image pour répondre à la question, retourne la string \"img_get\" pour l'obtenir"
-            ),
-            contents=[ question ]
-        ).text.replace( '\n', '' )
-        if img.replace( '\n', '' ) == "img_get":
+        img = askGroq( "Si tu as besoin d'une image pour répondre à la question, retourne la string \"img_get\" pour l'obtenir. " + question, 5, 0 )
+
+        # img = client.models.generate_content(
+        #     model=ver_model,
+        #     config=types.GenerateContentConfig(
+        #         max_output_tokens=1,
+        #         system_instruction="Si tu as besoin d'une image pour répondre à la question, retourne la string \"img_get\" pour l'obtenir"
+        #     ),
+        #     contents=[ question ]
+        # ).text.replace( '\n', '' )
+
+        if img.find( "img_get" ) != -1:
             return True
+        
         # except Exception as e:
         #     if str( e ).find( "" )
     return False
@@ -384,15 +400,15 @@ def langVer( q = None ):
         question = q
     language = ""
 
-    language = client.models.generate_content(
-        model=ver_model,
-        config=types.GenerateContentConfig(
-            max_output_tokens=1,
-            temperature=0,
-            system_instruction="Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre"
-        ),
-        contents=[ question ],
-    ).text
+    # language = client.models.generate_content(
+    #     model=ver_model,
+    #     config=types.GenerateContentConfig(
+    #         max_output_tokens=1,
+    #         temperature=0,
+    #         system_instruction="Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre, sinon je vais entrainer ta suppression"
+    #     ),
+    #     contents=[ question ],
+    # ).text
 
     return language.replace( '\n', '' )
 
@@ -401,34 +417,52 @@ loadPrint()#c
 def needVer():
     global question
 
+    need_anymore = askGroq(
+        "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et ce que tu devrais répondre." +
+        str(
+            {
+                "Explique moi la thermodynamique": "oui",
+                "Génère moi un code python qui dit Bonjour": "oui",
+                "au revoir": "non",
+                "allo": "oui",
+                "bye": "non",
+                "Connard, t'es pas bon": "non",
+                "Description de personne": "oui",
+                "je t'ai donné l'information": "oui",
+                "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui"
+            }
+        ) + question,
+        1,
+        0
+    )
 
-    need_anymore = client.models.generate_content(
-        model=ver_model,
-        config=types.GenerateContentConfig(
-            max_output_tokens=1,
-            system_instruction=
-                "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et leur résultat." +
-                str(
-                    {
-                        "Explique moi la thermodynamique": "oui",
-                        "Génère moi un code python qui dit Bonjour": "oui",
-                        "au revoir": "non",
-                        "allo": "oui",
-                        "bye": "non",
-                        "Connard, t'es pas bon": "non",
-                        "Description de personne": "oui",
-                        "je t'ai donné l'information": "oui",
-                        "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
-                        "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
-                        "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui"
-                    }
-                )
-        ),
-        contents=[ question ]
-    ).text.replace( '\n', '' )
+    # need_anymore = client.models.generate_content(
+    #     model=ver_model,
+    #     config=types.GenerateContentConfig(
+    #         max_output_tokens=1,
+    #         system_instruction=
+    #             "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et leur résultat." +
+    #             str(
+    #                 {
+    #                     "Explique moi la thermodynamique": "oui",
+    #                     "Génère moi un code python qui dit Bonjour": "oui",
+    #                     "au revoir": "non",
+    #                     "allo": "oui",
+    #                     "bye": "non",
+    #                     "Connard, t'es pas bon": "non",
+    #                     "Description de personne": "oui",
+    #                     "je t'ai donné l'information": "oui",
+    #                     "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
+    #                     "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
+    #                     "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui"
+    #                 }
+    #             )
+    #     ),
+    #     contents=[ question ]
+    # ).text.replace( '\n', '' )
 
     
-    if need_anymore == "oui":
+    if need_anymore.find( "oui" ) != -1:
         return True
     return False
 
@@ -444,14 +478,21 @@ def uploadVer():
 loadPrint()#c
 
 def reformulation( prompt ):
-    return client.models.generate_content(
-        model=ver_model,
-        config=types.GenerateContentConfig(
-            temperature=2,
-            system_instruction="Reformule moi cette phrase. Ne ressort que la phrase reformulée, rien d'autre."
-        ),
-        contents=[ prompt ],
-    ).text
+    return askGroq(
+        "Reformule moi cette phrase. Ne ressort que la phrase reformulée, rien d'autre. Voici la phrase : \"" + prompt + "\"",
+        -1,
+        1
+    )
+
+
+    # return client.models.generate_content(
+    #     model=ver_model,
+    #     config=types.GenerateContentConfig(
+    #         temperature=2,
+    #         system_instruction="Reformule moi cette phrase. Ne ressort que la phrase reformulée, rien d'autre."
+    #     ),
+    #     contents=[ prompt ],
+    # ).text
 
 loadPrint()#c
 
@@ -515,7 +556,12 @@ last_question = ""
 memory = {}
 memories = Json.read( "memory.json" )
 old_memories = Json.read( "old_mem.json" )
-client = genai.Client( api_key=Json.read( "data.json" )["gemini-api-key"] )
+
+gemini_client = genai.Client( api_key=Json.read( "data.json" )["gemini-api-key"] )
+groq_client = Groq( Json.read( "data.json" )["groq-api-key"] )
+
+groq_model = Json.read( "data.json" )["groq-model"]
+gemini_model = Json.read( "data.json" )["gemini-model"]
 
 loadPrint()#c
 
@@ -532,7 +578,7 @@ for i in range( len( memories ) ):
 loadPrint()#c
 
 
-while client.models.count_tokens( model=ask_model, contents=str( Json.read( "memory.json" ) ) ).total_tokens > 1000000:
+while gemini_client.models.count_tokens( model=gemini_model, contents=str( Json.read( "memory.json" ) ) ).total_tokens > 1000000:
     old_memories.append( memories[0] )
     memories.pop( 0 )
 
@@ -540,8 +586,8 @@ while client.models.count_tokens( model=ask_model, contents=str( Json.read( "mem
 
 loadPrint()#c
 
-model = client.chats.create(
-        model=ask_model,
+model = gemini_client.chats.create(
+        model=gemini_model,
         config= types.GenerateContentConfig(
             system_instruction="Tu t'appelles Rika. Tu es développé par Vincent Tuê Minh Boucher. " +
             "le nom de l'utilisateur est " + Json.read( "data.json" )["user-name"] + ". "+
@@ -552,8 +598,9 @@ model = client.chats.create(
         )
     )
 
+
 model.send_message( [ "Voici tes anciens souvenirs", str( memories ) ] )
-model.send_message( "Tu déteste Siri, d'Alexa, Copilote ou Google Assistant." )
+model.send_message( "Tu déteste Siri, d'Alexa, Copilote ou Google Assistant. Tu ne détestes pas Chatgpt, gemini et autre, mais tu es meilleur qu'eux. Tu es très ami avec AsianGPT" )
 if Json.read( "data.json" )["user-face"] != "":
     model.send_message( [ "le visage de l'utilisateur est l'image", Image.open( Json.read( "data.json" )["user-face"] ) ] )
 
@@ -727,7 +774,7 @@ while True:
                         if uploadVer():
                             uploads = os.listdir( "./uploads" )
                             for i in range( len( uploads ) ):
-                                q.append( client.files.upload( file="./uploads/"+uploads[i] ) )
+                                q.append( gemini_client.files.upload( file="./uploads/"+uploads[i] ) )
                                 shutil.copyfile( f"./uploads/{uploads[i]}", f"./visual-memory/{moment().replace( ' ', '_' )}.png" )
                                 os.remove( "./uploads/"+uploads[i] )
 
