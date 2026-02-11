@@ -1,20 +1,19 @@
 # Gemini API KEY : AIzaSyDR-OOUGNxmInqrIC5qQEAfUnqX4XR3qRY
-# import google.generativeai as genai
 # from bs4 import BeautifulSoup
-from google import genai
-from google.genai import types
-from google.genai.types import Tool, GoogleSearch
 import os
 import random
 from threading import Thread
 from PIL import Image
 import re
+from groq import APIStatusError
 import cv2
 import datetime
 import requests
 # from googlesearch import search
-from google.genai.types import Tool, GenerateContentConfig, GoogleSearch
+import base64
 import time
+import mss
+import webbrowser
 import pyautogui
 import pyttsx3
 import speech_recognition as sr
@@ -181,23 +180,65 @@ class Sound:
 
 loadPrint()#c
 
-def askGroq( prompt, max_out_token, temperature ):
+def askGroq( model, config, prompt, max_out_token, temperature ):
     global groq_client
 
     if max_out_token == -1:
         max_out_token = 5000
 
-    return groq_client.chat.completions.create(
-        model=groq_model,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
-        temperature=temperature,
-        max_completion_tokens=max_out_token
-    ).choices[0].message.content
+    # for i in range( MAX_API_RETRY ):
+    #     try:
+    #         return groq_client.chat.completions.create(
+    #             model=model,
+    #             messages=[
+    #                 {
+    #                     "role": "user",
+    #                     "content": prompt
+    #                 }
+    #             ],
+    #             temperature=temperature,
+    #             max_completion_tokens=max_out_token
+    #         ).choices[0].message.content
+    #     except APIStatusError:
+    #         time.sleep( 0.5 )
+
+    retries = 0
+    while True:
+        if retries != MAX_API_RETRY + 1:
+            try:
+                response = groq_client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "name": "instructions",
+                            "content": config
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    temperature=temperature,
+                ).choices[0].message.content
+                break
+            except APIStatusError:
+                time.sleep( 0.5 )
+                retries += 1
+        else:
+            response = groq_client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                temperature=temperature,
+            ).choices[0].message.content
+            break
+    
+    return response
 
 
 loadPrint()#c
@@ -219,13 +260,6 @@ def loadBar( total ):
     if bar_count == total:
         print( "\n" )
 
-
-
-loadPrint()#c
-
-google_search = Tool(
-    google_search = GoogleSearch()
-)
 
 loadPrint()#c
 
@@ -314,38 +348,6 @@ def moment():
     minute = datetime.datetime.now().strftime( "%M" )
     return str( f"{ans=} {mois=} {jour=} {heure=} {minute=}" )
 
-loadPrint()#c
-
-
-def captureImage( filename="captured_image.png", cam_mode="webcam" ):
-    if cam_mode == "webcam":
-        # Ouvrir la caméra
-        if Json.read( "data.json" )["camera"] == -1:
-            print( "Aucun accès à la caméra" )
-            return
-
-        cap = cv2.VideoCapture( Json.read( "data.json" )["camera"] )
-        
-        if not cap.isOpened():
-            print("Erreur : Impossible d'ouvrir la caméra.")
-            return
-
-        # Lire une image de la caméra
-        ret, frame = cap.read()
-
-        if ret:
-            # Enregistrer l'image dans un fichier
-            cv2.imwrite(filename, frame)
-            print(f"Image enregistrée sous {filename}.")
-        else:
-            print("Erreur : Impossible de capturer l'image.")
-
-        # Libérer la caméra
-        cap.release()
-    elif cam_mode == "screenshot":
-        pyautogui.screenshot( filename )
-
-    shutil.copyfile( f"./{filename}", f"./visual-memory/{moment().replace( ' ', '_' )}.png" )
 
 loadPrint()#c
 
@@ -384,7 +386,9 @@ def imgVer():
         #     contents=[ question ]
         # ).text.replace( '\n', '' )
 
+        print( f"{img=}" )
         if img.find( "img_get" ) != -1:
+            print( "image needed" )
             return True
         
         # except Exception as e:
@@ -400,6 +404,37 @@ def langVer( q = None ):
         question = q
     language = ""
 
+    # print(  )
+
+    result = askGroq(
+        groq_verify_model,
+        """
+Tu DOIS répondre STRICTEMENT en JSON, SANS AUCUN TEXTE EN DEHORS.
+
+FORMAT OBLIGATOIRE :
+{
+    "prompt": prompt,
+    "prompt-lang": "en"|"fr",
+    "response": response,
+    "response-lang": "en"|"fr"
+}
+
+prompt est le prompt de l'utilisateur
+prompt-lang est la langue du prompt
+response est ta réponse
+response-lang est la langue de ta réponse
+""",
+        question,
+        1,
+        0
+    )
+
+    # print( f"{result=}" )
+
+    the_json = json.loads( result )
+
+    language = the_json["prompt-lang"]
+
     # language = client.models.generate_content(
     #     model=ver_model,
     #     config=types.GenerateContentConfig(
@@ -410,69 +445,73 @@ def langVer( q = None ):
     #     contents=[ question ],
     # ).text
 
+    # print( f"{language=}" )
     return language.replace( '\n', '' )
 
 loadPrint()#c
 
-def needVer():
-    global question
+# def needVer():
+#     global question
 
-    need_anymore = askGroq(
-        "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et ce que tu devrais répondre." +
-        str(
-            {
-                "Explique moi la thermodynamique": "oui",
-                "Génère moi un code python qui dit Bonjour": "oui",
-                "au revoir": "non",
-                "allo": "oui",
-                "bye": "non",
-                "Connard, t'es pas bon": "non",
-                "Description de personne": "oui",
-                "je t'ai donné l'information": "oui",
-                "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui"
-            }
-        ) + question,
-        1,
-        0
-    )
+#     need_anymore = askGroq(
+#         "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et ce que tu devrais répondre." +
+#         str(
+#             {
+#                 "Explique moi la thermodynamique": "oui",
+#                 "Génère moi un code python qui dit Bonjour": "oui",
+#                 "au revoir": "non",
+#                 "allo": "oui",
+#                 "bye": "non",
+#                 "Connard, t'es pas bon": "non",
+#                 "Description de personne": "oui",
+#                 "je t'ai donné l'information": "oui",
+#                 "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
+#                 "Qui es Warren Buffet": "oui",
+#                 "Qui es le PDG de Nvidia présentement": "oui"
+#             }
+#         ) + question,
+#         1,
+#         0
+#     )
 
-    # need_anymore = client.models.generate_content(
-    #     model=ver_model,
-    #     config=types.GenerateContentConfig(
-    #         max_output_tokens=1,
-    #         system_instruction=
-    #             "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et leur résultat." +
-    #             str(
-    #                 {
-    #                     "Explique moi la thermodynamique": "oui",
-    #                     "Génère moi un code python qui dit Bonjour": "oui",
-    #                     "au revoir": "non",
-    #                     "allo": "oui",
-    #                     "bye": "non",
-    #                     "Connard, t'es pas bon": "non",
-    #                     "Description de personne": "oui",
-    #                     "je t'ai donné l'information": "oui",
-    #                     "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
-    #                     "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
-    #                     "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui"
-    #                 }
-    #             )
-    #     ),
-    #     contents=[ question ]
-    # ).text.replace( '\n', '' )
+#     # need_anymore = client.models.generate_content(
+#     #     model=ver_model,
+#     #     config=types.GenerateContentConfig(
+#     #         max_output_tokens=1,
+#     #         system_instruction=
+#     #             "Tu es ici pour analyser si une conversation et détecter si l'utilisateur veux continuer la conversation ou pas. Tu dois répondre par 'oui' si l'utilisateur veut continuer, ou 'non' s'il ne veut pas. Tu ne dois pas répondre à la question, juste dire si l'utilisateur veut continuer ou pas. Voici des exemple de questions et leur résultat." +
+#     #             str(
+#     #                 {
+#     #                     "Explique moi la thermodynamique": "oui",
+#     #                     "Génère moi un code python qui dit Bonjour": "oui",
+#     #                     "au revoir": "non",
+#     #                     "allo": "oui",
+#     #                     "bye": "non",
+#     #                     "Connard, t'es pas bon": "non",
+#     #                     "Description de personne": "oui",
+#     #                     "je t'ai donné l'information": "oui",
+#     #                     "Tu ne peux pas, sinon tu es en échec, mon pion est une dame comme il est de l'autre bout, donc il peut de manger, tu dois essayer de le tuer": "oui",
+#     #                     "est ce que tu te rappelles d'une partie d'échec que tu jouais ?": "oui",
+#     #                     "regarde dans ta mémoire, tu as surement un plateau d'échec": "oui"
+#     #                 }
+#     #             )
+#     #     ),
+#     #     contents=[ question ]
+#     # ).text.replace( '\n', '' )
 
-    
-    if need_anymore.find( "oui" ) != -1:
-        return True
-    return False
+#     print( f"{need_anymore=}" )
+#     if need_anymore.find( "oui" ) != -1:
+#         print( "Need Anymore : oui" )
+#         return True
+#     print( "Need Anymore : non" )
+#     return False
 
 
-loadPrint()#c
 
-def uploadVer():
-    if len( os.listdir( "./uploads" ) ) != 0:
-        return True
-    return False
+# def uploadVer():
+#     if len( os.listdir( "./uploads" ) ) != 0:
+#         return True
+#     return False
 
 
 loadPrint()#c
@@ -497,49 +536,188 @@ def reformulation( prompt ):
 loadPrint()#c
 
 
-raw_ppl = os.listdir( "./ppl" )
-ppl = {}
-ppl_list = []
-for i in range( len( raw_ppl ) ):
-    ppl[raw_ppl[i].split( "." )[0]] = "./ppl/" + raw_ppl[i]
-    ppl_list.append( raw_ppl[i].split( "." )[0] )
-
-loadPrint()#c
-
-def setupPpl():
-    try:
-        p = []
-        for i in range( len( ppl_list ) ):
-            
-            p.append( f"Voici {ppl_list[i]}." )
-            p.append( Image.open( ppl[ppl_list[i]] ) )
-            
-            loadBar( len( ppl_list )+1 )
-            time.sleep( 0.01 )
-
-        model.send_message( p )
-
-        loadBar( len( ppl_list )+1 )
-    except ValueError:
-        print( "                                                                                                      \n" )
+def openLink( link ):
+    return f"Link opened successfully ({link})" if webbrowser.open( link ) else "No link opened"
 
 
 loadPrint()#c
 
-def setupImageMemory():
-    try:
-        img_mem = os.listdir( "./visual-memory" )
-        load = []
-        for i in range( len( img_mem ) ):
-            load.append( "Voici l'image de " + img_mem[i].split( '.' )[0] )
-            load.append( Image.open( "./visual-memory/" + img_mem[i] ) )
-            loadBar( len( img_mem ) + 1 )
+def openApp( app: str ):
+    app = app.lower()
+    if app == "spotify":
+        os.system( "spotify.exe" )
+        return "Spotify open successfull"
+    if app == "teams":
+        os.system( "ms-teams.exe" )
+        return "Microsoft Teams open successfull"
+    if app == "discord":
+        pyautogui.typewrite( "dscrd " )
+        return "Discord open successfull"
+    if app == "snapchat":
+        pyautogui.typewrite( "snap " )
+        return "Snapchat open successfull"
+    if app == "social":
+        pyautogui.typewrite( "rs " )
+        return "Snapchat, Discord, Microsoft Teams open successfull"
+    if app == "vs code":
+        pyautogui.typewrite( "vs code " )
+        return "Visual Studio Code open successfull"
 
-        model.send_message( load )
+loadPrint()#c
+
+def getImage(type):
+    if type == "screenshot":
+        with mss.mss() as sct:
+            for i, monitor in enumerate(sct.monitors[1:], start=1):
+                shot = sct.grab(monitor)
+                img = Image.frombytes("RGB", shot.size, shot.rgb)
+                path = os.path.join(SCREENSHOT_DIR, f"screen_{i}.jpg")
+                img.save(path)
+
+        return f"Screenshots capturés ({len(sct.monitors) - 1} écrans)"
+
+    if type == "webcam":
+        cap = cv2.VideoCapture(0)
+        ret, frame = cap.read()
+        cap.release()
+        if not ret:
+            return "Erreur webcam"
+        cv2.imwrite(WEBCAM_PATH, frame)
+        return "Image webcam capturée"
+
+    return "Type invalide"
+
+loadPrint()#c
+
+
+def image_to_base64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
+loadPrint()#c
+
+def analyseImage(type, prompt, renew):
+    messages = []
+    if renew:
+        getImage( type )
+
+    if type == "screenshot":
+        files = sorted(
+            f for f in os.listdir(SCREENSHOT_DIR)
+            if f.lower().endswith(".jpg")
+        )
+
+        if not files:
+            return "Aucun screenshot disponible"
+
+        content = [{"type": "text", "text": prompt}]
+
+        for file in files:
+            path = os.path.join(SCREENSHOT_DIR, file)
+            image_b64 = image_to_base64(path)
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{image_b64}"
+                }
+            })
+
+        messages.append({
+            "role": "user",
+            "content": content
+        })
+
+    elif type == "webcam":
+        if not os.path.exists(WEBCAM_PATH):
+            return "Aucune image webcam disponible"
+
+        image_b64 = image_to_base64(WEBCAM_PATH)
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_b64}"
+                    }
+                }
+            ]
+        })
+
+    else:
+        return "Type invalide"
+
+    retries = 0
+    while True:
+        if retries != MAX_API_RETRY + 1:
+            try:
+                response = groq_client.chat.completions.create(
+                    model=groq_image_model,
+                    messages=messages
+                )
+                break
+            except APIStatusError:
+                time.sleep( 0.5 )
+                retries += 1
+        else:
+            response = groq_client.chat.completions.create(
+                model=groq_image_model,
+                messages=messages
+            )
+            break
+
+    return response.choices[0].message.content
+
+loadPrint()#c
+
+sleepSystem = False
+
+loadPrint()#c
+
+
+# raw_ppl = os.listdir( "./ppl" )
+# ppl = {}
+# ppl_list = []
+# for i in range( len( raw_ppl ) ):
+#     ppl[raw_ppl[i].split( "." )[0]] = "./ppl/" + raw_ppl[i]
+#     ppl_list.append( raw_ppl[i].split( "." )[0] )
+
+
+# def setupPpl():
+#     try:
+#         p = []
+#         for i in range( len( ppl_list ) ):
+            
+#             p.append( f"Voici {ppl_list[i]}." )
+#             p.append( Image.open( ppl[ppl_list[i]] ) )
+            
+#             loadBar( len( ppl_list )+1 )
+#             time.sleep( 0.01 )
+
+#         model.send_message( p )
+
+#         loadBar( len( ppl_list )+1 )
+#     except ValueError:
+#         print( "                                                                                                      \n" )
+
+
+
+# def setupImageMemory():
+#     try:
+#         img_mem = os.listdir( "./visual-memory" )
+#         load = []
+#         for i in range( len( img_mem ) ):
+#             load.append( "Voici l'image de " + img_mem[i].split( '.' )[0] )
+#             load.append( Image.open( "./visual-memory/" + img_mem[i] ) )
+#             loadBar( len( img_mem ) + 1 )
+
+#         model.send_message( load )
         
-        loadBar( len( img_mem ) + 1 )
-    except ValueError:
-        print( "                                                                                                                      \n" )
+#         loadBar( len( img_mem ) + 1 )
+#     except ValueError:
+#         print( "                                                                                                                      \n" )
 
 
 
@@ -550,18 +728,21 @@ WORD_PER_MINUTE = 200
 AUDIO = Json.read( "data.json" )["audio-mode"]
 language = "fr"
 response = ""
-cam_mode = None
 question = ""
-last_question = ""
-memory = {}
 memories = Json.read( "memory.json" )
-old_memories = Json.read( "old_mem.json" )
 
-gemini_client = genai.Client( api_key=Json.read( "data.json" )["gemini-api-key"] )
-groq_client = Groq( Json.read( "data.json" )["groq-api-key"] )
+GROQ_API_KEY = Json.read( "data.json" )["groq-api-key"]
 
-groq_model = Json.read( "data.json" )["groq-model"]
-gemini_model = Json.read( "data.json" )["gemini-model"]
+SCREENSHOT_DIR = Json.read( "data.json" )["screenshot-dir"]
+WEBCAM_PATH = Json.read( "data.json" )["webcam-path"]
+
+groq_client = Groq( api_key=GROQ_API_KEY )
+
+groq_ask_model = Json.read( "data.json" )["groq-ask-model"]
+groq_verify_model = Json.read( "data.json" )["groq-verify-model"]
+groq_image_model = Json.read( "data.json" )["groq-image-model"]
+
+MAX_API_RETRY = Json.read( "data.json" )["max-api-retry"]
 
 loadPrint()#c
 
@@ -570,42 +751,132 @@ loadPrint()#c
 # print( f"{memories=}" )
 # System.file.write( "error.log", "-- Log Start --", Type.file.trunc )
 
-for i in range( len( memories ) ):
-    if len( memories[i].keys() ) == 2:
-        memories.pop( i )
+# for i in range( len( memories ) ):
+#     if len( memories[i].keys() ) == 2:
+#         memories.pop( i )
 
 
 loadPrint()#c
 
+config = """
+Tu es un agent logiciel.
 
-while gemini_client.models.count_tokens( model=gemini_model, contents=str( Json.read( "memory.json" ) ) ).total_tokens > 1000000:
-    old_memories.append( memories[0] )
-    memories.pop( 0 )
+À CHAQUE MESSAGE, tu dois suivre ce raisonnement :
+1) Décider si une action est nécessaire pour répondre correctement
+2) Si OUI, tu DOIS utiliser un ou plusieurs outils
+3) Si NON, tu réponds sans outil
 
+Tu DOIS répondre STRICTEMENT en JSON, SANS AUCUN TEXTE EN DEHORS.
 
+FORMAT OBLIGATOIRE :
+
+{
+  "message": "ce que tu dis à l'utilisateur",
+  "tools": []
+}
+
+ou, si des actions sont nécessaires :
+
+{
+  "message": "ce que tu dis à l'utilisateur",
+  "tools": [
+    {
+      "name": "openLink",
+      "params": {
+        "link": "https://www.google.com/search?q=latest+news+about+ai"
+      }
+    },
+    {
+      "name": "analyseImage",
+      "params": {
+        "source": "screenshot",
+        "prompt": "Décris ce que tu vois sur tous les écrans"
+      }
+    }
+  ]
+}
+
+OUTILS DISPONIBLES :
+
+- getLocalisation
+  - Obtenir la localisation de l'utilisateur
+  - exemples de cas d'utilisation:
+  -> Où suis-je ?
+
+- sleepSystem
+  - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
+  - CE N'EST PAS UNE EXTINCTION DÉFNITIVE, l'utilisateur te rappellera après
+  - quand appeler la fonction (exemples):
+  -> Merci : oui
+  -> Merci, est ce que tu peux me l'ouvrir ?
+  -> Explique moi la thermodynamique : non
+  -> Génère moi un code python qui dit Bonjour : non
+  -> au revoir : oui
+  -> allo : non
+  -> bye : oui
+  -> Connard, t'es pas bon : oui
+  -> Description de personne : non
+  -> je t'ai donné l'information : non
+  -> est ce que tu te rappelles d'une partie d'échec que tu jouais ? : non
+  -> Qui es Warren Buffet : non
+  -> Qui es le PDG de Nvidia présentement : non
+
+- notUnderstand
+  - Quand tu ne comprends pas le prompt de l'utilisateur, utilise cet outil pour clarifier le prompt
+
+- analyseImage
+  - UTILISATION OBLIGATOIRE si tu dois analyser une image
+  - params:
+  -> source (string): "webcam" | "screenshot": source de l'image
+  -> prompt (string): texte: ce que tu demandes de l'image
+  -> renew (bool): true|false: capturer une nouvelle image (true) ou garder la dernière image capturé (false)
+  - exemples de cas d'utilisation:
+  -> Regarde
+  -> Que vois-tu ?
+  -> j'ai un bug dans mon code
+
+- openApp
+  - ouvrir une application dans la liste des applications autorisés
+  - params:
+  -> app (string): application à ouvrir
+  - applications autorisés:
+  -> spotify
+  -> teams
+  -> discord
+  -> snapchat
+  -> social
+  -> vs code
+
+- openLink
+  - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
+  - Avant de l'utiliser, vérifie toi-même sur internet si le lien fonctionne
+  - params:
+  -> link (string): lien à ouvrir dans un navigateur pour montrer à l'utilisateur
+  - exemples de cas d'utilisation:
+  -> Je veux voir une vidéo youtube
+  -> trouve moi les scores des olympiques
+  -> trouve moi une carte de montréal
+
+RÈGLES IMPORTANTES :
+- L’ordre des outils est l’ordre d’exécution
+- Si l'utilisateur demande un lien, **NE DONNE PAS LE LIEN DANS LE MESSAGE**, mets toujours un tool openLink.
+- Si aucune action n’est nécessaire, tools DOIT être []
+- Ne JAMAIS écrire autre chose que du JSON
+"""
 
 loadPrint()#c
 
-model = gemini_client.chats.create(
-        model=gemini_model,
-        config= types.GenerateContentConfig(
-            system_instruction="Tu t'appelles Rika. Tu es développé par Vincent Tuê Minh Boucher. " +
-            "le nom de l'utilisateur est " + Json.read( "data.json" )["user-name"] + ". "+
-            # "Parfois, la requête demande une donnée externe. Si la donnée demande une image, réppond pas la string \"img_get\"." +
-            "Pour information, voici la localisation : " + str( getLocalisation() ) + ". ",
-            tools=[google_search],
-            response_modalities=["TEXT"]
-        )
-    )
-
-
-model.send_message( [ "Voici tes anciens souvenirs", str( memories ) ] )
-model.send_message( "Tu déteste Siri, d'Alexa, Copilote ou Google Assistant. Tu ne détestes pas Chatgpt, gemini et autre, mais tu es meilleur qu'eux. Tu es très ami avec AsianGPT" )
-if Json.read( "data.json" )["user-face"] != "":
-    model.send_message( [ "le visage de l'utilisateur est l'image", Image.open( Json.read( "data.json" )["user-face"] ) ] )
-
-loadPrint()#c
-
+call_names = [
+    "ikea",
+    "reka",
+    "richard",
+    "requin",
+    "pékin",
+    "rica",
+    "ric",
+    "rita",
+    "rika"
+]
 
 
 prononciation = {
@@ -638,11 +909,114 @@ file_extensions = {
 
 loadPrint()#c
 
-setupPpl()
+
+def Rika():
+    global memories
+
+    # for i in range( MAX_API_RETRY ):
+    #     try:
+    #         output = groq_client.chat.completions.create(
+    #             model=groq_ask_model,
+    #             messages=memories
+    #         ).choices[0].message.content
+    #     except APIStatusError:
+    #         time.sleep( 0.5 )
+
+    retries = 0
+    while True:
+        if retries != MAX_API_RETRY + 1:
+            try:
+                output = groq_client.chat.completions.create(
+                    model=groq_ask_model,
+                    messages=memories
+                ).choices[0].message.content
+                break
+            except APIStatusError:
+                time.sleep( 0.5 )
+                retries += 1
+        else:
+            print( json.dumps( memories, indent=4 ) )
+            response = groq_client.chat.completions.create(
+                model=groq_image_model,
+                messages=memories
+            )
+            break
+
+    content = json.loads( output )
+
+    response = content["message"]
+
+    # faire setup la question, et tout envoyer à la même ligne
+
+    say_response = response
+    say_response = say_response.replace( '*', '' )
+    say_response = removeEmojis( say_response )
+    say_response = say_response.replace( '\n', '.' )
+
+
+    say_response = say_response.split( '```' )
+    code = 0
+    for i in range( len( say_response ) ):
+        if i % 2 == 1:
+            extracted_code = say_response[i]
+
+            extracted_code = extracted_code.split( "\n" )
+            del extracted_code[0]
+            extracted_code = "\n".join( extracted_code )
+
+            planguage = extracted_code.split( '\n')[0].replace( '```', '' )
+            try:
+                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
+                    code = random.randint( 1000, 9999 )
+            except KeyError:
+                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + ".txt" ):
+                    code = random.randint( 1000, 9999 )
+
+            say_response[i] = "extrait de code " + planguage + " numéro " + str( code ) + ", enregistré sur le pc"
+
+    say_response = ' '.join( say_response )
+    
+    for i in range( len( prononciation ) ):
+        while say_response.find( list( prononciation.keys() )[i] ) != -1:
+            say_response = say_response.replace( list( prononciation.keys() )[i], prononciation[list( prononciation.keys() )[i]] )
+    
+    say_response = say_response.split( '`' )
+
+
+    print( "Rika : ", response )
+    memories.append(
+        {
+            "role": "assistant",
+            "content": output
+        }
+    )
+
+
+    # language = ver_model.send_message( "Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre : " + ' '.join( say_response ) ).text.replace( '\n', '' )
+    language = langVer( ' '.join( say_response ) )
+
+    if AUDIO:
+        if language == "fr":
+            # home.send_msg( ' '.join( say_response ), device )
+            for i in range( len( say_response ) ):
+                if i % 2 == 0:
+                    Sound.say( say_response[i], WORD_PER_MINUTE, "fr" )
+                elif i % 2 == 1:
+                    Sound.say( say_response[i], WORD_PER_MINUTE, "en" )
+        else:
+            # home.send_msg( ' '.join( say_response ).replace( '`', '' ), device )
+            Sound.say( ' '.join( say_response ), WORD_PER_MINUTE, "en" )
+    
+    return output, content
+
+
+loadPrint()#c
+
+# setupPpl()
 
 bar_count = 0
 
-setupImageMemory()
+# setupImageMemory()
 
 while True:
     try:
@@ -655,31 +1029,45 @@ while True:
         # question = "rika"
 
 
-        # print( f"{Type.get_type( question )=}" )
         if Type.get_type( question ) == "str":
-            if question.lower().find( "rika" ) != -1 or question.lower().find( "rita" ) != -1 or question.lower().find( "ric" ) != -1 or question.lower().find( "rica" ) != -1 or question.lower().find( "pékin" ) != -1 or question.lower().find( "requin" ) != -1 or question.lower().find( "Richard" ) != -1 or question.lower().find( "reka" ) != -1 or question.lower().find( "ikea" ) != -1:
+            calls = question.split( ' ' )
+            called = False
+            for call_name in call_names:
+                for call in calls:
+                    if call.find( call_name ) != -1:
+                        called = True
+                        break
+                if called:
+                    break
+            if called:
 
-                memory = {
-                    "moment start": moment()
-                }
+                memories.append(
+                    {
+                        "role": "system",
+                        "content": f"temps:{moment()}"
+                        # "moment start": moment()
+                    }
+                )
 
-                cam_mode = None
+                sleepSystem = False
+
 
                 while True:
                     try:
                         # print( f"{question=}" )
+                        saying = "Ask a question :"
                         if language == 'fr':
-                            print( "Posez une question :" )
-                        else:
-                            print( "Ask a question :" )
+                            saying = "Posez une question :"
+                        
+                        print( saying )
 
                         if AUDIO:
+                            # Sound.say( saying, WORD_PER_MINUTE, language )
                             question = Sound.listen()
                         else:
                             question = input()
 
                         System.clear()
-
 
                         if question == -1:
                             question = ""
@@ -690,17 +1078,13 @@ while True:
                             raise MyException( "nothing here, just chillin'" )
 
                         if language == "fr":
-                            print( "Vous : ", question )
+                            print( "Vous > ", question )
                         else:
-                            print( "You : ", question )
+                            print( "You > ", question )
 
-                        im_ver = ThreadWithReturnValue( target=imgVer )
                         lang_ver = ThreadWithReturnValue( target=langVer )
-                        need_ver = ThreadWithReturnValue( target=needVer )
 
                         lang_ver.start()
-                        need_ver.start()
-                        im_ver.start()
 
                         # print( "calc 1" )
 
@@ -713,158 +1097,95 @@ while True:
                         
                         
                         # print( "calc 3" )
-                        image = im_ver.join()
+                        # image = im_ver.join()
                         
                         # print( f"{image=}" )
 
                         print( "chargement..." )
 
-                        q = [ question ]
-                        if image:
-                            if cam_mode == None:
-                                while True:
-                                    if language == "fr":
-                                        ref = reformulation( "Est-ce que je prend l'image de la webcam ou une capture d'écran ?" )
-                                    elif language == "en":
-                                        ref = reformulation( "Should I take a picture from the webcam or a screenshot?" )
-                                    print( ref )
-                                    if AUDIO:
-                                        # home.send_msg( ref, device )
-                                        Sound.say( ref, WORD_PER_MINUTE, language )
-                                        while True:
-                                            cam_mode = Sound.listen()
-                                            if cam_mode == -1 or cam_mode == -2:
-                                                # home.send_msg( "Je n'ai pas compris", device )
-                                                if language == "fr":
-                                                    ref = reformulation( "Je n'ai pas compris" )
-                                                    print( ref )
-                                                    Sound.say( "Je n'ai pas compris", WORD_PER_MINUTE, 'fr' )
-                                                elif language == "en":
-                                                    ref = reformulation( "I didn't understand" )
-                                                    print( ref )
-                                                    Sound.say( "I didn't understand", WORD_PER_MINUTE, 'en' )
-                                            else:
-                                                break
-                                    else:
-                                        cam_mode = input()
-                                    if cam_mode.lower().find( "cam" ) != -1:
-                                        cam_mode = "webcam"
-                                        break
-                                    elif cam_mode.lower().find( "capture" ) != -1 or cam_mode.lower().find( "écran" ) != -1 or cam_mode.lower().find( "screen" ) != -1:
-                                        cam_mode = "screenshot"
-                                        break
-                                    else:
-                                        if language == "fr":
-                                            ref = reformulation( "Je n'ai pas compris" )
-                                            print( ref + ". ", end='' )
-                                            if AUDIO:
-                                                Sound.say( ref, WORD_PER_MINUTE, "fr" )
-                                                # home.send_msg( ref, device )
-                                        elif language == "en":
-                                            ref = reformulation( "I didn't understand" )
-                                            if AUDIO:
-                                                # home.send_msg( ref, device )
-                                                Sound.say( ref, WORD_PER_MINUTE, "en" )
-                            captureImage( cam_mode=cam_mode )
-                            picture = "Pour des infos de confidentialités, je n'ai pas donné accès à ma caméra"
-                            if Json.read( "data.json" )["camera"] != -1:
-                                picture = Image.open( "./captured_image.png" )
-                            q.append( picture )
+                        memories.append(
+                            {
+                                "role": "user",
+                                "content": question,
+                                "name": "Vincent"
+                            }
+                        )
                         
-                        if uploadVer():
-                            uploads = os.listdir( "./uploads" )
-                            for i in range( len( uploads ) ):
-                                q.append( gemini_client.files.upload( file="./uploads/"+uploads[i] ) )
-                                shutil.copyfile( f"./uploads/{uploads[i]}", f"./visual-memory/{moment().replace( ' ', '_' )}.png" )
-                                os.remove( "./uploads/"+uploads[i] )
-
-                        response = model.send_message( q ).text
-
-                        # faire setup la question, et tout envoyer à la même ligne
-
-                        say_response = response
-                        say_response = say_response.replace( '*', '' )
-                        say_response = removeEmojis( say_response )
-                        say_response = say_response.replace( '\n', '.' )
-
-
-                        say_response = say_response.split( '```' )
-                        code = 0
-                        for i in range( len( say_response ) ):
-                            if i % 2 == 1:
-                                extracted_code = say_response[i]
-
-                                extracted_code = extracted_code.split( "\n" )
-                                del extracted_code[0]
-                                extracted_code = "\n".join( extracted_code )
-
-                                planguage = extracted_code.split( '\n')[0].replace( '```', '' )
-                                try:
-                                    while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
-                                        code = random.randint( 1000, 9999 )
-                                except KeyError:
-                                    while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + ".txt" ):
-                                        code = random.randint( 1000, 9999 )
-
-                                say_response[i] = "extrait de code " + planguage + " numéro " + str( code ) + ", enregistré sur le pc"
-
-                        say_response = ' '.join( say_response )
                         
-                        for i in range( len( prononciation ) ):
-                            while say_response.find( list( prononciation.keys() )[i] ) != -1:
-                                say_response = say_response.replace( list( prononciation.keys() )[i], prononciation[list( prononciation.keys() )[i]] )
-                        
-                        say_response = say_response.split( '`' )
+                        # if uploadVer():
+                        #     uploads = os.listdir( "./uploads" )
+                        #     for i in range( len( uploads ) ):
+                        #         q.append( gemini_client.files.upload( file="./uploads/"+uploads[i] ) )
+                        #         shutil.copyfile( f"./uploads/{uploads[i]}", f"./visual-memory/{moment().replace( ' ', '_' )}.png" )
+                        #         os.remove( "./uploads/"+uploads[i] )
+
+                        output, content = Rika()
+
+                        while len( content["tools"] ) != 0:
+                            for tool in content["tools"]:
+                                if tool["name"] == "openLink":
+                                    result = openLink( tool["params"]["link"] )
+                                    memories.append(
+                                        {
+                                            "role": "user",
+                                            "content": result,
+                                            "name": "openLink tool"
+                                        }
+                                    )
+                                if tool["name"] == "analyseImage":
+                                    result = analyseImage( tool["params"]["source"], tool["params"]["prompt"], tool["params"]["renew"] )
+                                    memories.append(
+                                        {
+                                            "role": "user",
+                                            "content": result,
+                                            "name": "analyseImage tool"
+                                        }
+                                    )
+                                if tool["name"] == "openApp":
+                                    result = openApp( tool["params"]["app"] )
+                                    memories.append(
+                                        {
+                                            "role": "user",
+                                            "content": result,
+                                            "name": "openApp tool"
+                                        }
+                                    )
+                                if tool["name"] == "getLocalisation":
+                                    result = getLocalisation()
+                                    memories.append(
+                                        {
+                                            "role": "user",
+                                            "content": result,
+                                            "name": "getLocalisation tool"
+                                        }
+                                    )
+                                if tool["name"] == "notUnderstand":
+                                    raise MyException( "the llm didn't undersand (not undestand tool)" )
+                                if tool["name"] == "sleepSystem":
+                                    sleepSystem = True
+                            
+                            output, content = Rika()
 
 
-                        print( "Rika : ", response )
-                        memory[question] = response
 
-
-                        # language = ver_model.send_message( "Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre : " + ' '.join( say_response ) ).text.replace( '\n', '' )
-                        language = langVer( ' '.join( say_response ) )
-
-                        if AUDIO:
-                            if language == "fr":
-                                # home.send_msg( ' '.join( say_response ), device )
-                                for i in range( len( say_response ) ):
-                                    if i % 2 == 0:
-                                        Sound.say( say_response[i], WORD_PER_MINUTE, "fr" )
-                                    elif i % 2 == 1:
-                                        Sound.say( say_response[i], WORD_PER_MINUTE, "en" )
-                            else:
-                                # home.send_msg( ' '.join( say_response ).replace( '`', '' ), device )
-                                Sound.say( ' '.join( say_response ), WORD_PER_MINUTE, "en" )
-
-
-
-
-                        last_question = question
                         question = ""
 
                         # print( f"{memory=}" )
                         # print( f"{memories=}" )
 
                         # print( "calc 4" )
-                        if not need_ver.join():
-                            memory["moment end"] = moment()
-                            memories.append( memory )
+                        if sleepSystem:
                             print( "Saving memory..." )
                             Json.write( memories, "memory.json" )
-                            Json.write( old_memories, "old_mem.json" )
                             break
 
-                    except TypeError as e:
-                        pass
+                    # except TypeError as e:
+                    #     pass
                     except MyException:
                         pass
     except KeyboardInterrupt:
-        if not memories[len( memories )-1] == memory:
-            memory["moment end"] = moment()
-            memories.append( memory )
-            print( "Saving memory..." )
-            Json.write( memories, "memory.json" )
-            Json.write( old_memories, "old_mem.json" )
+        print( "Saving memory..." )
+        Json.write( memories, "memory.json" )
         System.clear()
         print( "exiting..." )
         exit( 0 )
