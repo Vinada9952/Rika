@@ -4,6 +4,7 @@ import os
 import random
 from threading import Thread
 from PIL import Image
+from groq import RateLimitError
 import re
 from groq import APIStatusError
 import cv2
@@ -225,6 +226,10 @@ def askGroq( model, config, prompt, max_out_token, temperature ):
             except APIStatusError:
                 time.sleep( 0.5 )
                 retries += 1
+                # print(  )
+            except RateLimitError:
+                time.sleep( 0.5 )
+                # retries += 1
         else:
             response = groq_client.chat.completions.create(
                 model=model,
@@ -414,15 +419,11 @@ Tu DOIS répondre STRICTEMENT en JSON, SANS AUCUN TEXTE EN DEHORS.
 FORMAT OBLIGATOIRE :
 {
     "prompt": prompt,
-    "prompt-lang": "en"|"fr",
-    "response": response,
-    "response-lang": "en"|"fr"
+    "prompt-lang": "en"|"fr"
 }
 
 prompt est le prompt de l'utilisateur
 prompt-lang est la langue du prompt
-response est ta réponse
-response-lang est la langue de ta réponse
 """,
         question,
         1,
@@ -661,6 +662,9 @@ def analyseImage(type, prompt, renew):
             except APIStatusError:
                 time.sleep( 0.5 )
                 retries += 1
+            except RateLimitError:
+                time.sleep( 0.5 )
+                # retries += 1
         else:
             response = groq_client.chat.completions.create(
                 model=groq_image_model,
@@ -718,42 +722,6 @@ loadPrint()#c
 #         loadBar( len( img_mem ) + 1 )
 #     except ValueError:
 #         print( "                                                                                                                      \n" )
-
-
-
-loadPrint()#c
-
-
-WORD_PER_MINUTE = 200 
-AUDIO = Json.read( "data.json" )["audio-mode"]
-language = "fr"
-response = ""
-question = ""
-memories = Json.read( "memory.json" )
-
-GROQ_API_KEY = Json.read( "data.json" )["groq-api-key"]
-
-SCREENSHOT_DIR = Json.read( "data.json" )["screenshot-dir"]
-WEBCAM_PATH = Json.read( "data.json" )["webcam-path"]
-
-groq_client = Groq( api_key=GROQ_API_KEY )
-
-groq_ask_model = Json.read( "data.json" )["groq-ask-model"]
-groq_verify_model = Json.read( "data.json" )["groq-verify-model"]
-groq_image_model = Json.read( "data.json" )["groq-image-model"]
-
-MAX_API_RETRY = Json.read( "data.json" )["max-api-retry"]
-
-loadPrint()#c
-
-
-
-# print( f"{memories=}" )
-# System.file.write( "error.log", "-- Log Start --", Type.file.trunc )
-
-# for i in range( len( memories ) ):
-#     if len( memories[i].keys() ) == 2:
-#         memories.pop( i )
 
 
 loadPrint()#c
@@ -864,6 +832,59 @@ RÈGLES IMPORTANTES :
 - Ne JAMAIS écrire autre chose que du JSON
 """
 
+
+loadPrint()#c
+
+
+WORD_PER_MINUTE = 200
+AUDIO = Json.read( "data.json" )["audio-mode"]
+language = "fr"
+response = ""
+question = ""
+try:
+    memories = Json.read( "memory.json" )
+except FileNotFoundError:
+    memories = [
+        {
+            "role": "system",
+            "content": config,
+            "name": "instructions"
+        }
+    ]
+
+GROQ_API_KEY = Json.read( "data.json" )["groq-api-key"]
+
+SCREENSHOT_DIR = Json.read( "data.json" )["screenshot-dir"]
+WEBCAM_PATH = Json.read( "data.json" )["webcam-path"]
+
+groq_client = Groq( api_key=GROQ_API_KEY )
+
+groq_ask_model = Json.read( "data.json" )["groq-ask-model"]
+groq_verify_model = Json.read( "data.json" )["groq-verify-model"]
+groq_image_model = Json.read( "data.json" )["groq-image-model"]
+
+MAX_API_RETRY = Json.read( "data.json" )["max-api-retry"]
+
+loadPrint()#c
+
+
+
+for f in os.listdir(SCREENSHOT_DIR):
+    path = os.path.join(SCREENSHOT_DIR, f)
+    shutil.rmtree(path) if os.path.isdir(path) else os.remove(path)
+
+
+# print( f"{memories=}" )
+# System.file.write( "error.log", "-- Log Start --", Type.file.trunc )
+
+# for i in range( len( memories ) ):
+#     if len( memories[i].keys() ) == 2:
+#         memories.pop( i )
+
+
+
+
+
 loadPrint()#c
 
 call_names = [
@@ -922,6 +943,8 @@ def Rika():
     #     except APIStatusError:
     #         time.sleep( 0.5 )
 
+    print( "thinking..." )
+
     retries = 0
     while True:
         if retries != MAX_API_RETRY + 1:
@@ -931,16 +954,22 @@ def Rika():
                     messages=memories
                 ).choices[0].message.content
                 break
-            except APIStatusError:
+            # except APIStatusError:
+            #     time.sleep( 0.5 )
+            #     retries += 1
+            #     print( f"{retries=}", end='\r' )
+            except RateLimitError:
                 time.sleep( 0.5 )
-                retries += 1
+                # retries += 1
         else:
             print( json.dumps( memories, indent=4 ) )
-            response = groq_client.chat.completions.create(
+            output = groq_client.chat.completions.create(
                 model=groq_image_model,
                 messages=memories
-            )
+            ).choices[0].message.content
             break
+
+    print( "treating...", end='\r' )
 
     content = json.loads( output )
 
@@ -1101,7 +1130,7 @@ while True:
                         
                         # print( f"{image=}" )
 
-                        print( "chargement..." )
+                        print( "chargement...", end='\r' )
 
                         memories.append(
                             {
@@ -1122,6 +1151,7 @@ while True:
                         output, content = Rika()
 
                         while len( content["tools"] ) != 0:
+                            used_tools = content["tools"]
                             for tool in content["tools"]:
                                 if tool["name"] == "openLink":
                                     result = openLink( tool["params"]["link"] )
@@ -1164,7 +1194,20 @@ while True:
                                 if tool["name"] == "sleepSystem":
                                     sleepSystem = True
                             
-                            output, content = Rika()
+                            active_tools = [
+                                "analyseImage",
+                                "getLocalisation"
+                            ]
+                            need_response = False
+                            for tool in used_tools:
+                                if tool["name"] in active_tools:
+                                    need_response = True
+                                    break
+
+                            if need_response:
+                                output, content = Rika()
+                            else:
+                                content["tools"] = []
 
 
 

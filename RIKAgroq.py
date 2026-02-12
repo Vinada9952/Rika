@@ -1,0 +1,631 @@
+import os
+import cv2
+import base64
+import subprocess
+import json
+import requests
+import mss
+from groq import Groq
+from groq import APIStatusError
+import re
+import random
+from PIL import Image
+import requests
+import time
+import pyautogui
+import speech_recognition as sr
+import pyttsx3
+import webbrowser
+import edge_tts
+import pygame
+import asyncio
+
+class ExitAgent(Exception):
+    pass
+
+class Type:
+    def get_type( var ):
+        try:
+            if var == list( var ):
+                return "list"
+            elif var == str( var ):
+                return "str"
+        except TypeError:
+            try:
+                if var == int( var ):
+                    return "int"
+                elif var == float( var ):
+                    return "float"
+                elif var == bool( var ):
+                    return "bool"
+                else:
+                    return "Unknown type"
+            except TypeError:
+                return "Unknown type"
+    class file:
+        append = 'a'
+        trunc = 'w'
+        read = 'r'
+        create = 'x'
+    def list_cut( origin: str, separator: str ):
+        traitement = ""
+        origin = origin+separator
+        output = []
+        for i in range( len( origin ) ):
+            if origin[i] == separator:
+                output.append( traitement )
+                traitement = ""
+            else:
+                traitement += origin[i]
+        return output
+
+class Json:
+    def write( informations: dict, json_name: str ):
+        json_object = json.dumps( informations, indent=4 )
+        with open( json_name, Type.file.trunc, encoding="utf-8" ) as outfile:
+            outfile.write( json_object )
+    def read( json_name: str ):
+        with open( json_name, Type.file.read, encoding="utf-8" ) as infile:
+            informations = json.load( infile )
+        return informations
+
+pygame.mixer.init()
+class Sound:
+
+    def listen( language: str = "fr-FR" ):
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            try:
+                r.adjust_for_ambient_noise( 1 )
+            except AssertionError:
+                pass
+            # r.adjust_for_ambient_noise( 1 )
+            audio_data = r.listen( source=source, phrase_time_limit=10 )
+        try:
+            text = r.recognize_google( audio_data, language=language )
+            text = str( text )
+            return text
+        except sr.UnknownValueError:
+            return -1
+        except sr.RequestError:
+            return -2
+    
+    async def getVoices():
+        return await edge_tts.list_voices()
+
+
+    async def _generateVoice(text, voice):
+        text = "   " + text.replace( "*", "" ).replace( "\n", ".     " )
+        if type( voice ) == str:
+            communicate = edge_tts.Communicate(text, voice)
+            await communicate.save("./cache/output.mp3")
+        else:
+            communicate = edge_tts.Communicate(text, voice["ShortName"])
+            await communicate.save("./cache/output.mp3")
+    
+    def generateVoice( text, voice ):
+        return asyncio.run( Sound._generateVoice( text, voice ) )
+    
+    async def _playVoice():
+        pygame.mixer.music.load("./cache/output.mp3")
+        pygame.mixer.music.play()
+    
+    def playVoice():
+        return asyncio.run( Sound._playVoice() )
+    
+    def waitForVoiceToFinish():
+        while pygame.mixer.music.get_busy():
+            pygame.time.Clock().tick(10)
+        pygame.mixer.music.unload()
+
+# =====================
+# CONFIG
+# =====================
+
+API_KEYS = [
+    "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",
+    "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"
+]
+client = Groq( api_key="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" )
+
+
+call_names = [
+    "ikea",
+    "reka",
+    "richard",
+    "requin",
+    "pékin",
+    "rica",
+    "ric",
+    "rita",
+    "rika"
+]
+
+
+# prononciation = {
+#     "C#": "C sharp",
+#     "macOS": "maque O.S.",
+#     "Linux": "Linuxe",
+#     "_": " ",
+#     "tuê": "touè",
+#     "Tuê": "Touè",
+#     "Minh": "Migne",
+#     "minh": "Migne",
+#     "Rika": "Ri-k",
+#     "rika": "Ri-k",
+#     "Chambly": "Chanbly",
+#     "Donald Trump": "`Donald Trump`",
+#     "Los Angeles": "Los Angel",
+#     "DroidCam": "Droïd Came"
+# }
+
+AUDIO = True
+
+MAIN_MODEL = "groq/compound"
+VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+
+VOICE = "fr-CA-SylvieNeural"
+
+SCREENSHOT_DIR = "screenshots"
+WEBCAM_PATH = "captured.jpg"
+
+MAX_RETRIES = 10
+
+data = requests.get( "https://vinada9952rika.pythonanywhere.com/getConversation" )
+# print( data )
+# print( data.json() )
+conversation = data.json()["conversation"]
+# print( conversation )
+
+# =====================
+# SETUP
+# =====================
+os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+
+# =====================
+# IMAGE TO BASE64
+# =====================
+def image_to_base64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+# =====================
+# TOOL: openLink
+# =====================
+def openLink( link ):
+    return f"Link opened successfully ({link})" if webbrowser.open( link ) else "No link opened"
+
+# =====================
+# TOOL: openApp
+# =====================
+def openApp( app: str ):
+    app = app.lower()
+    if app == "spotify":
+        os.system( "spotify.exe" )
+        return "Spotify open successfull"
+    if app == "teams":
+        os.system( "ms-teams.exe" )
+        return "Microsoft Teams open successfull"
+    if app == "discord":
+        pyautogui.typewrite( "dscrd " )
+        return "Discord open successfull"
+    if app == "snapchat":
+        pyautogui.typewrite( "snap " )
+        return "Snapchat open successfull"
+    if app == "social":
+        pyautogui.typewrite( "rs " )
+        return "Snapchat, Discord, Microsoft Teams open successfull"
+    if app == "vs code":
+        pyautogui.typewrite( "vs code " )
+        return "Visual Studio Code open successfull"
+    # return f"Link opened successfully ({link})" if webbrowser.open( link ) else "No link opened"
+
+# def runCommand():
+#     subprocess.run
+
+
+# =====================
+# TOOL: getLocalisation
+# =====================
+def getLocalisation():
+    try:
+        response = requests.get('https://ipinfo.io/json')
+        data = str(response.json())
+        # print( "localisation saved" )
+        return data
+    except Exception as e:
+        return "Error getting localisation"
+    
+# =====================
+# TOOL: sleepSystem
+# =====================
+def sleepSystem():
+    # Json.write( conversation, "./conversation.json" )
+    requests.post( "https://vinada9952rika.pythonanywhere.com/setConversation", json={"conversation": conversation} )
+    Sound.waitForVoiceToFinish()
+    raise ExitAgent()
+    exit( 0 )
+
+# =====================
+# TOOL: getImage
+# =====================
+def getImage(type):
+    if type == "screenshot":
+        with mss.mss() as sct:
+            for i, monitor in enumerate(sct.monitors[1:], start=1):
+                shot = sct.grab(monitor)
+                img = Image.frombytes("RGB", shot.size, shot.rgb)
+                path = os.path.join(SCREENSHOT_DIR, f"screen_{i}.jpg")
+                img.save(path)
+
+        return f"Screenshots capturés ({len(sct.monitors) - 1} écrans)"
+
+    if type == "webcam":
+        cap = cv2.VideoCapture(0)
+        ret, frame = cap.read()
+        cap.release()
+        if not ret:
+            return "Erreur webcam"
+        cv2.imwrite(WEBCAM_PATH, frame)
+        return "Image webcam capturée"
+
+    return "Type invalide"
+
+# =====================
+# TOOL: analyseImage
+# =====================
+def analyseImage(type, prompt, renew):
+    messages = []
+    if renew:
+        getImage( type )
+
+    if type == "screenshot":
+        files = sorted(
+            f for f in os.listdir(SCREENSHOT_DIR)
+            if f.lower().endswith(".jpg")
+        )
+
+        if not files:
+            return "Aucun screenshot disponible"
+
+        content = [{"type": "text", "text": prompt}]
+
+        for file in files:
+            path = os.path.join(SCREENSHOT_DIR, file)
+            image_b64 = image_to_base64(path)
+            content.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{image_b64}"
+                }
+            })
+
+        messages.append({
+            "role": "user",
+            "content": content
+        })
+
+    elif type == "webcam":
+        if not os.path.exists(WEBCAM_PATH):
+            return "Aucune image webcam disponible"
+
+        image_b64 = image_to_base64(WEBCAM_PATH)
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_b64}"
+                    }
+                }
+            ]
+        })
+
+    else:
+        return "Type invalide"
+
+    response = client.chat.completions.create(
+        model=VISION_MODEL,
+        messages=messages
+    )
+
+    return response.choices[0].message.content
+
+def removeEmojis(text):
+    emoji_pattern = re.compile(
+        "["
+        "\U0001F600-\U0001F64F"  # emoticônes
+        "\U0001F300-\U0001F5FF"  # symboles & pictogrammes
+        "\U0001F680-\U0001F6FF"  # transport & cartes
+        "\U0001F1E0-\U0001F1FF"  # drapeaux
+        "\U00002700-\U000027BF"  # divers symboles
+        "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
+        "\U00002600-\U000026FF"  # Divers symboles
+        "\U00002B50-\U00002B55"  # étoiles, etc.
+        "]+",
+        flags=re.UNICODE
+    )
+    return emoji_pattern.sub(r'', text)
+
+file_extensions = {
+    "python": "py",
+    "c++": "cpp",
+    "java": "java",
+    "html": "html",
+    "javascript": "js",
+    "batch": "bat",
+    "css": "css"
+}
+
+
+# def splitForSpeach(text):
+#     """
+#     Split une string selon '.', ',' et '`'
+#     Retourne une liste de dict :
+#     [{"word": mot, "lang": lang}, ...]
+
+#     La langue est 'fr' par défaut.
+#     Chaque fois que le séparateur est '`', la langue toggle entre 'fr' et 'en'.
+#     """
+
+#     separators = {'.', ',', '`'}
+#     result = []
+
+#     current_word = ""
+#     current_lang = "fr"
+
+#     for char in text:
+#         if char in separators:
+#             # Si on a un mot en cours, on l'ajoute
+#             if current_word.strip():
+#                 result.append({
+#                     "word": current_word.strip(),
+#                     "lang": current_lang
+#                 })
+#                 current_word = ""
+
+#             # Si le séparateur est ` → toggle langue
+#             if char == "`":
+#                 current_lang = "en" if current_lang == "fr" else "fr"
+#         else:
+#             current_word += char
+
+#     # Ajouter le dernier mot si présent
+#     if current_word.strip():
+#         result.append({
+#             "word": current_word.strip(),
+#             "lang": current_lang
+#         })
+
+#     return result
+
+
+def treatResponse( response ):
+
+    # print( f"{AUDIO=}" )
+    # print( "treatResponse", response )
+
+    say_response = response
+    say_response = say_response.replace( '*', '' )
+    say_response = removeEmojis( say_response )
+    say_response = say_response.replace( '\n', '.' )
+
+
+    say_response = say_response.split( '```' )
+    code = 0
+    for i in range( len( say_response ) ):
+        if i % 2 == 1:
+            extracted_code = say_response[i]
+
+            extracted_code = extracted_code.split( "\n" )
+            del extracted_code[0]
+            extracted_code = "\n".join( extracted_code )
+
+            planguage = extracted_code.split( '\n')[0].replace( '```', '' )
+            try:
+                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
+                    code = random.randint( 1000, 9999 )
+            except KeyError:
+                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + ".txt" ):
+                    code = random.randint( 1000, 9999 )
+
+            say_response[i] = "extrait de code " + planguage + " numéro " + str( code ) + ", enregistré sur le pc"
+
+    say_response = ' '.join( say_response )
+    
+    # for i in range( len( prononciation ) ):
+    #     while say_response.find( list( prononciation.keys() )[i] ) != -1:
+    #         say_response = say_response.replace( list( prononciation.keys() )[i], prononciation[list( prononciation.keys() )[i]] )
+    
+    # say_response = say_response.split( '`' )
+    say_response = say_response.replace( '`', '' )
+
+
+    # language = ver_model.send_message( "Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre : " + ' '.join( say_response ) ).text.replace( '\n', '' )
+    language = "fr"
+
+    if AUDIO:
+            # home.send_msg( ' '.join( say_response ), device )
+        # for i in range( len( say_response ) ):
+        Sound.waitForVoiceToFinish()
+        Sound.generateVoice( say_response, VOICE )
+        Sound.playVoice()
+
+
+# =====================
+# MAIN LOOP
+# =====================
+def chat():
+
+
+    while True:
+        user_input = ""
+        if AUDIO:
+            print( "YOU > ", end="" )
+            user_input = Sound.listen()
+            print( user_input )
+        else:
+            user_input = input("YOU > ")
+        
+        if type( user_input ) == str:
+
+            conversation.append({"role": "user", "content": user_input, "name": "user"})
+
+            response = None
+            # while True:
+            for i in range( MAX_RETRIES ):
+                try:
+                    response = client.chat.completions.create(
+                        model=MAIN_MODEL,
+                        messages=conversation
+                    )
+                    break
+                except APIStatusError as e:
+                    if e.status_code == 429:
+                        client.api_key = random.choice( API_KEYS )
+                    time.sleep(0.5)
+
+            content = json.loads( response.choices[0].message.content )
+            conversation.append(
+                {
+                    "role": "assistant",
+                    "content": response.choices[0].message.content
+                }
+            )
+            print("🤖 >", content["message"])
+            if AUDIO:
+                treatResponse( content["message"] )
+
+            notUnderstand = False
+            while len( content["tools"] ) != 0:
+                for tool in content["tools"]:
+                    if tool["name"] == "analyseImage":
+                        result = analyseImage( tool["params"]["source"], tool["params"]["prompt"], tool["params"]["renew"] )
+                        conversation.append(
+                            {
+                                "role": "user",
+                                "content": result,
+                                "name": "analyseImage tool"
+                            }
+                        )
+                    if tool["name"] == "openLink":
+                        result = openLink( tool["params"]["link"] )
+                        conversation.append(
+                            {
+                                "role": "user",
+                                "content": result,
+                                "name": "openLink tool"
+                            }
+                        )
+                    if tool["name"] == "getLocalisation":
+                        result = getLocalisation()
+                        conversation.append(
+                            {
+                                "role": "user",
+                                "content": result,
+                                "name": "getLocalisation tool"
+                            }
+                        )
+                    if tool["name"] == "openApp":
+                        result = openApp( tool["params"]["app"] )
+                        conversation.append(
+                            {
+                                "role": "user",
+                                "content": result,
+                                "name": "openApp tool"
+                            }
+                        )
+                    if tool["name"] == "notUnderstand":
+                        notUnderstand = True
+                        break
+                    if tool["name"] == "sleepSystem":
+                        sleepSystem()
+                if notUnderstand:
+                    break
+                # while True:
+                for i in range( MAX_RETRIES ):
+                    try:
+                        response = client.chat.completions.create(
+                            model=MAIN_MODEL,
+                            messages=conversation
+                        )
+                        break
+                    except APIStatusError as e:
+                        if e.status_code == 429:
+                            client.api_key = random.choice( API_KEYS )
+                        time.sleep( 0.5 )
+                conversation.append(
+                    {
+                        "role": "assistant",
+                        "content": response.choices[0].message.content
+                    }
+                )
+                content = json.loads( response.choices[0].message.content )
+                if AUDIO:
+                    treatResponse( content["message"] )
+                print("🤖 >", content["message"])
+
+# =====================
+# START
+# =====================
+try:
+    if __name__ == "__main__":
+        print("🤖 RIKA")
+        while True:
+            # question = input("...\n")
+
+            question = ""
+            if not AUDIO:
+                question = "rika"
+                # question = input( "...\n" )
+            else:
+                print( "..." )
+                question = Sound.listen()
+                print( question )
+
+            called = False
+            if type( question ) == str:
+                calls = question.lower().split( ' ' )
+                for call_name in call_names:
+                    for call in calls:
+                        if call.find( call_name ) != -1:
+                            called = True
+                            break
+                    if called:
+                        break
+            
+            if called:
+                try:
+                    chat()
+                except ExitAgent:
+                    print( "Zzz..." )
+                    time.sleep( 2 )
+
+
+except KeyboardInterrupt:
+    # Sauvegarde brute pour debug
+    for message in conversation:
+        if message["role"] == "assistant":
+            message["content"] = json.loads( message["content"] )
+    with open("./debug.log", "w", encoding="utf-8") as f:
+        json.dump(conversation, f, ensure_ascii=False, indent=2)
+
+    # Affichage formaté dans la console
+    print("\n📝 Debug conversation (KeyboardInterrupt)\n")
+    for i, message in enumerate(conversation, start=1):
+        role = message.get("role", "unknown")
+        name = message.get("name", "")
+        content = message.get("content", "")
+
+        print(f"--- Message {i} ---")
+        print(f"Role : {role}")
+        if name:
+            print(f"Name : {name}")
+        if isinstance(content, str):
+            print(f"Content : {content}")
+        else:
+            # Si content est déjà un dict ou JSON
+            print(f"Content : {json.dumps(content, ensure_ascii=False, indent=2)}")
+        print("--------------------\n")
