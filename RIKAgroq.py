@@ -124,25 +124,11 @@ class Sound:
 # CONFIG
 # =====================
 
-API_KEYS = [
-    "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",
-    "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",
-    "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"
-]
+API_KEYS = Json.read( "settings.json" )["api-keys"]
 client = Groq( api_key=random.choice( API_KEYS ) )
 
 
-call_names = [
-    "ikea",
-    "reka",
-    "richard",
-    "requin",
-    "pékin",
-    "rica",
-    "ric",
-    "rita",
-    "rika"
-]
+call_names = Json.read( "settings.json" )["call-names"]
 
 
 # prononciation = {
@@ -162,18 +148,20 @@ call_names = [
 #     "DroidCam": "Droïd Came"
 # }
 
-AUDIO = True
+AUDIO = Json.read( "settings.json" )["audio"]
 
-MAIN_MODEL = "groq/compound"
-VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
-ASK_MODEL = "llama-3.1-8b-instant"
+MAIN_MODEL = Json.read( "settings.json" )["models"]["main"]
+VISION_MODEL = Json.read( "settings.json" )["models"]["vision"]
+ASK_MODEL = Json.read( "settings.json" )["models"]["data"]
 
-VOICE = "fr-CA-SylvieNeural"
+VOICE = Json.read( "settings.json" )["voice"]
 
-SCREENSHOT_DIR = "screenshots"
-WEBCAM_PATH = "captured.jpg"
+SCREENSHOT_DIR = Json.read( "settings.json" )["directories"]["screenshots"]
+WEBCAM_PATH = Json.read( "settings.json" )["directories"]["webcam"]
 
-MAX_RETRIES = 10
+MAX_RETRIES = Json.read( "settings.json" )["max-api-retries"]
+
+AUDIO_DURATION_LIMIT = Json.read( "settings.json" )["audio-duration-threshold"]
 
 data = requests.get( "https://vinada9952rika.pythonanywhere.com/getConversation" )
 # print( data )
@@ -369,7 +357,7 @@ def getLocalisation():
         return data
     except Exception as e:
         return "Error getting localisation"
-    
+
 # =====================
 # TOOL: sleepSystem
 # =====================
@@ -634,7 +622,7 @@ def treatResponse( response ):
         Sound.waitForVoiceToFinish()
         Sound.generateVoice( say_response, VOICE )
         # print( f"Durée de l'audio : {getAudioDuration( './cache/output.mp3' )} secondes" )
-        if getAudioDuration( "./cache/output.mp3" ) > 15:
+        if getAudioDuration( "./cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
             say_response = summarized( say_response ) + " " + reformulate( "Plus d'informations sont affiché à l'écran" )
             # print( "Résumé pour audio trop long :", say_response )
             Sound.generateVoice( say_response, VOICE )
