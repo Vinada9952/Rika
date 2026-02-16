@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rika Vocal</title>
+</head>
+<body>
+
+<h1>🤖 RIKA VOCAL</h1>
+
+<div id="chat"></div>
+
+<button onclick="startListening()">🎤 Parler</button>
+
+<br><br>
+<video id="video" autoplay width="300"></video>
+
+<script>
+let recognition;
+let video = document.getElementById("video");
+
+// =====================
+// WEBCAM
+// =====================
+window.onload = async function () {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Ton navigateur ne supporte pas getUserMedia");
+        return;
+    }
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+        });
+        video.srcObject = stream;
+    } catch (err) {
+        console.error("Erreur accès caméra/micro:", err);
+    }
+
+    // =====================
+    // RECONNAISSANCE VOCALE
+    // =====================
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        alert("SpeechRecognition non supporté");
+        return;
+    }
+
+    recognition = new SpeechRecognition();
+    recognition.lang = "fr-FR";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = function (event) {
+        let transcript = event.results[0][0].transcript;
+
+        document.getElementById("chat").innerHTML +=
+            "<p><b>Vous:</b> " + transcript + "</p>";
+
+        sendToServer(transcript);
+    };
+
+    recognition.onerror = function (event) {
+        console.error("Erreur micro:", event.error);
+    };
+};
+
+// =====================
+// START LISTENING
+// =====================
+function startListening() {
+    if (recognition) recognition.start();
+}
+
+// =====================
+// ENVOI AU SERVEUR
+// =====================
+async function sendToServer(text) {
+
+    // Capture webcam
+    let canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    let ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0);
+    let image = canvas.toDataURL("image/jpeg");
+
+    // Géolocalisation
+    let location = await new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(pos => {
+            resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        }, () => resolve(null));
+    });
+
+    let response = await fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            message: text,
+            image: image,
+            location: location
+        })
+    });
+
+    let data = await response.json();
+
+    document.getElementById("chat").innerHTML +=
+        "<p><b>Rika:</b> " + data.message + "</p>";
+
+    let audio = new Audio(data.audio);
+    audio.play();
+}
+
+</script>
+
+</body>
+</html>

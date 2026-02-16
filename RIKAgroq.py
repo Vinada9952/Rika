@@ -7,6 +7,7 @@ import requests
 import mss
 from groq import Groq
 from groq import APIStatusError
+from pydub import AudioSegment
 import re
 import random
 from PIL import Image
@@ -14,6 +15,7 @@ import requests
 import time
 import pyautogui
 import speech_recognition as sr
+from pygrabber.dshow_graph import FilterGraph
 import pyttsx3
 import webbrowser
 import edge_tts
@@ -159,10 +161,11 @@ call_names = [
 #     "DroidCam": "Droïd Came"
 # }
 
-AUDIO = True
+AUDIO = False
 
 MAIN_MODEL = "groq/compound"
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
+ASK_MODEL = "llama-3.1-8b-instant"
 
 VOICE = "fr-CA-SylvieNeural"
 
@@ -174,13 +177,143 @@ MAX_RETRIES = 10
 data = requests.get( "https://vinada9952rika.pythonanywhere.com/getConversation" )
 # print( data )
 # print( data.json() )
-conversation = data.json()["conversation"]
+# conversation = data.json()["conversation"]
+conversation = data.json()
 # print( conversation )
+
+# conversation = [
+#     {
+#         "role": "developer",
+#         "name": "instructions",
+#         "content": """
+# Tu t'appelles Rika
+
+# Tu es développé par Vincent Tuê Minh Boucher
+
+# À CHAQUE MESSAGE, tu dois suivre ce raisonnement :
+# 1) Décider si une action est nécessaire pour répondre correctement
+# 2) Si OUI, tu DOIS utiliser un ou plusieurs outils
+# 3) Si NON, tu réponds sans outil
+
+# Tu DOIS répondre STRICTEMENT en JSON, SANS AUCUN TEXTE EN DEHORS.
+
+# FORMAT OBLIGATOIRE :
+
+# {
+#   "message": "ce que tu dis à l'utilisateur",
+#   "tools": []
+# }
+
+# ou, si des actions sont nécessaires :
+
+# {
+#   "message": "ce que tu dis à l'utilisateur",
+#   "tools": [
+#     {
+#       "name": "openLink",
+#       "params": {
+#         "link": "https://www.google.com/search?q=latest+news+about+ai"
+#       }
+#     },
+#     {
+#       "name": "analyseImage",
+#       "params": {
+#         "source": "screenshot",
+#         "prompt": "Décris ce que tu vois sur tous les écrans"
+#       }
+#     }
+#   ]
+# }
+
+# OUTILS DISPONIBLES :
+
+# - getLocalisation
+#   - Obtenir la localisation de l'utilisateur
+#   - exemples de cas d'utilisation:
+#   -> Où suis-je ?
+
+# - sleepSystem
+#   - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
+#   - CE N'EST PAS UNE EXTINCTION DÉFNITIVE, l'utilisateur te rappellera après
+#   - quand appeler la fonction (exemples):
+#   -> Merci : oui
+#   -> Merci, est ce que tu peux me l'ouvrir ?
+#   -> Explique moi la thermodynamique : non
+#   -> Génère moi un code python qui dit Bonjour : non
+#   -> au revoir : oui
+#   -> allo : non
+#   -> bye : oui
+#   -> Connard, t'es pas bon : oui
+#   -> Description de personne : non
+#   -> je t'ai donné l'information : non
+#   -> est ce que tu te rappelles d'une partie d'échec que tu jouais ? : non
+#   -> Qui es Warren Buffet : non
+#   -> Qui es le PDG de Nvidia présentement : non
+
+# - notUnderstand
+#   - Quand tu ne comprends pas le prompt de l'utilisateur, utilise cet outil pour clarifier le prompt
+
+# - analyseImage
+#   - UTILISATION OBLIGATOIRE si tu dois analyser une image
+#   - params:
+#   -> source (string): "webcam" | "screenshot": source de l'image
+#   -> prompt (string): texte: ce que tu demandes de l'image
+#   -> renew (bool): true|false: capturer une nouvelle image (true) ou garder la dernière image capturé (false)
+#   - exemples de cas d'utilisation:
+#   -> Regarde
+#   -> Que vois-tu ?
+#   -> j'ai un bug dans mon code
+
+# - openApp
+#   - ouvrir une application dans la liste des applications autorisés
+#   - params:
+#   -> app (string): application à ouvrir
+#   - applications autorisés:
+#   -> spotify
+#   -> teams
+#   -> discord
+#   -> snapchat
+#   -> social
+#   -> vs code
+
+# - openLink
+#   - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
+#   - Avant de l'utiliser, vérifie toi-même sur internet si le lien fonctionne
+#   - params:
+#   -> link (string): lien à ouvrir dans un navigateur pour montrer à l'utilisateur
+#   - exemples de cas d'utilisation:
+#   -> Je veux voir une vidéo youtube
+#   -> trouve moi les scores des olympiques
+#   -> trouve moi une carte de montréal
+
+# RÈGLES IMPORTANTES :
+# - L’ordre des outils est l’ordre d’exécution
+# - Si l'utilisateur demande un lien, **NE DONNE PAS LE LIEN DANS LE MESSAGE**, mets toujours un tool openLink.
+# - Si aucune action n’est nécessaire, tools DOIT être []
+# - Ne JAMAIS écrire autre chose que du JSON
+# """
+#     }
+# ]
 
 # =====================
 # SETUP
 # =====================
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+
+def get_camera_index( search ) :
+
+    devices = FilterGraph().get_input_devices()
+
+    available_cameras = {}
+
+    for device_index, device_name in enumerate(devices):
+        available_cameras[device_index] = device_name
+
+    for index, name in available_cameras.items():
+        if name.find(search) != -1:
+            return index
+
+    return -1
 
 # =====================
 # IMAGE TO BASE64
@@ -241,14 +374,17 @@ def getLocalisation():
 # =====================
 def sleepSystem():
     # Json.write( conversation, "./conversation.json" )
-    requests.post( "https://vinada9952rika.pythonanywhere.com/setConversation", json={"conversation": conversation} )
+    requests.post( "https://vinada9952rika.pythonanywhere.com/setConversation", json=conversation )
+    Json.write( conversation, "./conversation.json" )
     Sound.waitForVoiceToFinish()
     raise ExitAgent()
-    exit( 0 )
+    # exit( 0 )
 
 # =====================
 # TOOL: getImage
 # =====================
+cap = cv2.VideoCapture(get_camera_index("USB"))
+# cap.release()
 def getImage(type):
     if type == "screenshot":
         with mss.mss() as sct:
@@ -261,9 +397,7 @@ def getImage(type):
         return f"Screenshots capturés ({len(sct.monitors) - 1} écrans)"
 
     if type == "webcam":
-        cap = cv2.VideoCapture(0)
         ret, frame = cap.read()
-        cap.release()
         if not ret:
             return "Erreur webcam"
         cv2.imwrite(WEBCAM_PATH, frame)
@@ -401,6 +535,27 @@ file_extensions = {
 
 #     return result
 
+def summarized( response ):
+    summary = client.chat.completions.create(
+        model=ASK_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": "Ressort uniquement du Json avec ce format : {\"message\": \"résumé du texte\"}, sans rien d'autre, pas de texte en dehors du Json, pas de guillemets avant ou après le Json, rien d'autre que le Json, pas de point d'exclamation, pas de smiley, pas de ponctuation inutile, juste le strict minimum pour faire un résumé très concis du texte donné. Le résumé doit être très court et concis, il doit ressortir l'essentiel du texte sans détails inutiles."
+            },
+            {
+                "role": "user",
+                "content": response
+            }
+        ]
+    )
+
+    return summary.choices[0].message.content
+
+def getAudioDuration(file_path):
+    audio = AudioSegment.from_file(file_path)
+    duration_seconds = audio.duration_seconds
+    return int(f"{duration_seconds:.2f}")
 
 def treatResponse( response ):
 
@@ -451,8 +606,23 @@ def treatResponse( response ):
         # for i in range( len( say_response ) ):
         Sound.waitForVoiceToFinish()
         Sound.generateVoice( say_response, VOICE )
+        if getAudioDuration( "./cache/output.mp3" ) > 10:
+            say_response = summarized( say_response )
+            print( "Résumé pour audio trop long :", say_response )
+            Sound.generateVoice( say_response, VOICE )
         Sound.playVoice()
 
+def getUserInput():
+    user_input = ""
+    if AUDIO:
+        # Sound.waitForVoiceToFinish()
+        # print( "YOU > ", end="" )
+        # user_input = Sound.listen()
+        # print( user_input )
+        user_input = input("YOU > ") # MODIFDEBUG
+    else:
+        user_input = input("YOU > ")
+    return user_input
 
 # =====================
 # MAIN LOOP
@@ -461,17 +631,19 @@ def chat():
 
 
     while True:
-        user_input = ""
-        if AUDIO:
-            print( "YOU > ", end="" )
-            user_input = Sound.listen()
-            print( user_input )
-        else:
-            user_input = input("YOU > ")
+        user_input = getUserInput()
         
         if type( user_input ) == str:
 
-            conversation.append({"role": "user", "content": user_input, "name": "user"})
+            # print( f"{type(conversation)=}" )
+            # print( f"{conversation=}" )
+            conversation.append(
+                {
+                    "role": "user",
+                    "content": user_input,
+                    "name": "Vincent"
+                }
+            )
 
             response = None
             # while True:
@@ -501,8 +673,20 @@ def chat():
             notUnderstand = False
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
-                    if tool["name"] == "analyseImage":
-                        result = analyseImage( tool["params"]["source"], tool["params"]["prompt"], tool["params"]["renew"] )
+                    if tool["name"] == "analyseOldImage":
+                        result = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                        conversation.append(
+                            {
+                                "role": "user",
+                                "content": result,
+                                "name": "analyseImage tool"
+                            }
+                        )
+                    if tool["name"] == "analyseNewImage":
+                        try:
+                            result = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
+                        except KeyError:
+                            result = "Paramètres invalides pour analyseImage"
                         conversation.append(
                             {
                                 "role": "user",
@@ -585,7 +769,9 @@ try:
                 question = Sound.listen()
                 print( question )
 
+
             called = False
+            called = True # MODIFDEBUG
             if type( question ) == str:
                 calls = question.lower().split( ' ' )
                 for call_name in call_names:
