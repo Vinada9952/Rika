@@ -126,9 +126,10 @@ class Sound:
 
 API_KEYS = [
     "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",
-    "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"
+    "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",
+    "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"
 ]
-client = Groq( api_key="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" )
+client = Groq( api_key=random.choice( API_KEYS ) )
 
 
 call_names = [
@@ -161,7 +162,7 @@ call_names = [
 #     "DroidCam": "Droïd Came"
 # }
 
-AUDIO = False
+AUDIO = True
 
 MAIN_MODEL = "groq/compound"
 VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
@@ -541,7 +542,14 @@ def summarized( response ):
         messages=[
             {
                 "role": "system",
-                "content": "Ressort uniquement du Json avec ce format : {\"message\": \"résumé du texte\"}, sans rien d'autre, pas de texte en dehors du Json, pas de guillemets avant ou après le Json, rien d'autre que le Json, pas de point d'exclamation, pas de smiley, pas de ponctuation inutile, juste le strict minimum pour faire un résumé très concis du texte donné. Le résumé doit être très court et concis, il doit ressortir l'essentiel du texte sans détails inutiles."
+                "content": """
+Ressort moi uniquement du Json avec ce format exact, sans rien d'autre :
+{
+    "message": "résumé du texte à dire à l'utilisateur, en français, concis. Garde le contenu général pour le raccourcir",
+}
+
+Ne met pas de caractères de mise en forme dans le message, comme des astérisques, des accents, ou des emojis. Juste du texte brut, sans retour à la ligne. Ne coupe pas les phrases au milieu, garde les phrases entières. Ne fais pas de résumé trop court, garde les informations importantes.
+"""
             },
             {
                 "role": "user",
@@ -550,12 +558,31 @@ def summarized( response ):
         ]
     )
 
-    return summary.choices[0].message.content
+    return json.loads( summary.choices[0].message.content )["message"]
+
+def reformulate( response ):
+    reformulation = client.chat.completions.create(
+        model=ASK_MODEL,
+        messages=[
+            {
+                "role": "system",
+                "content": """Ressort moi uniquement du Json avec ce format exact, sans rien d'autre :
+{
+    "message": "reformulation du texte à dire à l'utilisateur, en français, plus compréhensible et naturel à l'oral",
+}
+
+Ne reformule que pour rendre le texte plus compréhensible à l'oral, ne change pas le sens du message. Reformule de manière à ce que ce soit plus naturel à dire à l'oral, comme si tu parlais à un humain.
+"""
+            },
+        ]
+    )
+
+    return json.loads( reformulation.choices[0].message.content )["message"]
 
 def getAudioDuration(file_path):
     audio = AudioSegment.from_file(file_path)
     duration_seconds = audio.duration_seconds
-    return int(f"{duration_seconds:.2f}")
+    return duration_seconds
 
 def treatResponse( response ):
 
@@ -606,20 +633,20 @@ def treatResponse( response ):
         # for i in range( len( say_response ) ):
         Sound.waitForVoiceToFinish()
         Sound.generateVoice( say_response, VOICE )
-        if getAudioDuration( "./cache/output.mp3" ) > 10:
-            say_response = summarized( say_response )
-            print( "Résumé pour audio trop long :", say_response )
+        # print( f"Durée de l'audio : {getAudioDuration( './cache/output.mp3' )} secondes" )
+        if getAudioDuration( "./cache/output.mp3" ) > 15:
+            say_response = summarized( say_response ) + " " + reformulate( "Plus d'informations sont affiché à l'écran" )
+            # print( "Résumé pour audio trop long :", say_response )
             Sound.generateVoice( say_response, VOICE )
         Sound.playVoice()
 
 def getUserInput():
     user_input = ""
     if AUDIO:
-        # Sound.waitForVoiceToFinish()
-        # print( "YOU > ", end="" )
-        # user_input = Sound.listen()
-        # print( user_input )
-        user_input = input("YOU > ") # MODIFDEBUG
+        Sound.waitForVoiceToFinish()
+        print( "YOU > ", end="" )
+        user_input = Sound.listen()
+        print( user_input )
     else:
         user_input = input("YOU > ")
     return user_input
@@ -771,7 +798,6 @@ try:
 
 
             called = False
-            called = True # MODIFDEBUG
             if type( question ) == str:
                 calls = question.lower().split( ' ' )
                 for call_name in call_names:
