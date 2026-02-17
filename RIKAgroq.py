@@ -125,7 +125,10 @@ class Sound:
 # =====================
 
 API_KEYS = Json.read( "settings.json" )["api-keys"]
-client = Groq( api_key=random.choice( API_KEYS ) )
+clients = [
+    Groq( api_key=n )
+    for n in API_KEYS
+]
 
 
 call_names = Json.read( "settings.json" )["call-names"]
@@ -449,7 +452,7 @@ def analyseImage(type, prompt, renew):
     else:
         return "Type invalide"
 
-    response = client.chat.completions.create(
+    response = random.choice( clients ).chat.completions.create(
         model=VISION_MODEL,
         messages=messages
     )
@@ -525,7 +528,7 @@ file_extensions = {
 #     return result
 
 def summarized( response ):
-    summary = client.chat.completions.create(
+    summary = random.choice( clients ).chat.completions.create(
         model=ASK_MODEL,
         messages=[
             {
@@ -535,9 +538,9 @@ Ressort moi uniquement du Json avec ce format exact, sans rien d'autre :
 {
     "message": "résumé du texte à dire à l'utilisateur, en français, concis. Garde le contenu général pour le raccourcir",
 }
-
-Ne met pas de caractères de mise en forme dans le message, comme des astérisques, des accents, ou des emojis. Juste du texte brut, sans retour à la ligne. Ne coupe pas les phrases au milieu, garde les phrases entières. Ne fais pas de résumé trop court, garde les informations importantes.
-"""
+Ne met pas de caractères de mise en forme dans le message, comme des astérisques, des accents, ou des emojis. Juste du texte brut, sans retour à la ligne. Ne coupe pas les phrases au milieu, garde les phrases entières. Ne fais pas de résumé trop court, garde les informations importantes. Fait environ 2 ou 3 phrases complètes.
+""",
+                "name": "instructions"
             },
             {
                 "role": "user",
@@ -547,25 +550,6 @@ Ne met pas de caractères de mise en forme dans le message, comme des astérisqu
     )
 
     return json.loads( summary.choices[0].message.content )["message"]
-
-def reformulate( response ):
-    reformulation = client.chat.completions.create(
-        model=ASK_MODEL,
-        messages=[
-            {
-                "role": "system",
-                "content": """Ressort moi uniquement du Json avec ce format exact, sans rien d'autre :
-{
-    "message": "reformulation du texte à dire à l'utilisateur, en français, plus compréhensible et naturel à l'oral",
-}
-
-Ne reformule que pour rendre le texte plus compréhensible à l'oral, ne change pas le sens du message. Reformule de manière à ce que ce soit plus naturel à dire à l'oral, comme si tu parlais à un humain.
-"""
-            },
-        ]
-    )
-
-    return json.loads( reformulation.choices[0].message.content )["message"]
 
 def getAudioDuration(file_path):
     audio = AudioSegment.from_file(file_path)
@@ -623,7 +607,8 @@ def treatResponse( response ):
         Sound.generateVoice( say_response, VOICE )
         # print( f"Durée de l'audio : {getAudioDuration( './cache/output.mp3' )} secondes" )
         if getAudioDuration( "./cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
-            say_response = summarized( say_response ) + " " + reformulate( "Plus d'informations sont affiché à l'écran" )
+            # say_response = summarized( say_response ) + " " + reformulate( "Plus d'informations sont affiché à l'écran" )
+            say_response = summarized( say_response ) + "\nPlus d'informations sont affiché à l'écran"
             # print( "Résumé pour audio trop long :", say_response )
             Sound.generateVoice( say_response, VOICE )
         Sound.playVoice()
@@ -664,14 +649,12 @@ def chat():
             # while True:
             for i in range( MAX_RETRIES ):
                 try:
-                    response = client.chat.completions.create(
+                    response = random.choice( clients ).chat.completions.create(
                         model=MAIN_MODEL,
                         messages=conversation
                     )
                     break
                 except APIStatusError as e:
-                    if e.status_code == 429:
-                        client.api_key = random.choice( API_KEYS )
                     time.sleep(0.5)
 
             content = json.loads( response.choices[0].message.content )
@@ -746,14 +729,12 @@ def chat():
                 # while True:
                 for i in range( MAX_RETRIES ):
                     try:
-                        response = client.chat.completions.create(
+                        response = random.choice( clients ).chat.completions.create(
                             model=MAIN_MODEL,
                             messages=conversation
                         )
                         break
                     except APIStatusError as e:
-                        if e.status_code == 429:
-                            client.api_key = random.choice( API_KEYS )
                         time.sleep( 0.5 )
                 conversation.append(
                     {
