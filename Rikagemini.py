@@ -4,9 +4,10 @@ import os
 import random
 from threading import Thread
 from PIL import Image
-from groq import RateLimitError
 import re
 from groq import APIStatusError
+from groq import RateLimitError
+from groq import Groq
 import cv2
 import datetime
 import requests
@@ -18,7 +19,6 @@ import webbrowser
 import pyautogui
 import pyttsx3
 import speech_recognition as sr
-from groq import Groq
 import json
 # from Vincent import GoogleHome
 import shutil
