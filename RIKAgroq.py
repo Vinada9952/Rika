@@ -6,6 +6,8 @@ import json
 import requests
 import mss
 from groq import Groq
+import smtplib
+from email.mime.text import MIMEText
 from groq import APIStatusError
 from pydub import AudioSegment
 import re
@@ -124,14 +126,16 @@ class Sound:
 # CONFIG
 # =====================
 
-API_KEYS = Json.read( "settings.json" )["api-keys"]
+settings = Json.read( "settings.json" )
+
+API_KEYS = settings["api-keys"]
 clients = [
     Groq( api_key=n )
     for n in API_KEYS
 ]
 
 
-call_names = Json.read( "settings.json" )["call-names"]
+call_names = settings["call-names"]
 
 
 # prononciation = {
@@ -151,20 +155,26 @@ call_names = Json.read( "settings.json" )["call-names"]
 #     "DroidCam": "Droïd Came"
 # }
 
-AUDIO = Json.read( "settings.json" )["audio"]
 
-MAIN_MODEL = Json.read( "settings.json" )["models"]["main"]
-VISION_MODEL = Json.read( "settings.json" )["models"]["vision"]
-ASK_MODEL = Json.read( "settings.json" )["models"]["data"]
+AUDIO = settings["audio"]["audio"]
 
-VOICE = Json.read( "settings.json" )["voice"]
+MAIN_MODEL = settings["models"]["main"]
+VISION_MODEL = settings["models"]["vision"]
+ASK_MODEL = settings["models"]["data"]
 
-SCREENSHOT_DIR = Json.read( "settings.json" )["directories"]["screenshots"]
-WEBCAM_PATH = Json.read( "settings.json" )["directories"]["webcam"]
+VOICE = settings["audio"]["voice"]
 
-MAX_RETRIES = Json.read( "settings.json" )["max-api-retries"]
+SCREENSHOT_DIR = settings["directories"]["screenshots"]
+WEBCAM_PATH = settings["directories"]["webcam"]
 
-AUDIO_DURATION_LIMIT = Json.read( "settings.json" )["audio-duration-threshold"]
+MAX_RETRIES = settings["max-api-retries"]
+
+AUDIO_DURATION_LIMIT = settings["audio"]["audio-duration-threshold"]
+
+SMTP_SERVER = settings["email"]["smtp"]["server"]
+SMTP_PORT = settings["email"]["smtp"]["port"]
+EMAIL = settings["email"]["email"]
+EMAIL_PASSWORD = settings["email"]["pwd"]
 
 data = requests.get( "https://vinada9952rika.pythonanywhere.com/getConversation" )
 # print( data )
@@ -360,6 +370,21 @@ def getLocalisation():
         return data
     except Exception as e:
         return "Error getting localisation"
+
+# =====================
+# TOOL: sendEmail
+# =====================
+def sendEmail( receiver, subject, text ):
+    global settings
+    msg = MIMEText(text)
+    msg["Subject"] = subject
+    msg["From"] = EMAIL
+    msg["To"] = receiver
+
+    with smtplib.SMTP( SMTP_SERVER, SMTP_PORT ) as server:
+        server.starttls()
+        server.login(EMAIL, EMAIL_PASSWORD)
+        server.sendmail(EMAIL, receiver, msg.as_string())
 
 # =====================
 # TOOL: sleepSystem

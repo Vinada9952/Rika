@@ -6,3 +6,11 @@ old_mem.json
 Old_Rika_memory/
 cache/
 *.json
+conversation.json
+cache/
+screenshots/
+captured.jpg
+credentials.json
+data.json
+debug.log
+*.log
