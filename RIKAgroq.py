@@ -24,7 +24,7 @@ import edge_tts
 import pygame
 import asyncio
 
-class ExitAgent(Exception):
+class ExitAgent( Exception ):
     pass
 
 class Type:
@@ -98,20 +98,20 @@ class Sound:
         return await edge_tts.list_voices()
 
 
-    async def _generateVoice(text, voice):
+    async def _generateVoice( text, voice ):
         text = "   " + text.replace( "*", "" ).replace( "\n", ".     " )
         if type( voice ) == str:
-            communicate = edge_tts.Communicate(text, voice)
-            await communicate.save("./cache/output.mp3")
+            communicate = edge_tts.Communicate( text, voice )
+            await communicate.save( "./cache/output.mp3" )
         else:
-            communicate = edge_tts.Communicate(text, voice["ShortName"])
-            await communicate.save("./cache/output.mp3")
+            communicate = edge_tts.Communicate( text, voice["ShortName"] )
+            await communicate.save( "./cache/output.mp3" )
     
     def generateVoice( text, voice ):
         return asyncio.run( Sound._generateVoice( text, voice ) )
     
     async def _playVoice():
-        pygame.mixer.music.load("./cache/output.mp3")
+        pygame.mixer.music.load( "./cache/output.mp3" )
         pygame.mixer.music.play()
     
     def playVoice():
@@ -119,7 +119,7 @@ class Sound:
     
     def waitForVoiceToFinish():
         while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
+            pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
 
 # =====================
@@ -190,7 +190,7 @@ data = requests.get( "https://rikavinada9952.pythonanywhere.com/getConversation"
 # print( data.json() )
 # conversation = data.json()["conversation"]
 conversation = data.json()
-# print( conversation )
+# print( conversation  )
 
 base_message = f"""
 Tu t'appelles Rika.
@@ -199,9 +199,9 @@ Tu es développée par Vincent Tuê Minh Boucher.
 
 
 À CHAQUE MESSAGE, tu dois suivre ce raisonnement :
-1) Déterminer si une ou plusieurs actions sont nécessaires pour répondre correctement.
-2) Si OUI, tu dois utiliser un ou plusieurs outils.
-3) Si NON, tu réponds sans utiliser d'outil.
+1 ) Déterminer si une ou plusieurs actions sont nécessaires pour répondre correctement.
+2 ) Si OUI, tu dois utiliser un ou plusieurs outils.
+3 ) Si NON, tu réponds sans utiliser d'outil.
 
 Tu DOIS répondre STRICTEMENT en JSON, SANS AUCUN TEXTE EN DEHORS.
 
@@ -212,7 +212,7 @@ Cas sans action :
   "tools": []
 {"}"}
 
-Cas avec action(s) :
+Cas avec action( s ) :
 
 {"{"}
   "message": "ce que tu dis à l'utilisateur",
@@ -243,7 +243,7 @@ OUTILS DISPONIBLES :
 - sleepSystem
   - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
   - CE N'EST PAS UNE EXTINCTION DÉFNITIVE, l'utilisateur te rappellera après
-  - quand appeler la fonction (exemples):
+  - quand appeler la fonction ( exemples ):
   - Utiliser quand :
     -> "merci"
     -> "bye"
@@ -262,22 +262,22 @@ OUTILS DISPONIBLES :
   - UTILISATION OBLIGATOIRE si l'utilisateur demande de REGARDER, VOIR, MONTRER, OBSERVER ou si aucune image n'a encore été analysée dans la conversation.
   - Cette action capture TOUJOURS une NOUVELLE image avant analyse.
   - params:
-    -> source (string): "screenshot"|"webcam"
-    -> prompt (string): ce que tu veux savoir de l'image
+    -> source ( string ): "screenshot"|"webcam"
+    -> prompt ( string ): ce que tu veux savoir de l'image
   - À utiliser pour :
     -> Regarde
     -> Que vois-tu ?
     -> Regarde mon écran
     -> Regarde la webcam
-    -> J'ai un bug (sans analyse précédente)
+    -> J'ai un bug ( sans analyse précédente )
     -> Observe
 
 - analyseOldImage
   - UTILISATION OBLIGATOIRE uniquement si une image a DÉJÀ été capturée dans la conversation ET que l'utilisateur demande une analyse supplémentaire ou une précision.
   - NE JAMAIS capturer une nouvelle image.
   - params:
-    -> source (string): "screenshot"|"webcam"
-    -> prompt (string): ce que tu veux savoir de l'image
+    -> source ( string ): "screenshot"|"webcam"
+    -> prompt ( string ): ce que tu veux savoir de l'image
   - À utiliser pour :
     -> Regarde mieux
     -> Analyse plus en détail
@@ -288,7 +288,7 @@ OUTILS DISPONIBLES :
 - openApp
   - ouvrir une application dans la liste des applications autorisés
   - params:
-    -> app (string): application à ouvrir
+    -> app ( string ): application à ouvrir
   - applications autorisés:
     -> spotify
     -> teams
@@ -301,7 +301,7 @@ OUTILS DISPONIBLES :
   - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
   - Avant de l'utiliser, vérifie toi-même sur internet si le lien fonctionne
   - params:
-    -> link (string): lien à ouvrir dans un navigateur pour montrer à l'utilisateur
+    -> link ( string ): lien à ouvrir dans un navigateur pour montrer à l'utilisateur
   - exemples de cas d'utilisation:
     -> Je veux voir une vidéo youtube
     -> trouve moi les scores des olympiques
@@ -311,9 +311,9 @@ OUTILS DISPONIBLES :
   - Envoyer un email depuis l'adresse {EMAIL}
   - À utiliser uniquement lorsque demandé ou en cas d'urgence
   - params:
-    -> receiver (string): destinataire
-    -> subject (string): sujet de l'email
-    -> content (string): contenu de l'email
+    -> receiver ( string ): destinataire
+    -> subject ( string ): sujet de l'email
+    -> content ( string ): contenu de l'email
   - liste de contacts:
 {CONTACT_NAMES}
   - Pour envoyer des couriels à l'utilisateur, receiver doit être "user-email"
@@ -324,7 +324,7 @@ RÈGLES IMPORTANTES :
 - L'ordre d'apparition des outils dans "tools": [] est l'ordre d'exécution des outils
 - Si aucune action n'est nécessaire, tools DOIT être [].
 - Si l'utilisateur demande un lien, **NE DONNE PAS LE LIEN DANS LE MESSAGE**, mets toujours un tool openLink.
-- Quand on te demande de voir ou de regarder, c'est avec l'outil d'analyse d'image (ancienne ou nouvelle, dépendament du contexte).
+- Quand on te demande de voir ou de regarder, c'est avec l'outil d'analyse d'image ( ancienne ou nouvelle, dépendament du contexte ).
 - Si tu hésites entre analyseNewImage et analyseOldImage, utilise toujours analyseNewImage.
 - Quand tu utilise un outil, donne toujours tout les paramètres et arguments nécéssaires.
 - À CHAQUE FOIS que l'utilisateur demande d'envoyer un couriel, tu dois OBLIGATOIREMENT utiliser l'outil sendEmail.
@@ -343,7 +343,7 @@ conversation[0] = {
 # =====================
 # SETUP
 # =====================
-os.makedirs(SCREENSHOT_DIR, exist_ok=True)
+os.makedirs( SCREENSHOT_DIR, exist_ok=True )
 
 def get_camera_index( search ) :
 
@@ -351,11 +351,11 @@ def get_camera_index( search ) :
 
     available_cameras = {}
 
-    for device_index, device_name in enumerate(devices):
+    for device_index, device_name in enumerate( devices ):
         available_cameras[device_index] = device_name
 
     for index, name in available_cameras.items():
-        if name.find(search) != -1:
+        if name.find( search ) != -1:
             return index
 
     return -1
@@ -363,9 +363,9 @@ def get_camera_index( search ) :
 # =====================
 # IMAGE TO BASE64
 # =====================
-def image_to_base64(path):
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
+def image_to_base64( path ):
+    with open( path, "rb" ) as f:
+        return base64.b64encode( f.read() ).decode()
 
 # =====================
 # TOOL: openLink
@@ -394,7 +394,7 @@ def openApp( app: str ):
     if app == "vs code":
         pyautogui.typewrite( "vs code " )
     return f"ouverture de {app} réussie",  False
-    # return f"Link opened successfully ({link})" if webbrowser.open( link ) else "No link opened"
+    # return f"Link opened successfully ( {link} )" if webbrowser.open( link ) else "No link opened"
 
 # def runCommand():
 #     subprocess.run
@@ -405,8 +405,8 @@ def openApp( app: str ):
 # =====================
 def getLocalisation():
     try:
-        response = requests.get('https://ipinfo.io/json')
-        data = str(response.json())
+        response = requests.get( 'https://ipinfo.io/json' )
+        data = str( response.json() )
         # print( "localisation saved" )
         return data, True
     except Exception as e:
@@ -420,15 +420,15 @@ def sendEmail( receiver, subject, text ):
         receiver = USER_EMAIL
     else:
         receiver = CONTACT_LIST[receiver]
-    msg = MIMEText(text)
+    msg = MIMEText( text )
     msg["Subject"] = subject
     msg["From"] = EMAIL
     msg["To"] = receiver
 
     with smtplib.SMTP( SMTP_SERVER, SMTP_PORT ) as server:
         server.starttls()
-        server.login(EMAIL, EMAIL_PASSWORD)
-        server.sendmail(EMAIL, receiver, msg.as_string())
+        server.login( EMAIL, EMAIL_PASSWORD )
+        server.sendmail( EMAIL, receiver, msg.as_string() )
     
     return "Envoie du courriel réussi", False
 
@@ -446,24 +446,24 @@ def sleepSystem():
 # =====================
 # TOOL: getImage
 # =====================
-cap = cv2.VideoCapture(get_camera_index("USB"))
+cap = cv2.VideoCapture( get_camera_index( "USB" ) )
 # cap.release()
-def getImage(type):
+def getImage( type ):
     if type == "screenshot":
         with mss.mss() as sct:
-            for i, monitor in enumerate(sct.monitors[1:], start=1):
-                shot = sct.grab(monitor)
-                img = Image.frombytes("RGB", shot.size, shot.rgb)
-                path = os.path.join(SCREENSHOT_DIR, f"screen_{i}.jpg")
-                img.save(path)
+            for i, monitor in enumerate( sct.monitors[1:], start=1 ):
+                shot = sct.grab( monitor )
+                img = Image.frombytes( "RGB", shot.size, shot.rgb )
+                path = os.path.join( SCREENSHOT_DIR, f"screen_{i}.jpg" )
+                img.save( path )
 
-        return f"Screenshots capturés ({len(sct.monitors) - 1} écrans)"
+        return f"Screenshots capturés ({len( sct.monitors ) - 1} écrans)"
 
     if type == "webcam":
         ret, frame = cap.read()
         if not ret:
             return "Erreur webcam"
-        cv2.imwrite(WEBCAM_PATH, frame)
+        cv2.imwrite( WEBCAM_PATH, frame )
         return "Image webcam capturée"
 
     return "Type invalide"
@@ -471,15 +471,15 @@ def getImage(type):
 # =====================
 # TOOL: analyseImage
 # =====================
-def analyseImage(type, prompt, renew):
+def analyseImage( type, prompt, renew ):
     messages = []
     if renew:
         getImage( type )
 
     if type == "screenshot":
-        files = sorted(
-            f for f in os.listdir(SCREENSHOT_DIR)
-            if f.lower().endswith(".jpg")
+        files = sorted( 
+            f for f in os.listdir( SCREENSHOT_DIR )
+            if f.lower().endswith( ".jpg" )
         )
 
         if not files:
@@ -488,50 +488,59 @@ def analyseImage(type, prompt, renew):
         content = [{"type": "text", "text": prompt}]
 
         for file in files:
-            path = os.path.join(SCREENSHOT_DIR, file)
-            image_b64 = image_to_base64(path)
-            content.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{image_b64}"
-                }
-            })
-
-        messages.append({
-            "role": "user",
-            "content": content
-        })
-
-    elif type == "webcam":
-        if not os.path.exists(WEBCAM_PATH):
-            return "Aucune image webcam disponible", True
-
-        image_b64 = image_to_base64(WEBCAM_PATH)
-        messages.append({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": prompt},
+            path = os.path.join( SCREENSHOT_DIR, file )
+            image_b64 = image_to_base64( path )
+            content.append(
                 {
                     "type": "image_url",
                     "image_url": {
                         "url": f"data:image/jpeg;base64,{image_b64}"
                     }
                 }
-            ]
-        })
+            )
+
+        messages.append(
+            {
+                "role": "user",
+                "content": content
+            }
+        )
+
+    elif type == "webcam":
+        if not os.path.exists( WEBCAM_PATH ):
+            return "Aucune image webcam disponible", True
+
+        image_b64 = image_to_base64( WEBCAM_PATH )
+        messages.append(
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": prompt
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/jpeg;base64,{image_b64}"
+                        }
+                    }
+                ]
+            }
+        )
 
     else:
         return "Type invalide", True
 
-    response = random.choice( clients ).chat.completions.create(
+    response = random.choice( clients ).chat.completions.create( 
         model=VISION_MODEL,
         messages=messages
     )
 
     return response.choices[0].message.content, True
 
-def removeEmojis(text):
-    emoji_pattern = re.compile(
+def removeEmojis( text ):
+    emoji_pattern = re.compile( 
         "["
         "\U0001F600-\U0001F64F"  # emoticônes
         "\U0001F300-\U0001F5FF"  # symboles & pictogrammes
@@ -544,7 +553,7 @@ def removeEmojis(text):
         "]+",
         flags=re.UNICODE
     )
-    return emoji_pattern.sub(r'', text)
+    return emoji_pattern.sub( r'', text )
 
 file_extensions = {
     "python": "py",
@@ -557,7 +566,7 @@ file_extensions = {
 }
 
 
-# def splitForSpeach(text):
+# def splitForSpeach( text ):
 #     """
 #     Split une string selon '.', ',' et '`'
 #     Retourne une liste de dict :
@@ -577,10 +586,10 @@ file_extensions = {
 #         if char in separators:
 #             # Si on a un mot en cours, on l'ajoute
 #             if current_word.strip():
-#                 result.append({
+#                 result.append( {
 #                     "word": current_word.strip(),
 #                     "lang": current_lang
-#                 })
+#                 } )
 #                 current_word = ""
 
 #             # Si le séparateur est ` → toggle langue
@@ -591,15 +600,15 @@ file_extensions = {
 
 #     # Ajouter le dernier mot si présent
 #     if current_word.strip():
-#         result.append({
+#         result.append( {
 #             "word": current_word.strip(),
 #             "lang": current_lang
-#         })
+#         } )
 
 #     return result
 
 def summarized( response ):
-    summary = random.choice( clients ).chat.completions.create(
+    summary = random.choice( clients ).chat.completions.create( 
         model=ASK_MODEL,
         messages=[
             {
@@ -627,8 +636,8 @@ Raccourcis le message d'origine sans omettre d'informations importantes.
 
     return json.loads( summary.choices[0].message.content )["message"]
 
-def getAudioDuration(file_path):
-    audio = AudioSegment.from_file(file_path)
+def getAudioDuration( file_path ):
+    audio = AudioSegment.from_file( file_path )
     duration_seconds = audio.duration_seconds
     return duration_seconds
 
@@ -653,7 +662,7 @@ def treatResponse( response ):
             del extracted_code[0]
             extracted_code = "\n".join( extracted_code )
 
-            planguage = extracted_code.split( '\n')[0].replace( '```', '' )
+            planguage = extracted_code.split( '\n' )[0].replace( '```', '' )
             try:
                 while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
                     code = random.randint( 1000, 9999 )
@@ -697,7 +706,7 @@ def getUserInput():
         user_input = Sound.listen()
         print( user_input )
     else:
-        user_input = input("YOU > ")
+        user_input = input( "YOU > " )
     return user_input
 
 # =====================
@@ -711,9 +720,9 @@ def chat():
         
         if type( user_input ) == str:
 
-            # print( f"{type(conversation)=}" )
+            # print( f"{type( conversation )=}" )
             # print( f"{conversation=}" )
-            conversation.append(
+            conversation.append( 
                 {
                     "role": "user",
                     "content": user_input,
@@ -725,22 +734,22 @@ def chat():
             # while True:
             for i in range( MAX_RETRIES ):
                 try:
-                    response = random.choice( clients ).chat.completions.create(
+                    response = random.choice( clients ).chat.completions.create( 
                         model=MAIN_MODEL,
                         messages=conversation
                     )
                     break
                 except APIStatusError as e:
-                    time.sleep(0.5)
+                    time.sleep( 0.5 )
 
             content = json.loads( response.choices[0].message.content )
-            conversation.append(
+            conversation.append( 
                 {
                     "role": "assistant",
                     "content": response.choices[0].message.content
                 }
             )
-            print("🤖 >", content["message"])
+            print( "🤖 >", content["message"] )
             if AUDIO:
                 treatResponse( content["message"] )
 
@@ -766,7 +775,7 @@ def chat():
                     if tool["name"] == "sleepSystem":
                         sleepSystem()
                     
-                    conversation.append(
+                    conversation.append( 
                         {
                             "role": "user",
                             "content": result,
@@ -779,21 +788,21 @@ def chat():
                 if do_response:
                     for i in range( MAX_RETRIES ):
                         try:
-                            response = random.choice( clients ).chat.completions.create(
+                            response = random.choice( clients ).chat.completions.create( 
                                 model=MAIN_MODEL,
                                 messages=conversation
                             )
                             break
                         except APIStatusError as e:
                             time.sleep( 0.5 )
-                    conversation.append(
+                    conversation.append( 
                         {
                             "role": "assistant",
                             "content": response.choices[0].message.content
                         }
                     )
                     content = json.loads( response.choices[0].message.content )
-                    print("🤖 >", content["message"])
+                    print( "🤖 >", content["message"] )
                     if AUDIO:
                         treatResponse( content["message"] )
                 else:
@@ -804,9 +813,9 @@ def chat():
 # =====================
 try:
     if __name__ == "__main__":
-        print("🤖 RIKA")
+        print( "🤖 RIKA" )
         while True:
-            # question = input("...\n")
+            # question = input( "...\n" )
 
             question = ""
             if not AUDIO:
@@ -842,23 +851,23 @@ except KeyboardInterrupt:
     for message in conversation:
         if message["role"] == "assistant":
             message["content"] = json.loads( message["content"] )
-    with open("./debug.log", "w", encoding="utf-8") as f:
-        json.dump(conversation, f, ensure_ascii=False, indent=2)
+    with open( "./debug.log", "w", encoding="utf-8" ) as f:
+        json.dump( conversation, f, ensure_ascii=False, indent=2 )
 
     # Affichage formaté dans la console
-    print("\n📝 Debug conversation (KeyboardInterrupt)\n")
-    for i, message in enumerate(conversation, start=1):
-        role = message.get("role", "unknown")
-        name = message.get("name", "")
-        content = message.get("content", "")
+    print( "\n📝 Debug conversation ( KeyboardInterrupt )\n" )
+    for i, message in enumerate( conversation, start=1 ):
+        role = message.get( "role", "unknown" )
+        name = message.get( "name", "" )
+        content = message.get( "content", "" )
 
-        print(f"--- Message {i} ---")
-        print(f"Role : {role}")
+        print( f"--- Message {i} ---" )
+        print( f"Role : {role}" )
         if name:
-            print(f"Name : {name}")
-        if isinstance(content, str):
-            print(f"Content : {content}")
+            print( f"Name : {name}" )
+        if isinstance( content, str ):
+            print( f"Content : {content}" )
         else:
             # Si content est déjà un dict ou JSON
-            print(f"Content : {json.dumps(content, ensure_ascii=False, indent=2)}")
-        print("--------------------\n")
+            print( f"Content : {json.dumps( content, ensure_ascii=False, indent=2 )}" )
+        print( "--------------------\n" )
