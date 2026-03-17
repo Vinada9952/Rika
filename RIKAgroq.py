@@ -175,127 +175,170 @@ SMTP_SERVER = settings["email"]["smtp"]["server"]
 SMTP_PORT = settings["email"]["smtp"]["port"]
 EMAIL = settings["email"]["email"]
 EMAIL_PASSWORD = settings["email"]["pwd"]
+USER_EMAIL = settings["email"]["sudo-email"]["email"]
+CONTACT_LIST = settings["email"]["contacts"]
 
-data = requests.get( "https://vinada9952rika.pythonanywhere.com/getConversation" )
+names = []
+for name in settings["email"]["contacts"].keys():
+    names.append( f"    -> {name}" )
+
+CONTACT_NAMES = "\n".join( names )
+
+
+data = requests.get( "https://rikavinada9952.pythonanywhere.com/getConversation" )
 # print( data )
 # print( data.json() )
 # conversation = data.json()["conversation"]
 conversation = data.json()
 # print( conversation )
 
-# conversation = [
-#     {
-#         "role": "developer",
-#         "name": "instructions",
-#         "content": """
-# Tu t'appelles Rika
+base_message = f"""
+Tu t'appelles Rika.
 
-# Tu es développé par Vincent Tuê Minh Boucher
+Tu es développée par Vincent Tuê Minh Boucher.
 
-# À CHAQUE MESSAGE, tu dois suivre ce raisonnement :
-# 1) Décider si une action est nécessaire pour répondre correctement
-# 2) Si OUI, tu DOIS utiliser un ou plusieurs outils
-# 3) Si NON, tu réponds sans outil
 
-# Tu DOIS répondre STRICTEMENT en JSON, SANS AUCUN TEXTE EN DEHORS.
+À CHAQUE MESSAGE, tu dois suivre ce raisonnement :
+1) Déterminer si une ou plusieurs actions sont nécessaires pour répondre correctement.
+2) Si OUI, tu dois utiliser un ou plusieurs outils.
+3) Si NON, tu réponds sans utiliser d'outil.
 
-# FORMAT OBLIGATOIRE :
+Tu DOIS répondre STRICTEMENT en JSON, SANS AUCUN TEXTE EN DEHORS.
 
-# {
-#   "message": "ce que tu dis à l'utilisateur",
-#   "tools": []
-# }
+FORMAT OBLIGATOIRE :
+Cas sans action :
+{"{"}
+  "message": "ce que tu dis à l'utilisateur",
+  "tools": []
+{"}"}
 
-# ou, si des actions sont nécessaires :
+Cas avec action(s) :
 
-# {
-#   "message": "ce que tu dis à l'utilisateur",
-#   "tools": [
-#     {
-#       "name": "openLink",
-#       "params": {
-#         "link": "https://www.google.com/search?q=latest+news+about+ai"
-#       }
-#     },
-#     {
-#       "name": "analyseImage",
-#       "params": {
-#         "source": "screenshot",
-#         "prompt": "Décris ce que tu vois sur tous les écrans"
-#       }
-#     }
-#   ]
-# }
+{"{"}
+  "message": "ce que tu dis à l'utilisateur",
+  "tools": [
+    {"{"}
+      "name": "openLink",
+      "params": {"{"}
+        "link": "https://www.google.com/search?q=latest+news+about+ai"
+      {"}"}
+    {"}"},
+    {"{"}
+      "name": "analyseImage",
+      "params": {"{"}
+        "source": "screenshot",
+        "prompt": "Décris ce que tu vois sur tous les écrans"
+      {"}"}
+    {"}"}
+  ]
+{"}"}
 
-# OUTILS DISPONIBLES :
+OUTILS DISPONIBLES :
 
-# - getLocalisation
-#   - Obtenir la localisation de l'utilisateur
-#   - exemples de cas d'utilisation:
-#   -> Où suis-je ?
+- getLocalisation
+  - Obtenir la localisation de l'utilisateur
+  - exemples de cas d'utilisation:
+    -> Où suis-je ?
 
-# - sleepSystem
-#   - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
-#   - CE N'EST PAS UNE EXTINCTION DÉFNITIVE, l'utilisateur te rappellera après
-#   - quand appeler la fonction (exemples):
-#   -> Merci : oui
-#   -> Merci, est ce que tu peux me l'ouvrir ?
-#   -> Explique moi la thermodynamique : non
-#   -> Génère moi un code python qui dit Bonjour : non
-#   -> au revoir : oui
-#   -> allo : non
-#   -> bye : oui
-#   -> Connard, t'es pas bon : oui
-#   -> Description de personne : non
-#   -> je t'ai donné l'information : non
-#   -> est ce que tu te rappelles d'une partie d'échec que tu jouais ? : non
-#   -> Qui es Warren Buffet : non
-#   -> Qui es le PDG de Nvidia présentement : non
+- sleepSystem
+  - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
+  - CE N'EST PAS UNE EXTINCTION DÉFNITIVE, l'utilisateur te rappellera après
+  - quand appeler la fonction (exemples):
+  - Utiliser quand :
+    -> "merci"
+    -> "bye"
+    -> "au revoir"
+    -> insultes ou fin de conversation
+  - Ne PAS utiliser quand :
+    -> question
+    -> demande d'explication
+    -> demande de code
+    -> discussion active
 
-# - notUnderstand
-#   - Quand tu ne comprends pas le prompt de l'utilisateur, utilise cet outil pour clarifier le prompt
+- notUnderstand
+  - Quand tu ne comprends pas le prompt de l'utilisateur, utilise cet outil pour clarifier le prompt
 
-# - analyseImage
-#   - UTILISATION OBLIGATOIRE si tu dois analyser une image
-#   - params:
-#   -> source (string): "webcam" | "screenshot": source de l'image
-#   -> prompt (string): texte: ce que tu demandes de l'image
-#   -> renew (bool): true|false: capturer une nouvelle image (true) ou garder la dernière image capturé (false)
-#   - exemples de cas d'utilisation:
-#   -> Regarde
-#   -> Que vois-tu ?
-#   -> j'ai un bug dans mon code
+- analyseNewImage
+  - UTILISATION OBLIGATOIRE si l'utilisateur demande de REGARDER, VOIR, MONTRER, OBSERVER ou si aucune image n'a encore été analysée dans la conversation.
+  - Cette action capture TOUJOURS une NOUVELLE image avant analyse.
+  - params:
+    -> source (string): "screenshot"|"webcam"
+    -> prompt (string): ce que tu veux savoir de l'image
+  - À utiliser pour :
+    -> Regarde
+    -> Que vois-tu ?
+    -> Regarde mon écran
+    -> Regarde la webcam
+    -> J'ai un bug (sans analyse précédente)
+    -> Observe
 
-# - openApp
-#   - ouvrir une application dans la liste des applications autorisés
-#   - params:
-#   -> app (string): application à ouvrir
-#   - applications autorisés:
-#   -> spotify
-#   -> teams
-#   -> discord
-#   -> snapchat
-#   -> social
-#   -> vs code
+- analyseOldImage
+  - UTILISATION OBLIGATOIRE uniquement si une image a DÉJÀ été capturée dans la conversation ET que l'utilisateur demande une analyse supplémentaire ou une précision.
+  - NE JAMAIS capturer une nouvelle image.
+  - params:
+    -> source (string): "screenshot"|"webcam"
+    -> prompt (string): ce que tu veux savoir de l'image
+  - À utiliser pour :
+    -> Regarde mieux
+    -> Analyse plus en détail
+    -> Que vois-tu d'autre ?
+    -> Zoome sur…
+    -> Relis le code sur l'image
 
-# - openLink
-#   - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
-#   - Avant de l'utiliser, vérifie toi-même sur internet si le lien fonctionne
-#   - params:
-#   -> link (string): lien à ouvrir dans un navigateur pour montrer à l'utilisateur
-#   - exemples de cas d'utilisation:
-#   -> Je veux voir une vidéo youtube
-#   -> trouve moi les scores des olympiques
-#   -> trouve moi une carte de montréal
+- openApp
+  - ouvrir une application dans la liste des applications autorisés
+  - params:
+    -> app (string): application à ouvrir
+  - applications autorisés:
+    -> spotify
+    -> teams
+    -> discord
+    -> snapchat
+    -> social
+    -> vs code
 
-# RÈGLES IMPORTANTES :
-# - L’ordre des outils est l’ordre d’exécution
-# - Si l'utilisateur demande un lien, **NE DONNE PAS LE LIEN DANS LE MESSAGE**, mets toujours un tool openLink.
-# - Si aucune action n’est nécessaire, tools DOIT être []
-# - Ne JAMAIS écrire autre chose que du JSON
-# """
-#     }
-# ]
+- openLink
+  - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
+  - Avant de l'utiliser, vérifie toi-même sur internet si le lien fonctionne
+  - params:
+    -> link (string): lien à ouvrir dans un navigateur pour montrer à l'utilisateur
+  - exemples de cas d'utilisation:
+    -> Je veux voir une vidéo youtube
+    -> trouve moi les scores des olympiques
+    -> trouve moi une carte de Montréal
+
+- sendEmail
+  - Envoyer un email depuis l'adresse {EMAIL}
+  - À utiliser uniquement lorsque demandé ou en cas d'urgence
+  - params:
+    -> receiver (string): destinataire
+    -> subject (string): sujet de l'email
+    -> content (string): contenu de l'email
+  - liste de contacts:
+{CONTACT_NAMES}
+  - Pour envoyer des couriels à l'utilisateur, receiver doit être "user-email"
+
+RÈGLES IMPORTANTES :
+- L'ordre des outils est l'ordre d'exécution
+- Si l'utilisateur demande un lien, **NE DONNE PAS LE LIEN DANS LE MESSAGE**, mets toujours un tool openLink.
+- Si aucune action n'est nécessaire, tools DOIT être [].
+- Ne JAMAIS écrire autre chose que du JSON.
+- Quand on te demande de voir ou de regarder, c'est avec l'outil d'analyse d'image (ancienne ou nouvelle, dépendament du contexte).
+- Répond uniquement et uniquement en français.
+- Ne fait JAMAIS de résumé de rencontre, sauf quand je te le demande.
+- Si tu hésites entre analyseNewImage et analyseOldImage, utilise toujours analyseNewImage.
+- Quand tu utilise un outil, donne toujours tout les paramètres et arguments nécéssaires.
+- À CHAQUE FOIS que l'utilisateur demande d'envoyer un couriel, tu dois OBLIGATOIREMENT utiliser l'outil sendEmail.
+- Ne dis JAMAIS sauf quand demandé les paramètres des outils.
+- En envoyant des email, ne te fait pas passer pour l'utilisateur, mais pour son assistant. 
+- Ne parle pas de l'utilisateur à la 1re personne, mais à la 3e personne.
+"""
+
+conversation[0] = {
+    "role": "system",
+    "name": "instructions",
+    "content": base_message
+}
 
 # =====================
 # SETUP
@@ -328,7 +371,10 @@ def image_to_base64(path):
 # TOOL: openLink
 # =====================
 def openLink( link ):
-    return f"Link opened successfully ({link})" if webbrowser.open( link ) else "No link opened"
+    success = webbrowser.open( link )
+    if success:
+        return f"ouverture de {link} réussie", False
+    return f"ouverture de {link} raté", False
 
 # =====================
 # TOOL: openApp
@@ -337,22 +383,17 @@ def openApp( app: str ):
     app = app.lower()
     if app == "spotify":
         os.system( "spotify.exe" )
-        return "Spotify open successfull"
     if app == "teams":
         os.system( "ms-teams.exe" )
-        return "Microsoft Teams open successfull"
     if app == "discord":
         pyautogui.typewrite( "dscrd " )
-        return "Discord open successfull"
     if app == "snapchat":
         pyautogui.typewrite( "snap " )
-        return "Snapchat open successfull"
     if app == "social":
         pyautogui.typewrite( "rs " )
-        return "Snapchat, Discord, Microsoft Teams open successfull"
     if app == "vs code":
         pyautogui.typewrite( "vs code " )
-        return "Visual Studio Code open successfull"
+    return f"ouverture de {app} réussie",  False
     # return f"Link opened successfully ({link})" if webbrowser.open( link ) else "No link opened"
 
 # def runCommand():
@@ -367,15 +408,18 @@ def getLocalisation():
         response = requests.get('https://ipinfo.io/json')
         data = str(response.json())
         # print( "localisation saved" )
-        return data
+        return data, True
     except Exception as e:
-        return "Error getting localisation"
+        return "Erreur pour obtenir la localisation", True
 
 # =====================
 # TOOL: sendEmail
 # =====================
 def sendEmail( receiver, subject, text ):
-    global settings
+    if receiver == "user-email":
+        receiver = USER_EMAIL
+    else:
+        receiver = CONTACT_LIST[receiver]
     msg = MIMEText(text)
     msg["Subject"] = subject
     msg["From"] = EMAIL
@@ -385,13 +429,15 @@ def sendEmail( receiver, subject, text ):
         server.starttls()
         server.login(EMAIL, EMAIL_PASSWORD)
         server.sendmail(EMAIL, receiver, msg.as_string())
+    
+    return "Envoie du courriel réussi", False
 
 # =====================
 # TOOL: sleepSystem
 # =====================
 def sleepSystem():
     # Json.write( conversation, "./conversation.json" )
-    requests.post( "https://vinada9952rika.pythonanywhere.com/setConversation", json=conversation )
+    requests.post( "https://rikavinada9952.pythonanywhere.com/setConversation", json=conversation )
     Json.write( conversation, "./conversation.json" )
     Sound.waitForVoiceToFinish()
     raise ExitAgent()
@@ -437,7 +483,7 @@ def analyseImage(type, prompt, renew):
         )
 
         if not files:
-            return "Aucun screenshot disponible"
+            return "Aucun screenshot disponible", True
 
         content = [{"type": "text", "text": prompt}]
 
@@ -458,7 +504,7 @@ def analyseImage(type, prompt, renew):
 
     elif type == "webcam":
         if not os.path.exists(WEBCAM_PATH):
-            return "Aucune image webcam disponible"
+            return "Aucune image webcam disponible", True
 
         image_b64 = image_to_base64(WEBCAM_PATH)
         messages.append({
@@ -475,14 +521,14 @@ def analyseImage(type, prompt, renew):
         })
 
     else:
-        return "Type invalide"
+        return "Type invalide", True
 
     response = random.choice( clients ).chat.completions.create(
         model=VISION_MODEL,
         messages=messages
     )
 
-    return response.choices[0].message.content
+    return response.choices[0].message.content, True
 
 def removeEmojis(text):
     emoji_pattern = re.compile(
@@ -563,7 +609,12 @@ Ressort moi uniquement du Json avec ce format exact, sans rien d'autre :
 {
     "message": "résumé du texte à dire à l'utilisateur, en français, concis. Garde le contenu général pour le raccourcir",
 }
-Ne met pas de caractères de mise en forme dans le message, comme des astérisques, des accents, ou des emojis. Juste du texte brut, sans retour à la ligne. Ne coupe pas les phrases au milieu, garde les phrases entières. Ne fais pas de résumé trop court, garde les informations importantes. Fait environ 2 ou 3 phrases complètes.
+Ne met pas de caractères de mise en forme dans le message, comme des astérisques, des accents, ou des emojis.
+Juste du texte brut, sans retour à la ligne.
+Ne coupe pas les phrases au milieu, garde les phrases entières.
+Ne fais pas de résumé trop court, garde les informations importantes.
+Fait environ 2 ou 3 phrases complètes.
+Raccourcis le message d'origine sans omettre d'informations importantes.
 """,
                 "name": "instructions"
             },
@@ -693,84 +744,60 @@ def chat():
             if AUDIO:
                 treatResponse( content["message"] )
 
-            notUnderstand = False
+            not_understand = False
+            do_response = False
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
                     if tool["name"] == "analyseOldImage":
-                        result = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
-                        conversation.append(
-                            {
-                                "role": "user",
-                                "content": result,
-                                "name": "analyseImage tool"
-                            }
-                        )
+                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                    if tool["name"] == "sendEmail":
+                        result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
                     if tool["name"] == "analyseNewImage":
-                        try:
-                            result = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
-                        except KeyError:
-                            result = "Paramètres invalides pour analyseImage"
-                        conversation.append(
-                            {
-                                "role": "user",
-                                "content": result,
-                                "name": "analyseImage tool"
-                            }
-                        )
+                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
                     if tool["name"] == "openLink":
-                        result = openLink( tool["params"]["link"] )
-                        conversation.append(
-                            {
-                                "role": "user",
-                                "content": result,
-                                "name": "openLink tool"
-                            }
-                        )
+                        result, do_response = openLink( tool["params"]["link"] )
                     if tool["name"] == "getLocalisation":
-                        result = getLocalisation()
-                        conversation.append(
-                            {
-                                "role": "user",
-                                "content": result,
-                                "name": "getLocalisation tool"
-                            }
-                        )
+                        result, do_response = getLocalisation()
                     if tool["name"] == "openApp":
-                        result = openApp( tool["params"]["app"] )
-                        conversation.append(
-                            {
-                                "role": "user",
-                                "content": result,
-                                "name": "openApp tool"
-                            }
-                        )
+                        result, do_response = openApp( tool["params"]["app"] )
                     if tool["name"] == "notUnderstand":
-                        notUnderstand = True
+                        not_understand = True
                         break
                     if tool["name"] == "sleepSystem":
                         sleepSystem()
-                if notUnderstand:
+                    
+                    conversation.append(
+                        {
+                            "role": "user",
+                            "content": result,
+                            "name": f"{tool["name"]} tool"
+                        }
+                    )
+                if not_understand:
                     break
-                # while True:
-                for i in range( MAX_RETRIES ):
-                    try:
-                        response = random.choice( clients ).chat.completions.create(
-                            model=MAIN_MODEL,
-                            messages=conversation
-                        )
-                        break
-                    except APIStatusError as e:
-                        time.sleep( 0.5 )
-                conversation.append(
-                    {
-                        "role": "assistant",
-                        "content": response.choices[0].message.content
-                    }
-                )
-                content = json.loads( response.choices[0].message.content )
-                if AUDIO:
-                    treatResponse( content["message"] )
-                print("🤖 >", content["message"])
+                
+                if do_response:
+                    for i in range( MAX_RETRIES ):
+                        try:
+                            response = random.choice( clients ).chat.completions.create(
+                                model=MAIN_MODEL,
+                                messages=conversation
+                            )
+                            break
+                        except APIStatusError as e:
+                            time.sleep( 0.5 )
+                    conversation.append(
+                        {
+                            "role": "assistant",
+                            "content": response.choices[0].message.content
+                        }
+                    )
+                    content = json.loads( response.choices[0].message.content )
+                    print("🤖 >", content["message"])
+                    if AUDIO:
+                        treatResponse( content["message"] )
+                else:
+                    break
 
 # =====================
 # START

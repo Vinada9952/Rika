@@ -13,4 +13,4 @@ class Json:
 
 conversation = Json.read( "./conversation.json" )
 
-requests.post( "https://vinada9952rika.pythonanywhere.com/setConversation", json=conversation )
+requests.post( "https://rikavinada9952.pythonanywhere.com/setConversation", json=conversation )
