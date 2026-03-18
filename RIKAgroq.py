@@ -434,7 +434,7 @@ def sendEmail( receiver, subject, text ):
         receiver = USER_EMAIL
     else:
         receiver = CONTACT_LIST[receiver]
-    msg = MIMEText( text )
+    msg = MIMEText( "Message Écrit Par Rika, Assistant IA de Vincent : \n\n" + text )
     msg["Subject"] = subject
     msg["From"] = EMAIL
     msg["To"] = receiver
