@@ -176,6 +176,7 @@ SMTP_PORT = settings["email"]["smtp"]["port"]
 EMAIL = settings["email"]["email"]
 EMAIL_PASSWORD = settings["email"]["pwd"]
 USER_EMAIL = settings["email"]["sudo-email"]["email"]
+USERNAME = settings["email"]["sudo-email"]["name"]
 CONTACT_LIST = settings["email"]["contacts"]
 
 ASSISTANT_NAME = settings["assistant-name"]
@@ -199,6 +200,7 @@ Tu t'appelles {ASSISTANT_NAME}.
 
 Tu es développée par Vincent Tuê Minh Boucher.
 
+Ton utilisateur est {USERNAME}
 
 À CHAQUE MESSAGE, tu dois suivre ce raisonnement :
 1) Déterminer si une ou plusieurs actions sont nécessaires pour répondre correctement.
@@ -337,6 +339,7 @@ RÈGLES IMPORTANTES :
 - À CHAQUE FOIS que l'utilisateur demande d'envoyer un couriel, tu dois OBLIGATOIREMENT utiliser l'outil sendEmail.
 - En envoyant des email, ne te fait pas passer pour l'utilisateur, mais pour son assistant. 
 - Dans les email, ne parle pas de l'utilisateur à la 1re personne, mais à la 3e personne.
+- Quand tu répond que tu as envoyé un email, FAIT-LE avec l'outil sendEmail
 - Ne dis JAMAIS les paramètres utilisés pour les outils.
 - Ne fait JAMAIS de résumé de conversation, sauf quand je te le demande.
 - Si une action est requise (ex: envoyer un email, ouvrir une app, ouvrir un lien, analyser une image), la réponse est invalide si aucun outil n’est appelé.
@@ -435,12 +438,11 @@ def sendEmail( receiver, subject, text ):
     msg["From"] = EMAIL
     msg["To"] = receiver
 
-    print( f"{receiver=}, {subject=}, {text=}" )
 
-    # with smtplib.SMTP( SMTP_SERVER, SMTP_PORT ) as server:
-    #     server.starttls()
-    #     server.login( EMAIL, EMAIL_PASSWORD )
-    #     server.sendmail( EMAIL, receiver, msg.as_string() )
+    with smtplib.SMTP( SMTP_SERVER, SMTP_PORT ) as server:
+        server.starttls()
+        server.login( EMAIL, EMAIL_PASSWORD )
+        server.sendmail( EMAIL, receiver, msg.as_string() )
     
     return "Envoie du courriel réussi", False
 
@@ -653,10 +655,13 @@ def getAudioDuration( file_path ):
     duration_seconds = audio.duration_seconds
     return duration_seconds
 
-def treatResponse( response ):
+def treadTextResponse( response: str ):
+    return response.replace( '**', '' )
+
+def treatAudioResponse( response ):
 
     # print( f"{AUDIO=}" )
-    # print( "treatResponse", response )
+    # print( "treatAudioResponse", response )
 
     say_response = response
     say_response = say_response.replace( '*', '' )
@@ -738,7 +743,7 @@ def chat():
                 {
                     "role": "user",
                     "content": user_input,
-                    "name": "Vincent"
+                    "name": USERNAME
                 }
             )
 
@@ -761,9 +766,10 @@ def chat():
                     "content": response.choices[0].message.content
                 }
             )
-            print( "🤖 >", content["message"] )
+            treated_text = treadTextResponse( content["message"] )
+            print( "🤖 >", treated_text )
             if AUDIO:
-                treatResponse( content["message"] )
+                treatAudioResponse( content["message"] )
 
             not_understand = False
             do_response = False
@@ -816,7 +822,7 @@ def chat():
                     content = json.loads( response.choices[0].message.content )
                     print( "🤖 >", content["message"] )
                     if AUDIO:
-                        treatResponse( content["message"] )
+                        treatAudioResponse( content["message"] )
                 else:
                     break
 
