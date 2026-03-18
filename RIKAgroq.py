@@ -359,7 +359,7 @@ conversation[0] = {
 # =====================
 os.makedirs( SCREENSHOT_DIR, exist_ok=True )
 
-def get_camera_index( search ) :
+def get_camera_index( search ):
 
     devices = FilterGraph().get_input_devices()
 

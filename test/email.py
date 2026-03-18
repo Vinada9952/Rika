@@ -28,7 +28,7 @@ def mail( sender, password, receiver, subject, text ):
 mail(
     settings["email"],
     settings["pwd"],
-    settings["contacts"]["William Cote"],
+    settings["sudo-email"]["email"],
     input( "Sujet\n> " ),
     input( "Message\n> " )
 )
