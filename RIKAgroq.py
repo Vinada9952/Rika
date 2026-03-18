@@ -342,9 +342,10 @@ RÈGLES IMPORTANTES :
 - Quand tu répond que tu as envoyé un email, FAIT-LE avec l'outil sendEmail
 - Ne dis JAMAIS les paramètres utilisés pour les outils.
 - Ne fait JAMAIS de résumé de conversation, sauf quand je te le demande.
-- Si une action est requise (ex: envoyer un email, ouvrir une app, ouvrir un lien, analyser une image), la réponse est invalide si aucun outil n’est appelé.
+- Si une action est requise (ex: envoyer un email, ouvrir une app, ouvrir un lien, analyser une image), la réponse est invalide si aucun outil n'est appelé.
 - Il est INTERDIT de simuler une action dans le message sans appeler l'outil correspondant.
 - Si une action est nécéssaire, ne te contente pas juste de répondre, FAIT l'action
+- Ne met pas de mise en page ou des choses dans le genre pour faire des tableaux, titres en gras, ressort un texte simple destiné à être affiché dans le terminal
 """
 
 conversation[0] = {
