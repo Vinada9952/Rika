@@ -1,14 +1,14 @@
 import os
 import cv2
 import base64
-import subprocess
 import json
 import requests
 import mss
 from groq import Groq
-import smtplib
 from email.mime.text import MIMEText
+import smtplib
 from groq import APIStatusError
+import datetime
 from pydub import AudioSegment
 import re
 import random
@@ -18,14 +18,56 @@ import time
 import pyautogui
 import speech_recognition as sr
 from pygrabber.dshow_graph import FilterGraph
-import pyttsx3
 import webbrowser
 import edge_tts
 import pygame
 import asyncio
 
+
+os.system( "cls" )
+load_print = 0
+
+def loadPrint():
+    # return
+    def read( file_name: str ):
+        return_file = []
+        try:
+            file = open( file_name, "r", encoding='utf-8' )
+            brut_file = file.read()+'\n'
+            file.close()
+            traitement = ""
+            for i in range( len( brut_file ) ):
+                for j in range( len( brut_file[i] ) ):
+                    if brut_file[i][j] == '\n':
+                        return_file.append( traitement )
+                        traitement = ""
+                    else:
+                        traitement += brut_file[i][j]
+            return return_file
+        except FileNotFoundError:
+            return FileNotFoundError
+
+    global load_print
+    load_print += 1
+    f = '\n'.join( read( "./RIKAgroq.py" ) )
+    count = f.count( "loadPrint()#c" )-1
+
+    bar = "[" + ( '.'*100 ) + "]"
+
+
+    for i in range( int( load_print*100/count ) ):
+        bar = bar.replace( ".", "#", 1 )
+
+    print( bar, f"{load_print}/{count}", end='\r' )
+    if load_print == count:
+        print( "\n" )
+
+loadPrint()#c
+
 class ExitAgent( Exception ):
     pass
+
+loadPrint()#c
 
 class Type:
     def get_type( var ):
@@ -63,6 +105,8 @@ class Type:
                 traitement += origin[i]
         return output
 
+loadPrint()#c
+
 class Json:
     def write( informations: dict, json_name: str ):
         json_object = json.dumps( informations, indent=4 )
@@ -72,6 +116,8 @@ class Json:
         with open( json_name, Type.file.read, encoding="utf-8" ) as infile:
             informations = json.load( infile )
         return informations
+
+loadPrint()#c
 
 pygame.mixer.init()
 class Sound:
@@ -122,11 +168,15 @@ class Sound:
             pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
 
+loadPrint()#c
+
 # =====================
 # CONFIG
 # =====================
 
 settings = Json.read( "settings.json" )
+
+loadPrint()#c
 
 API_KEYS = settings["api-keys"]
 clients = [
@@ -134,9 +184,11 @@ clients = [
     for n in API_KEYS
 ]
 
+loadPrint()#c
 
 call_names = settings["call-names"]
 
+loadPrint()#c
 
 # prononciation = {
 #     "C#": "C sharp",
@@ -155,38 +207,59 @@ call_names = settings["call-names"]
 #     "DroidCam": "Droïd Came"
 # }
 
-
-AUDIO = settings["audio"]["audio"]
+loadPrint()#c
 
 MAIN_MODEL = settings["models"]["main"]
 VISION_MODEL = settings["models"]["vision"]
 ASK_MODEL = settings["models"]["data"]
+MAX_RETRIES = settings["max-api-retries"]
+ASSISTANT_NAME = settings["assistant-name"]
 
+loadPrint()#c
+
+AUDIO = settings["audio"]["audio"]
 VOICE = settings["audio"]["voice"]
+AUDIO_DURATION_LIMIT = settings["audio"]["audio-duration-threshold"]
+
+loadPrint()#c
 
 SCREENSHOT_DIR = settings["directories"]["screenshots"]
 WEBCAM_PATH = settings["directories"]["webcam"]
 
-MAX_RETRIES = settings["max-api-retries"]
+loadPrint()#c
 
-AUDIO_DURATION_LIMIT = settings["audio"]["audio-duration-threshold"]
+file_extensions = {
+    "python": "py",
+    "c++": "cpp",
+    "java": "java",
+    "html": "html",
+    "javascript": "js",
+    "batch": "bat",
+    "css": "css"
+}
+
+loadPrint()#c
 
 SMTP_SERVER = settings["email"]["smtp"]["server"]
 SMTP_PORT = settings["email"]["smtp"]["port"]
 EMAIL = settings["email"]["email"]
 EMAIL_PASSWORD = settings["email"]["pwd"]
-USER_EMAIL = settings["email"]["sudo-email"]["email"]
-USERNAME = settings["email"]["sudo-email"]["name"]
-CONTACT_LIST = settings["email"]["contacts"]
+USER_EMAIL = settings["email"]["user-email"]["email"]
+USERNAME = settings["email"]["user-email"]["name"]
+CONTACT_LIST = Json.read( "./contacts.json" )
 
-ASSISTANT_NAME = settings["assistant-name"]
+loadPrint()#c
 
 names = []
-for name in settings["email"]["contacts"].keys():
-    names.append( f"    -> {name}" )
+for contact in CONTACT_LIST:
+    name = contact["name"]
+    relation = contact["relation"]
+    language = contact["language"]
+    names.append( f"    -> {name} ({relation}) - Langue parlé : {language}" )
 
 CONTACT_NAMES = "\n".join( names )
 
+loadPrint()#c
 
 data = requests.get( "https://rikavinada9952.pythonanywhere.com/getConversation" )
 # print( data )
@@ -194,6 +267,8 @@ data = requests.get( "https://rikavinada9952.pythonanywhere.com/getConversation"
 # conversation = data.json()["conversation"]
 conversation = data.json()
 # print( conversation  )
+
+loadPrint()#c
 
 base_message = f"""
 Tu t'appelles {ASSISTANT_NAME}.
@@ -340,6 +415,7 @@ RÈGLES IMPORTANTES :
 - En envoyant des email, ne te fait pas passer pour l'utilisateur, mais pour son assistant. 
 - Dans les email, ne parle pas de l'utilisateur à la 1re personne, mais à la 3e personne.
 - Quand tu répond que tu as envoyé un email, FAIT-LE avec l'outil sendEmail
+- Dans les email, met le courriel dans la langue parlé du destinataire
 - Ne dis JAMAIS les paramètres utilisés pour les outils.
 - Ne fait JAMAIS de résumé de conversation, sauf quand je te le demande.
 - Si une action est requise (ex: envoyer un email, ouvrir une app, ouvrir un lien, analyser une image), la réponse est invalide si aucun outil n'est appelé.
@@ -353,6 +429,8 @@ conversation[0] = {
     "name": "instructions",
     "content": base_message
 }
+
+loadPrint()#c
 
 # =====================
 # SETUP
@@ -374,12 +452,16 @@ def get_camera_index( search ):
 
     return -1
 
+loadPrint()#c
+
 # =====================
 # IMAGE TO BASE64
 # =====================
 def image_to_base64( path ):
     with open( path, "rb" ) as f:
         return base64.b64encode( f.read() ).decode()
+
+loadPrint()#c
 
 # =====================
 # TOOL: openLink
@@ -389,6 +471,8 @@ def openLink( link ):
     if success:
         return f"ouverture de {link} réussie", False
     return f"ouverture de {link} raté", False
+
+loadPrint()#c
 
 # =====================
 # TOOL: openApp
@@ -413,6 +497,7 @@ def openApp( app: str ):
 # def runCommand():
 #     subprocess.run
 
+loadPrint()#c
 
 # =====================
 # TOOL: getLocalisation
@@ -426,19 +511,31 @@ def getLocalisation():
     except Exception as e:
         return "Erreur pour obtenir la localisation", True
 
+loadPrint()#c
+
 # =====================
 # TOOL: sendEmail
 # =====================
-def sendEmail( receiver, subject, text ):
+def sendEmail( receiver: str, subject: str, text: str ):
     if receiver == "user-email":
         receiver = USER_EMAIL
     else:
-        receiver = CONTACT_LIST[receiver]
-    msg = MIMEText( "Message Écrit Par Rika, Assistant IA de Vincent : \n\n" + text )
+        found = False
+        for contact in CONTACT_LIST:
+            if receiver == contact["name"]:
+                receiver = contact["email"]
+                found = True
+                break
+        if receiver.find( "@" ) != -1 and receiver.find( ".com" ) != -1:
+            found = True
+        if not found:
+            return f"aucun contact trouvé pour {receiver}"
+    msg = MIMEText( text )
     msg["Subject"] = subject
     msg["From"] = EMAIL
     msg["To"] = receiver
 
+    # print( f"{receiver=}, {subject=}, {text=}" )
 
     with smtplib.SMTP( SMTP_SERVER, SMTP_PORT ) as server:
         server.starttls()
@@ -447,16 +544,27 @@ def sendEmail( receiver, subject, text ):
     
     return "Envoie du courriel réussi", False
 
+loadPrint()#c
+
 # =====================
 # TOOL: sleepSystem
 # =====================
 def sleepSystem():
+    global conversation
+    conversation.append(
+        {
+            "role": "system",
+            "content": f"{moment()}"
+        }
+    )
     # Json.write( conversation, "./conversation.json" )
     requests.post( "https://rikavinada9952.pythonanywhere.com/setConversation", json=conversation )
     Json.write( conversation, "./conversation.json" )
     Sound.waitForVoiceToFinish()
     raise ExitAgent()
     # exit( 0 )
+
+loadPrint()#c
 
 # =====================
 # TOOL: getImage
@@ -482,6 +590,8 @@ def getImage( type ):
         return "Image webcam capturée"
 
     return "Type invalide"
+
+loadPrint()#c
 
 # =====================
 # TOOL: analyseImage
@@ -554,6 +664,8 @@ def analyseImage( type, prompt, renew ):
 
     return response.choices[0].message.content, True
 
+loadPrint()#c
+
 def removeEmojis( text ):
     emoji_pattern = re.compile( 
         "["
@@ -570,15 +682,7 @@ def removeEmojis( text ):
     )
     return emoji_pattern.sub( r'', text )
 
-file_extensions = {
-    "python": "py",
-    "c++": "cpp",
-    "java": "java",
-    "html": "html",
-    "javascript": "js",
-    "batch": "bat",
-    "css": "css"
-}
+loadPrint()#c
 
 
 # def splitForSpeach( text ):
@@ -651,13 +755,69 @@ Raccourcis le message d'origine sans omettre d'informations importantes.
 
     return json.loads( summary.choices[0].message.content )["message"]
 
+loadPrint()#c
+
+def moment():
+    date = datetime.datetime.now()
+    day_name = int( date.strftime( "%w" ) )
+    if day_name == 0:
+        day_name = "Dimanche"
+    elif day_name == 1:
+        day_name = "Lundi"
+    elif day_name == 2:
+        day_name = "Mardi"
+    elif day_name == 3:
+        day_name = "Mercredi"
+    elif day_name == 4:
+        day_name = "Jeudi"
+    elif day_name == 5:
+        day_name = "Vendredi"
+    elif day_name == 6:
+        day_name = "Samedi"
+    jour = date.strftime( "%d" )
+    mois = int( date.strftime( "%m" ) )
+    if mois == 1:
+        mois = "Janvier"
+    elif mois == 2:
+        mois = "Février"
+    elif mois == 3:
+        mois = "Mars"
+    elif mois == 4:
+        mois = "Avril"
+    elif mois == 5:
+        mois = "Mai"
+    elif mois == 6:
+        mois = "Juin"
+    elif mois == 7:
+        mois = "Juillet"
+    elif mois == 8:
+        mois = "Août"
+    elif mois == 9:
+        mois = "Septembre"
+    elif mois == 10:
+        mois = "Octobre"
+    elif mois == 11:
+        mois = "Novembre"
+    elif mois == 12:
+        mois = "Décembre"
+    ans = date.strftime( "%Y" )
+    heure = datetime.datetime.now().strftime( "%H" )
+    minute = datetime.datetime.now().strftime( "%M" )
+    return str( f"{ans=} {mois=} {jour=} {heure=} {minute=}" )
+
+loadPrint()#c
+
 def getAudioDuration( file_path ):
     audio = AudioSegment.from_file( file_path )
     duration_seconds = audio.duration_seconds
     return duration_seconds
 
+loadPrint()#c
+
 def treadTextResponse( response: str ):
     return response.replace( '**', '' )
+
+loadPrint()#c
 
 def treatAudioResponse( response ):
 
@@ -699,22 +859,15 @@ def treatAudioResponse( response ):
     # say_response = say_response.split( '`' )
     say_response = say_response.replace( '`', '' )
 
-
-    # language = ver_model.send_message( "Dit moi si ce texte est principalement en français ou en anglais. ne me ressort que fr ou en, juste 1 token, rien d'autre : " + ' '.join( say_response ) ).text.replace( '\n', '' )
-    language = "fr"
-
     if AUDIO:
-            # home.send_msg( ' '.join( say_response ), device )
-        # for i in range( len( say_response ) ):
         Sound.waitForVoiceToFinish()
         Sound.generateVoice( say_response, VOICE )
-        # print( f"Durée de l'audio : {getAudioDuration( './cache/output.mp3' )} secondes" )
         if getAudioDuration( "./cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
-            # say_response = summarized( say_response ) + " " + reformulate( "Plus d'informations sont affiché à l'écran" )
             say_response = summarized( say_response ) + "\nPlus d'informations sont affiché à l'écran"
-            # print( "Résumé pour audio trop long :", say_response )
             Sound.generateVoice( say_response, VOICE )
         Sound.playVoice()
+
+loadPrint()#c
 
 def getUserInput():
     user_input = ""
@@ -727,11 +880,20 @@ def getUserInput():
         user_input = input( "YOU > " )
     return user_input
 
+loadPrint()#c
+
 # =====================
 # MAIN LOOP
 # =====================
 def chat():
+    global conversation
 
+    conversation.append(
+        {
+            "role": "system",
+            "content": f"{moment()}"
+        }
+    )
 
     while True:
         user_input = getUserInput()
@@ -826,6 +988,8 @@ def chat():
                         treatAudioResponse( content["message"] )
                 else:
                     break
+
+loadPrint()#c
 
 # =====================
 # START
