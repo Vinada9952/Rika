@@ -7,6 +7,8 @@ import time
 import threading
 import cv2
 from pynput import mouse, keyboard
+import ctypes
+from ctypes import wintypes
 
 
 WIDTH = pyautogui.size().width
@@ -26,20 +28,24 @@ hwnd = pygame.display.get_wm_info()["window"]
 win32gui.SetWindowLong(
     hwnd,
     win32con.GWL_EXSTYLE,
-    win32gui.GetWindowLong( hwnd, win32con.GWL_EXSTYLE ) | win32con.WS_EX_LAYERED
- )
+    (
+        win32gui.GetWindowLong( hwnd, win32con.GWL_EXSTYLE )
+        | win32con.WS_EX_LAYERED
+        | win32con.WS_EX_TOOLWINDOW   # ← cache l'icône de la barre des tâches
+    ) & ~win32con.WS_EX_APPWINDOW     # ← retire le style qui force l'apparition
+)
 win32gui.SetLayeredWindowAttributes( 
     hwnd,
     win32api.RGB( FILL_COLOR[0], FILL_COLOR[1], FILL_COLOR[2] ),
     0,
     win32con.LWA_COLORKEY
- )
+)
 win32gui.SetWindowPos(
     hwnd,
     win32con.HWND_TOPMOST,
     0, 0, 0, 0,
     win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
- )
+)
 
 def has_user_activity(
     detect_mouse_move: bool = True,
@@ -83,6 +89,56 @@ def has_user_activity(
     keyboard_listener.stop()
 
     return result
+
+def wrap_text(text, font, max_width):
+    """Découpe le texte en lignes selon la largeur max en pixels."""
+    if text == -1 or text == -2:
+        return [""]
+    words = text.split()
+    lines = []
+    current_line = ""
+
+    for word in words:
+        test_line = current_line + (" " if current_line else "") + word
+        if font.size(test_line)[0] > max_width:
+            if current_line:
+                lines.append(current_line)
+            current_line = word
+        else:
+            current_line = test_line
+
+    if current_line:
+        lines.append(current_line)
+
+    return lines
+
+def onFocusGained(hwnd, callback):
+    """
+    Appelle callback() quand la fenêtre hwnd gagne le focus.
+    Lance un thread de surveillance en arrière-plan.
+    """
+    def _watch():
+        was_focused = False
+        while True:
+            focused_hwnd = win32gui.GetForegroundWindow()
+            is_focused = (focused_hwnd == hwnd)
+            
+            if is_focused and not was_focused:
+                if callback is not None:
+                    callback()
+
+            
+            was_focused = is_focused
+            time.sleep(0.1)
+    
+    t = threading.Thread(target=_watch, daemon=True)
+    t.start()
+    return t
+
+def looseFocus():
+    pyautogui.hotkey('alt', 'tab')
+
+onFocusGained( hwnd, looseFocus() )
 
 class Loading( pygame.sprite.Sprite ):
     last_image = None
@@ -351,6 +407,8 @@ _detected = threading.Event()
 def _trigger(*_):
     _detected.set()
 
+
+
 mouse.Listener(on_move=_trigger, on_click=_trigger, on_scroll=_trigger).start()
 keyboard.Listener(on_press=_trigger).start()
 
@@ -377,9 +435,9 @@ class GUI:
         loaded = load
     
     def displayRika( value ):
-        global display_rika
+        global display_rika, last_movement
         display_rika = value
-        # print( f"{value=}, {display_rika=}" )
+        last_movement = 0
     
     def setTextToDisplay( value ):
         global text
@@ -426,37 +484,47 @@ def main():
             ready_sprite.setToFrame( 1 )
         
 
-        if int( time.time() ) - last_movement > 15:
+        if int( time.time() ) - last_movement > 10:
             rika.setSize( WIDTH/3, WIDTH/3 )
             rika.setPos( ( WIDTH/3, HEIGHT/5 ) )
             if _detected.is_set():
                 last_movement = int( time.time() )
-                rika.setPos( ( 20, HEIGHT-WIDTH/10-20 ) )
                 _detected.clear()
         else:
-            rika.setSize( WIDTH/10, WIDTH/10 )
-            if pyautogui.position().x < WIDTH/5 and pyautogui.position().y >= HEIGHT/4*3:
-                rika.setPos( ( WIDTH-WIDTH/10-20, HEIGHT-WIDTH/10-20 ) )
-            elif pyautogui.position().x > WIDTH/5*4 and pyautogui.position().y >= HEIGHT/4*3:
-                rika.setPos( ( 20, HEIGHT-WIDTH/10-20 ) )
+            rika.setPos( ( 20, HEIGHT-WIDTH/7-20 ) )
+            rika.setSize( WIDTH/7, WIDTH/7 )
+            if pyautogui.position().x < WIDTH/7 and pyautogui.position().y >= HEIGHT/4*3:
+                rika.setPos( ( WIDTH-WIDTH/7-20, HEIGHT-WIDTH/7-20 ) )
+            elif pyautogui.position().x > WIDTH/7*4 and pyautogui.position().y >= HEIGHT/4*3:
+                rika.setPos( ( 20, HEIGHT-WIDTH/7-20 ) )
 
         initiating_sprite.update( dt, initiating )
         loading_sprite.update( loaded, initiating )
         rika.update( dt, ready, display_rika )
         ready_sprite.update( dt )
 
-        font_size = max(12, int(36 * rika.current_size[0] / (WIDTH/3)))
-        font = pygame.font.Font( "./assets/gui/Nasalization Rg.otf", font_size )
-        show_text = font.render( text, True, LIGHT_BLUE )
+        font_size = max(12, int(36 * rika.current_size[0] / (WIDTH / 3)))
+        font = pygame.font.Font("./assets/gui/Nasalization Rg.otf", font_size)
 
+        max_text_width = rika.current_size[0]
+        lines = wrap_text(text, font, max_text_width)
+
+        # Calcule la position de base
+        if rika.rect.x + rika.rect.width / 2 > WIDTH / 2:
+            text_x = rika.rect.x - max_text_width
+        else:
+            text_x = rika.rect.x + rika.rect.width
+
+        text_y = rika.rect.y
 
         screen.fill( FILL_COLOR )
         if ready:
-            if rika.rect.x + rika.rect.width / 2 > WIDTH / 2:
-                text_pos = (rika.rect.x - show_text.get_width(), rika.rect.y)
-            else:
-                text_pos = (rika.rect.x + rika.rect.width, rika.rect.y)
-            screen.blit( show_text, text_pos )
+            for line in lines:
+                rendered = font.render(line, True, LIGHT_BLUE)
+                screen.blit(rendered, (text_x, text_y))
+                text_y += font.get_linesize()
+
+
         all_sprite.draw( screen )
         pygame.display.flip()
 
@@ -465,7 +533,6 @@ def main():
 
 main_thread = threading.Thread( target=main )
 main_thread.daemon = True
-
 
 
 def test():
@@ -490,7 +557,7 @@ def test():
     time.sleep( 5 )
 
     print( "text display" )
-    GUI.setTextToDisplay( "Hello World" )
+    GUI.setTextToDisplay( "Hello World, this is a test text for Rika GUI text display" )
 
     try:
         while True:
@@ -504,3 +571,5 @@ def test():
 
     print( "quit" )
     GUI.quitGUI()
+
+# test()

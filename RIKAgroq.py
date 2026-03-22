@@ -5,6 +5,7 @@ import json
 import requests
 import mss
 from groq import Groq
+from json import JSONDecodeError
 from email.mime.text import MIMEText
 import smtplib
 from groq import APIStatusError
@@ -53,7 +54,8 @@ def loadPrint():
 
     global load_print
     load_print += 1
-    f = '\n'.join( read( "./RIKAgroq.py" ) )
+    # f = '\n'.join( read( "C:/Users/" ) )
+    f = '\n'.join( read( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/RIKAgroq.py" ) )
     count = f.count( "loadPrint()#c" )-1
 
     bar = "[" + ( '.'*100 ) + "]"
@@ -157,16 +159,16 @@ class Sound:
         text = "   " + text.replace( "*", "" ).replace( "\n", ".     " )
         if type( voice ) == str:
             communicate = edge_tts.Communicate( text, voice )
-            await communicate.save( "./cache/output.mp3" )
+            await communicate.save( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/cache/output.mp3" )
         else:
             communicate = edge_tts.Communicate( text, voice["ShortName"] )
-            await communicate.save( "./cache/output.mp3" )
+            await communicate.save( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/cache/output.mp3" )
     
     def generateVoice( text, voice ):
         return asyncio.run( Sound._generateVoice( text, voice ) )
     
     async def _playVoice():
-        pygame.mixer.music.load( "./cache/output.mp3" )
+        pygame.mixer.music.load( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/cache/output.mp3" )
         pygame.mixer.music.play()
     
     def playVoice():
@@ -255,7 +257,7 @@ EMAIL = settings["email"]["email"]
 EMAIL_PASSWORD = settings["email"]["pwd"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
 USERNAME = settings["email"]["user-email"]["name"]
-CONTACT_LIST = Json.read( "./contacts.json" )
+CONTACT_LIST = Json.read( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/contacts.json" )
 
 loadPrint()#c
 
@@ -567,9 +569,8 @@ def sleepSystem():
             "content": f"{moment()}"
         }
     )
-    # Json.write( conversation, "./conversation.json" )
     requests.post( "https://rikavinada9952.pythonanywhere.com/setConversation", json=conversation )
-    Json.write( conversation, "./conversation.json" )
+    Json.write( conversation, "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/conversation.json" )
     Sound.waitForVoiceToFinish()
     raise ExitAgent()
     # exit( 0 )
@@ -750,9 +751,9 @@ Ressort moi uniquement du Json avec ce format exact, sans rien d'autre :
 Ne met pas de caractères de mise en forme dans le message, comme des astérisques, des accents, ou des emojis.
 Juste du texte brut, sans retour à la ligne.
 Ne coupe pas les phrases au milieu, garde les phrases entières.
-Ne fais pas de résumé trop court, garde les informations importantes.
-Fait environ 2 ou 3 phrases complètes.
 Raccourcis le message d'origine sans omettre d'informations importantes.
+Le résultat doit OBLIGATOIREMENT avoir moins de 50 mots
+Garde le plus d'informations importantes possible
 """,
                 "name": "instructions"
             },
@@ -763,7 +764,10 @@ Raccourcis le message d'origine sans omettre d'informations importantes.
         ]
     )
 
-    return json.loads( summary.choices[0].message.content )["message"]
+    try:
+        return json.loads( summary.choices[0].message.content )["message"]
+    except JSONDecodeError:
+        return summary.choices[0].message.content
 
 loadPrint()#c
 
@@ -852,10 +856,10 @@ def treatAudioResponse( response ):
 
             planguage = extracted_code.split( '\n' )[0].replace( '```', '' )
             try:
-                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
+                while os.path.exists( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
                     code = random.randint( 1000, 9999 )
             except KeyError:
-                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + ".txt" ):
+                while os.path.exists( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/code/code-" + planguage + "-" + str( code ) + ".txt" ):
                     code = random.randint( 1000, 9999 )
 
             say_response[i] = "extrait de code " + planguage + " numéro " + str( code ) + ", enregistré sur le pc"
@@ -872,9 +876,10 @@ def treatAudioResponse( response ):
     if AUDIO:
         Sound.waitForVoiceToFinish()
         Sound.generateVoice( say_response, VOICE )
-        if getAudioDuration( "./cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
-            say_response = summarized( say_response ) + "\nPlus d'informations sont affiché à l'écran"
+        if getAudioDuration( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
+            say_response = summarized( say_response )
             Sound.generateVoice( say_response, VOICE )
+            GUI.setTextToDisplay( say_response )
         Sound.playVoice()
         GUI.setTextToDisplay( "" )
 
@@ -1050,7 +1055,7 @@ except KeyboardInterrupt:
     for message in conversation:
         if message["role"] == "assistant":
             message["content"] = json.loads( message["content"] )
-    with open( "./debug.log", "w", encoding="utf-8" ) as f:
+    with open( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/debug.log", "w", encoding="utf-8" ) as f:
         json.dump( conversation, f, ensure_ascii=False, indent=2 )
 
     # Affichage formaté dans la console
