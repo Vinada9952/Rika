@@ -6,8 +6,8 @@ old_mem.json
 Old_Rika_memory/
 cache/
 *.json
-conversation.json
 cache/
+conversation.json
 screenshots/
 captured.jpg
 credentials.json
