@@ -20,9 +20,13 @@ import speech_recognition as sr
 from pygrabber.dshow_graph import FilterGraph
 import webbrowser
 import edge_tts
+from gui import GUI
 import pygame
 import asyncio
 
+GUI.startGUI()
+
+GUI.setInit( True )
 
 os.system( "cls" )
 load_print = 0
@@ -58,9 +62,14 @@ def loadPrint():
     for i in range( int( load_print*100/count ) ):
         bar = bar.replace( ".", "#", 1 )
 
+    percentage = load_print*100/count
+
+    GUI.setLoading( percentage )
+
     print( bar, f"{load_print}/{count}", end='\r' )
     if load_print == count:
         print( "\n" )
+        GUI.setInit( False )
 
 loadPrint()#c
 
@@ -551,6 +560,7 @@ loadPrint()#c
 # =====================
 def sleepSystem():
     global conversation
+    GUI.displayRika( False )
     conversation.append(
         {
             "role": "system",
@@ -866,6 +876,7 @@ def treatAudioResponse( response ):
             say_response = summarized( say_response ) + "\nPlus d'informations sont affiché à l'écran"
             Sound.generateVoice( say_response, VOICE )
         Sound.playVoice()
+        GUI.setTextToDisplay( "" )
 
 loadPrint()#c
 
@@ -878,6 +889,7 @@ def getUserInput():
         print( user_input )
     else:
         user_input = input( "YOU > " )
+    GUI.setTextToDisplay( user_input )
     return user_input
 
 loadPrint()#c
@@ -1023,13 +1035,17 @@ try:
             
             if called:
                 try:
+                    GUI.displayRika( True )
                     chat()
                 except ExitAgent:
+                    GUI.displayRika( False )
                     print( "Zzz..." )
                     time.sleep( 2 )
 
 
 except KeyboardInterrupt:
+
+    GUI.quitGUI()
     # Sauvegarde brute pour debug
     for message in conversation:
         if message["role"] == "assistant":
