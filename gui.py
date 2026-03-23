@@ -681,10 +681,10 @@ class GUI:
     
     def displayRika( value ):
         global display_rika, last_movement
-        last_movement = 0
         display_rika = value
         if display_rika == False:
             GUI.setTextToDisplay( "" )
+        last_movement = 0
     
     def setTextToDisplay( value ):
         global text
