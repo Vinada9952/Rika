@@ -138,7 +138,6 @@ def onFocusGained(hwnd, callback):
 def looseFocus():
     pyautogui.hotkey('alt', 'tab')
 
-onFocusGained( hwnd, looseFocus() )
 
 class Loading( pygame.sprite.Sprite ):
     last_image = None
@@ -429,31 +428,96 @@ class TextInputSprite( pygame.sprite.Sprite ):
         )
         self._listener.start()
 
+    # def _restart_listener( self, suppress: bool ):
+    #     """Recrée le listener avec suppress=True ou False selon visibilité."""
+    #     if self._listener and self._listener.is_alive():
+    #         self._listener.stop()
+
+    #     def on_press( key ):
+    #         if not self.visible:
+    #             return
+
+    #         try:
+    #             char = key.char
+    #             if char:
+    #                 self.input_text += char
+    #         except AttributeError:
+    #             if key == keyboard.Key.backspace:
+    #                 self.input_text = self.input_text[:-1]
+    #             elif key == keyboard.Key.enter:
+    #                 self.submitted_text = self.input_text
+    #                 self.input_text     = ""
+    #             elif key == keyboard.Key.space:
+    #                 self.input_text += " "
+
+    #     self._listener = keyboard.Listener(
+    #         on_press = on_press,
+    #         suppress = suppress
+    #     )
+    #     self._listener.start()
+
     def _restart_listener( self, suppress: bool ):
-        """Recrée le listener avec suppress=True ou False selon visibilité."""
-        if self._listener and self._listener.is_alive():
-            self._listener.stop()
+        shift_held = [False]  # liste pour pouvoir modifier dans le closure
+
+        shift_map = {
+            '1': '!',
+            '2': '@',
+            '3': '#',
+            '4': '$',
+            '5': '%',
+            '6': '?',
+            '7': '&',
+            '8': '*',
+            '9': '(',
+            '0': ')',
+            '-': '_',
+            '=': '+',
+            '/': '\\',
+            ';': ':',
+            ".": '"',
+            ',': '\'',
+        }
 
         def on_press( key ):
             if not self.visible:
                 return
 
-            try:
-                char = key.char
-                if char:
-                    self.input_text += char
-            except AttributeError:
-                if key == keyboard.Key.backspace:
-                    self.input_text = self.input_text[:-1]
-                elif key == keyboard.Key.enter:
-                    self.submitted_text = self.input_text
-                    self.input_text     = ""
-                elif key == keyboard.Key.space:
-                    self.input_text += " "
+            # Détecter Shift
+            if key in ( keyboard.Key.shift, keyboard.Key.shift_r ):
+                shift_held[0] = True
+                return
+
+            if key == keyboard.Key.backspace:
+                self.input_text = self.input_text[:-1]
+            elif key == keyboard.Key.enter:
+                self.submitted_text = self.input_text
+                self.input_text = ""
+            elif key == keyboard.Key.space:
+                self.input_text += " "
+            else:
+                try:
+                    char = key.char
+                    if char:
+                        if shift_held[0]:
+                            if char in shift_map:
+                                char = shift_map[char]
+                            else:
+                                char = char.upper()
+                        self.input_text += char
+                except AttributeError:
+                    pass
+
+        def on_release( key ):
+            if key in ( keyboard.Key.shift, keyboard.Key.shift_r ):
+                shift_held[0] = False
+
+        if self._listener and self._listener.is_alive():
+            self._listener.stop()
 
         self._listener = keyboard.Listener(
-            on_press = on_press,
-            suppress = suppress
+            on_press   = on_press,
+            on_release = on_release,
+            suppress   = suppress
         )
         self._listener.start()
 
@@ -633,6 +697,10 @@ class GUI:
     def getInput():
         global text_input_sprite
         return text_input_sprite.getText()
+    
+    def getTextInputState():
+        global text_input_sprite
+        return text_input_sprite.state
 
 all_sprite = pygame.sprite.Group()
 
@@ -732,6 +800,7 @@ def main():
 
         clock.tick( 30 )
 
+onFocusGained( hwnd, looseFocus() )
 
 main_thread = threading.Thread( target=main )
 main_thread.daemon = True

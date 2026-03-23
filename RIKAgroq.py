@@ -5,6 +5,7 @@ import json
 import requests
 import mss
 from groq import Groq
+import threading
 from json import JSONDecodeError
 from email.mime.text import MIMEText
 import smtplib
@@ -179,6 +180,25 @@ class Sound:
         while pygame.mixer.music.get_busy():
             pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
+
+loadPrint()#c
+
+PROTOCOLS = [
+    "Bébé Chat"
+]
+
+protocol_list = ""
+for protocol in PROTOCOLS:
+    protocol_list += f"\n    -> {protocol}"
+
+loadPrint()#c
+
+def doProtocol( name ):
+    global PROTOCOLS
+    if name == PROTOCOLS[0]:
+        sendEmail( "mariannelord@icloud.com", "Protocol Bébé Chat", "https://fr.pinterest.com/nellyglassmann/chats-mignons-cats/\n\nMiaou" )
+    return f"protocol {name} execution success", False
+
 
 loadPrint()#c
 
@@ -414,6 +434,13 @@ OUTILS DISPONIBLES :
     -> Envoie un email à mon père...
     -> Dit à mon frère que...
 
+- doProtocol
+  - Utiliser un des protocols prévu
+  - À utiliser uniquement quand je te demande explicitement
+  - params:
+    -> protocol (string): Nom du protocol
+  - liste de protocol:{protocol_list}
+
 RÈGLES IMPORTANTES :
 - Ne JAMAIS écrire autre chose que du JSON.
 - Répond uniquement et uniquement en français.
@@ -476,12 +503,13 @@ def toggleRika():
     if called:
         called = False
         AUDIO = audio_tmp
-        sleepSystem()
+        try:
+            sleepSystem()
+        except ExitAgent:
+            pass
     if not called:
         called = True
         AUDIO = False
-
-keyboard.add_hotkey( "windows+alt+r", toggleRika )
 
 loadPrint()#c
 
@@ -504,6 +532,8 @@ def checkAudioCall():
                     if called:
                         break
         time.sleep( 1 )
+
+check_audio_call = threading.Thread( target=checkAudioCall )
 
 loadPrint()#c
 
@@ -603,8 +633,11 @@ loadPrint()#c
 # TOOL: sleepSystem
 # =====================
 def sleepSystem():
-    global conversation
+    global conversation, called
+    GUI.setTextToDisplay( "" )
+    GUI.textInput( False )
     GUI.displayRika( False )
+    called = False
     conversation.append(
         {
             "role": "system",
@@ -916,19 +949,17 @@ def treatAudioResponse( response ):
     # say_response = say_response.split( '`' )
     say_response = say_response.replace( '`', '' )
 
-    if AUDIO:
+    if getAudioDuration( f"{PROJECT_LOCATION}/cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
+        say_response = summarized( say_response )
+        Sound.generateVoice( say_response, VOICE )
+    else:
         Sound.waitForVoiceToFinish()
         Sound.generateVoice( say_response, VOICE )
-        if getAudioDuration( f"{PROJECT_LOCATION}/cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
-            say_response = summarized( say_response )
-            Sound.generateVoice( say_response, VOICE )
-            GUI.setTextToDisplay( say_response )
-        Sound.playVoice()
+    Sound.playVoice()
 
 loadPrint()#c
 
 def getUserInput():
-    GUI.setTextToDisplay( "" )
     user_input = ""
     if AUDIO:
         Sound.waitForVoiceToFinish()
@@ -937,6 +968,11 @@ def getUserInput():
         print( user_input )
     else:
         # user_input = input( "YOU > " )
+        while True:
+            print( GUI.getTextInputState() )
+            if GUI.getTextInputState() == "hidden":
+                break
+            time.sleep( 1 )
         GUI.textInput( True )
         while True:
             time.sleep( 1 )
@@ -997,6 +1033,7 @@ def chat():
             )
             treated_text = treadTextResponse( content["message"] )
             print( "🤖 >", treated_text )
+            GUI.setTextToDisplay( treated_text )
             if AUDIO:
                 treatAudioResponse( content["message"] )
 
@@ -1016,6 +1053,8 @@ def chat():
                         result, do_response = getLocalisation()
                     if tool["name"] == "openApp":
                         result, do_response = openApp( tool["params"]["app"] )
+                    if tool["name"] == "doProtocol":
+                        result, do_response = doProtocol( tool["params"]["protocol"] )
                     if tool["name"] == "notUnderstand":
                         not_understand = True
                         break
@@ -1049,7 +1088,9 @@ def chat():
                         }
                     )
                     content = json.loads( response.choices[0].message.content )
-                    print( "🤖 >", content["message"] )
+                    treated_text = treadTextResponse( content["message"] )
+                    GUI.setTextToDisplay( treated_text )
+                    print( "🤖 >", treated_text )
                     if AUDIO:
                         treatAudioResponse( content["message"] )
                 else:
@@ -1063,6 +1104,8 @@ loadPrint()#c
 try:
     if __name__ == "__main__":
         print( "🤖 RIKA" )
+        keyboard.add_hotkey( "ctrl+alt+r", toggleRika )
+        check_audio_call.start()
         while True:
             # question = input( "...\n" )
 
