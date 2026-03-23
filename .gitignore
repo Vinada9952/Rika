@@ -6,7 +6,6 @@ old_mem.json
 Old_Rika_memory/
 cache/
 *.json
-cache/
 conversation.json
 screenshots/
 captured.jpg
@@ -15,3 +14,4 @@ data.json
 debug.log
 *.log
 contacts.json
+cache/output.mp3
