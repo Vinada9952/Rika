@@ -367,6 +367,187 @@ class Rika( pygame.sprite.Sprite ):
         if not self.frame_updated:
             self.image = self.last_image
 
+class TextInputSprite( pygame.sprite.Sprite ):
+    last_image = None
+    frame_updated = False
+    submitted_text = ""
+    input_text = ""
+    visible = False
+    state = "hidden"
+
+    def __init__( self, appear_path, idle_path, disappear_path, pos: tuple, size: tuple ):
+        super().__init__()
+
+        self.cap_appear    = cv2.VideoCapture( appear_path )
+        self.cap_idle      = cv2.VideoCapture( idle_path )
+        self.cap_disappear = cv2.VideoCapture( disappear_path )
+
+        self.pos  = pos
+        self.size = size
+
+        self.fps         = self.cap_appear.get( cv2.CAP_PROP_FPS ) or 30
+        self.frame_delay = 1000 / self.fps
+        self.frame_time  = 0
+
+        self.image = pygame.Surface( ( 0, 0 ), pygame.SRCALPHA )
+        self.rect  = pygame.Rect( pos[0], pos[1], size[0], size[1] )
+
+        self._font = pygame.font.Font( "./assets/gui/Nasalization Rg.otf", 28 )
+
+        self._listener = None
+        self._start_listener()
+
+    # ── listener pynput permanent ─────────────────────────────────────────
+    def _start_listener( self ):
+        def on_press( key ):
+            if not self.visible:
+                return  # on laisse passer les touches normalement
+
+            # intercept : supprime le caractère sur la fenêtre en focus
+            # en simulant un backspace AVANT que la touche arrive à destination
+            # → on supprime la frappe dans la fenêtre cible avec suppress=True
+            # (voir Listener(suppress=True) plus bas)
+
+            try:
+                char = key.char
+                if char:
+                    self.input_text += char
+            except AttributeError:
+                if key == keyboard.Key.backspace:
+                    self.input_text = self.input_text[:-1]
+                elif key == keyboard.Key.enter:
+                    self.submitted_text = self.input_text
+                    self.input_text     = ""
+                elif key == keyboard.Key.space:
+                    self.input_text += " "
+
+        # suppress=True bloque la touche pour toutes les autres fenêtres
+        # quand le popup est visible, le listener est recréé avec/sans suppress
+        self._listener = keyboard.Listener(
+            on_press  = on_press,
+            suppress  = False   # sera géré dynamiquement via setVisible
+        )
+        self._listener.start()
+
+    def _restart_listener( self, suppress: bool ):
+        """Recrée le listener avec suppress=True ou False selon visibilité."""
+        if self._listener and self._listener.is_alive():
+            self._listener.stop()
+
+        def on_press( key ):
+            if not self.visible:
+                return
+
+            try:
+                char = key.char
+                if char:
+                    self.input_text += char
+            except AttributeError:
+                if key == keyboard.Key.backspace:
+                    self.input_text = self.input_text[:-1]
+                elif key == keyboard.Key.enter:
+                    self.submitted_text = self.input_text
+                    self.input_text     = ""
+                elif key == keyboard.Key.space:
+                    self.input_text += " "
+
+        self._listener = keyboard.Listener(
+            on_press = on_press,
+            suppress = suppress
+        )
+        self._listener.start()
+
+    # ── méthode publique appelée par GUI ──────────────────────────────────
+    def setVisible( self, value: bool ):
+        if value and self.state == "hidden":
+            self.cap_appear.set( cv2.CAP_PROP_POS_FRAMES, 0 )
+            self.state      = "appearing"
+            self.visible    = True
+            self.input_text = ""
+            self._restart_listener( suppress=True )   # bloque les touches
+
+        elif not value and self.state in ( "appearing", "idle" ):
+            self.cap_disappear.set( cv2.CAP_PROP_POS_FRAMES, 0 )
+            self.state   = "disappearing"
+            self.visible = False
+            self._restart_listener( suppress=False )  # laisse passer les touches
+
+    # ── lecture frame ─────────────────────────────────────────────────────
+    def _read_frame( self, cap, loop=False ):
+        ret, frame = cap.read()
+        if not ret:
+            if loop:
+                cap.set( cv2.CAP_PROP_POS_FRAMES, 0 )
+                ret, frame = cap.read()
+            else:
+                return None
+
+        frame      = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
+        gray       = cv2.cvtColor( frame, cv2.COLOR_RGB2GRAY )
+        _, alpha   = cv2.threshold( gray, 25, 255, cv2.THRESH_BINARY )
+        frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
+        frame_rgba[:, :, 3] = alpha
+
+        surface = pygame.image.frombuffer(
+            frame_rgba.tobytes(),
+            frame_rgba.shape[1::-1],
+            "RGBA"
+        )
+        surface = pygame.transform.scale( surface, ( int(self.size[0]), int(self.size[1]) ) )
+        return surface.convert_alpha()
+
+    # ── update ────────────────────────────────────────────────────────────
+    def update( self, dt ):
+        if self.state == "hidden":
+            return
+
+        self.frame_time += dt
+        if self.frame_time < self.frame_delay:
+            if self.last_image:
+                self.image = self.last_image
+            return
+        self.frame_time = 0
+
+        if self.state == "appearing":
+            frame = self._read_frame( self.cap_appear, loop=False )
+            if frame is None:
+                self.cap_idle.set( cv2.CAP_PROP_POS_FRAMES, 0 )
+                self.state = "idle"
+                frame = self._read_frame( self.cap_idle, loop=True )
+
+        elif self.state == "idle":
+            frame = self._read_frame( self.cap_idle, loop=True )
+
+        elif self.state == "disappearing":
+            frame = self._read_frame( self.cap_disappear, loop=False )
+            if frame is None:
+                self.state      = "hidden"
+                self.visible    = False
+                self.image      = pygame.Surface( (0, 0), pygame.SRCALPHA )
+                self.last_image = self.image
+                return
+
+        if frame is not None:
+            surface  = frame.copy()
+            cursor   = "|" if ( pygame.time.get_ticks() // 500 ) % 2 == 0 else ""
+            display  = self.input_text + cursor
+            rendered = self._font.render( display, True, LIGHT_BLUE )
+            tx = ( self.size[0] - rendered.get_width()  ) // 2
+            ty = int( self.size[1] * 0.75 )
+            surface.blit( rendered, ( tx, ty ) )
+            self.image      = surface
+            self.last_image = surface
+
+        self.rect.x = self.pos[0]
+        self.rect.y = self.pos[1]
+    
+    def getText( self ):
+        if self.submitted_text == "":
+            return None
+        tmp = self.submitted_text
+        self.submitted_text = ""
+        return tmp
+
 class LoadingSprite( pygame.sprite.Sprite ):
     full_size = 0
     current_percent = 0
@@ -436,12 +617,22 @@ class GUI:
     
     def displayRika( value ):
         global display_rika, last_movement
-        display_rika = value
         last_movement = 0
+        display_rika = value
+        if display_rika == False:
+            GUI.setTextToDisplay( "" )
     
     def setTextToDisplay( value ):
         global text
         text = value
+    
+    def textInput( value: bool ):
+        global text_input_sprite
+        text_input_sprite.setVisible( value )
+    
+    def getInput():
+        global text_input_sprite
+        return text_input_sprite.getText()
 
 all_sprite = pygame.sprite.Group()
 
@@ -458,11 +649,19 @@ ready_sprite = SystemReady(
 rika = Rika(
     "./assets/gui/Blender/Rika0001-0250.avi"
 )
+text_input_sprite = TextInputSprite(
+    "./assets/gui/Blender/text_input0001-0250.avi",
+    "./assets/gui/Blender/text_input0001-0250.avi",
+    "./assets/gui/Blender/text_input0001-0250.avi",
+    ( WIDTH // 4, HEIGHT // 4 ),
+    ( WIDTH // 2, HEIGHT // 2 ),
+)
 
 all_sprite.add( initiating_sprite )
 all_sprite.add( loading_sprite )
 all_sprite.add( ready_sprite )
 all_sprite.add( rika )
+all_sprite.add( text_input_sprite )
 
 clock = pygame.time.Clock()
 
@@ -483,13 +682,15 @@ def main():
             ready = True
             ready_sprite.setToFrame( 1 )
         
-
+        if text_input_sprite.visible:
+            last_movement = int( time.time() )
         if int( time.time() ) - last_movement > 10:
-            rika.setSize( WIDTH/3, WIDTH/3 )
-            rika.setPos( ( WIDTH/3, HEIGHT/5 ) )
             if _detected.is_set():
                 last_movement = int( time.time() )
                 _detected.clear()
+            else:
+                rika.setSize( WIDTH/3, WIDTH/3 )
+                rika.setPos( ( WIDTH/3, HEIGHT/5 ) )
         else:
             rika.setPos( ( 20, HEIGHT-WIDTH/7-20 ) )
             rika.setSize( WIDTH/7, WIDTH/7 )
@@ -498,10 +699,11 @@ def main():
             elif pyautogui.position().x > WIDTH/7*4 and pyautogui.position().y >= HEIGHT/4*3:
                 rika.setPos( ( 20, HEIGHT-WIDTH/7-20 ) )
 
+        rika             .update( dt, ready, display_rika )
+        loading_sprite   .update( loaded, initiating )
         initiating_sprite.update( dt, initiating )
-        loading_sprite.update( loaded, initiating )
-        rika.update( dt, ready, display_rika )
-        ready_sprite.update( dt )
+        ready_sprite     .update( dt )
+        text_input_sprite.update( dt )
 
         font_size = max(12, int(36 * rika.current_size[0] / (WIDTH / 3)))
         font = pygame.font.Font("./assets/gui/Nasalization Rg.otf", font_size)
@@ -558,6 +760,16 @@ def test():
 
     print( "text display" )
     GUI.setTextToDisplay( "Hello World, this is a test text for Rika GUI text display" )
+    time.sleep( 5 )
+
+    GUI.textInput( True )
+    while True:
+        time.sleep( 0.5 )
+        text = GUI.getInput()
+        if text:
+            print( text )
+            break
+    GUI.textInput( False )
 
     try:
         while True:

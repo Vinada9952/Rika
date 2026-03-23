@@ -13,6 +13,7 @@ import datetime
 from pydub import AudioSegment
 import re
 import random
+import keyboard
 from PIL import Image
 import requests
 import time
@@ -55,7 +56,7 @@ def loadPrint():
     global load_print
     load_print += 1
     # f = '\n'.join( read( "C:/Users/" ) )
-    f = '\n'.join( read( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/RIKAgroq.py" ) )
+    f = '\n'.join( read( f"{"C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika"}/RIKAgroq.py" ) )
     count = f.count( "loadPrint()#c" )-1
 
     bar = "[" + ( '.'*100 ) + "]"
@@ -159,16 +160,16 @@ class Sound:
         text = "   " + text.replace( "*", "" ).replace( "\n", ".     " )
         if type( voice ) == str:
             communicate = edge_tts.Communicate( text, voice )
-            await communicate.save( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/cache/output.mp3" )
+            await communicate.save( f"{PROJECT_LOCATION}/cache/output.mp3" )
         else:
             communicate = edge_tts.Communicate( text, voice["ShortName"] )
-            await communicate.save( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/cache/output.mp3" )
+            await communicate.save( f"{PROJECT_LOCATION}/cache/output.mp3" )
     
     def generateVoice( text, voice ):
         return asyncio.run( Sound._generateVoice( text, voice ) )
     
     async def _playVoice():
-        pygame.mixer.music.load( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/cache/output.mp3" )
+        pygame.mixer.music.load( f"{PROJECT_LOCATION}/cache/output.mp3" )
         pygame.mixer.music.play()
     
     def playVoice():
@@ -225,6 +226,7 @@ VISION_MODEL = settings["models"]["vision"]
 ASK_MODEL = settings["models"]["data"]
 MAX_RETRIES = settings["max-api-retries"]
 ASSISTANT_NAME = settings["assistant-name"]
+PROJECT_LOCATION = settings["project-location"]
 
 loadPrint()#c
 
@@ -257,7 +259,7 @@ EMAIL = settings["email"]["email"]
 EMAIL_PASSWORD = settings["email"]["pwd"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
 USERNAME = settings["email"]["user-email"]["name"]
-CONTACT_LIST = Json.read( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/contacts.json" )
+CONTACT_LIST = Json.read( f"{PROJECT_LOCATION}/contacts.json" )
 
 loadPrint()#c
 
@@ -433,6 +435,8 @@ RÈGLES IMPORTANTES :
 - Il est INTERDIT de simuler une action dans le message sans appeler l'outil correspondant.
 - Si une action est nécéssaire, ne te contente pas juste de répondre, FAIT l'action
 - Ne met pas de mise en page ou des choses dans le genre pour faire des tableaux, titres en gras, ressort un texte simple destiné à être affiché dans le terminal
+- Essaie de faire les messages les plus courts possibles
+- Ta réponse est fait pour être dite à l'oral. Garde des caractères normaux pouvant être dit par un module TTS.
 """
 
 conversation[0] = {
@@ -462,6 +466,44 @@ def get_camera_index( search ):
             return index
 
     return -1
+
+loadPrint()#c
+
+called = False
+audio_tmp = AUDIO
+def toggleRika():
+    global called, AUDIO
+    if called:
+        called = False
+        AUDIO = audio_tmp
+        sleepSystem()
+    if not called:
+        called = True
+        AUDIO = False
+
+keyboard.add_hotkey( "windows+alt+r", toggleRika )
+
+loadPrint()#c
+
+def checkAudioCall():
+    global called
+    while True:
+        if not called:
+            print( "..." )
+            question = Sound.listen()
+            print( question )
+
+            called = False
+            if type( question ) == str:
+                calls = question.lower().split( ' ' )
+                for call_name in call_names:
+                    for call in calls:
+                        if call.find( call_name ) != -1:
+                            called = True
+                            break
+                    if called:
+                        break
+        time.sleep( 1 )
 
 loadPrint()#c
 
@@ -570,7 +612,7 @@ def sleepSystem():
         }
     )
     requests.post( "https://rikavinada9952.pythonanywhere.com/setConversation", json=conversation )
-    Json.write( conversation, "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/conversation.json" )
+    Json.write( conversation, f"{PROJECT_LOCATION}/conversation.json" )
     Sound.waitForVoiceToFinish()
     raise ExitAgent()
     # exit( 0 )
@@ -738,6 +780,7 @@ loadPrint()#c
 #     return result
 
 def summarized( response ):
+    return response
     summary = random.choice( clients ).chat.completions.create( 
         model=ASK_MODEL,
         messages=[
@@ -856,10 +899,10 @@ def treatAudioResponse( response ):
 
             planguage = extracted_code.split( '\n' )[0].replace( '```', '' )
             try:
-                while os.path.exists( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
+                while os.path.exists( f"{PROJECT_LOCATION}/code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
                     code = random.randint( 1000, 9999 )
             except KeyError:
-                while os.path.exists( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/code/code-" + planguage + "-" + str( code ) + ".txt" ):
+                while os.path.exists( f"{PROJECT_LOCATION}/code/code-" + planguage + "-" + str( code ) + ".txt" ):
                     code = random.randint( 1000, 9999 )
 
             say_response[i] = "extrait de code " + planguage + " numéro " + str( code ) + ", enregistré sur le pc"
@@ -876,16 +919,16 @@ def treatAudioResponse( response ):
     if AUDIO:
         Sound.waitForVoiceToFinish()
         Sound.generateVoice( say_response, VOICE )
-        if getAudioDuration( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
+        if getAudioDuration( f"{PROJECT_LOCATION}/cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
             say_response = summarized( say_response )
             Sound.generateVoice( say_response, VOICE )
             GUI.setTextToDisplay( say_response )
         Sound.playVoice()
-        GUI.setTextToDisplay( "" )
 
 loadPrint()#c
 
 def getUserInput():
+    GUI.setTextToDisplay( "" )
     user_input = ""
     if AUDIO:
         Sound.waitForVoiceToFinish()
@@ -893,8 +936,14 @@ def getUserInput():
         user_input = Sound.listen()
         print( user_input )
     else:
-        user_input = input( "YOU > " )
-    GUI.setTextToDisplay( user_input )
+        # user_input = input( "YOU > " )
+        GUI.textInput( True )
+        while True:
+            time.sleep( 1 )
+            user_input = GUI.getInput()
+            if user_input:
+                GUI.textInput( False )
+                break
     return user_input
 
 loadPrint()#c
@@ -1018,25 +1067,13 @@ try:
             # question = input( "...\n" )
 
             question = ""
-            if not AUDIO:
-                question = "rika"
-                # question = input( "...\n" )
-            else:
-                print( "..." )
-                question = Sound.listen()
-                print( question )
-
-
-            called = False
-            if type( question ) == str:
-                calls = question.lower().split( ' ' )
-                for call_name in call_names:
-                    for call in calls:
-                        if call.find( call_name ) != -1:
-                            called = True
-                            break
-                    if called:
-                        break
+            # if not AUDIO:
+            #     question = "rika"
+            #     # question = input( "...\n" )
+            # else:
+            # print( "..." )
+            # question = Sound.listen()
+            # print( question )
             
             if called:
                 try:
@@ -1045,7 +1082,7 @@ try:
                 except ExitAgent:
                     GUI.displayRika( False )
                     print( "Zzz..." )
-                    time.sleep( 2 )
+            time.sleep( 2 )
 
 
 except KeyboardInterrupt:
@@ -1055,7 +1092,7 @@ except KeyboardInterrupt:
     for message in conversation:
         if message["role"] == "assistant":
             message["content"] = json.loads( message["content"] )
-    with open( "C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika/debug.log", "w", encoding="utf-8" ) as f:
+    with open( f"{PROJECT_LOCATION}/debug.log", "w", encoding="utf-8" ) as f:
         json.dump( conversation, f, ensure_ascii=False, indent=2 )
 
     # Affichage formaté dans la console

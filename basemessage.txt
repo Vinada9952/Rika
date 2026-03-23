@@ -149,3 +149,5 @@ RÈGLES IMPORTANTES :
 - Il est INTERDIT de simuler une action dans le message sans appeler l'outil correspondant.
 - Si une action est nécéssaire, ne te contente pas juste de répondre, FAIT l'action
 - Ne met pas de mise en page ou des choses dans le genre pour faire des tableaux, titres en gras, ressort un texte simple destiné à être affiché dans le terminal
+- Essaie de faire les messages les plus courts possibles
+- Ta réponse est fait pour être dite à l'oral. Garde des caractères normaux pouvant être dit par un module TTS.
