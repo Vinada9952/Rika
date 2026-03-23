@@ -161,16 +161,16 @@ class Sound:
         text = "   " + text.replace( "*", "" ).replace( "\n", ".     " )
         if type( voice ) == str:
             communicate = edge_tts.Communicate( text, voice )
-            await communicate.save( f"{PROJECT_LOCATION}/cache/output.mp3" )
+            await communicate.save( "./cache/output.mp3" )
         else:
             communicate = edge_tts.Communicate( text, voice["ShortName"] )
-            await communicate.save( f"{PROJECT_LOCATION}/cache/output.mp3" )
+            await communicate.save( "./cache/output.mp3" )
     
     def generateVoice( text, voice ):
         return asyncio.run( Sound._generateVoice( text, voice ) )
     
     async def _playVoice():
-        pygame.mixer.music.load( f"{PROJECT_LOCATION}/cache/output.mp3" )
+        pygame.mixer.music.load( "./cache/output.mp3" )
         pygame.mixer.music.play()
     
     def playVoice():
@@ -279,7 +279,7 @@ EMAIL = settings["email"]["email"]
 EMAIL_PASSWORD = settings["email"]["pwd"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
 USERNAME = settings["email"]["user-email"]["name"]
-CONTACT_LIST = Json.read( f"{PROJECT_LOCATION}/contacts.json" )
+CONTACT_LIST = Json.read( "./contacts.json" )
 
 loadPrint()#c
 
@@ -645,7 +645,7 @@ def sleepSystem():
         }
     )
     requests.post( "https://rikavinada9952.pythonanywhere.com/setConversation", json=conversation )
-    Json.write( conversation, f"{PROJECT_LOCATION}/conversation.json" )
+    Json.write( conversation, "./conversation.json" )
     Sound.waitForVoiceToFinish()
     raise ExitAgent()
     # exit( 0 )
@@ -932,10 +932,10 @@ def treatAudioResponse( response ):
 
             planguage = extracted_code.split( '\n' )[0].replace( '```', '' )
             try:
-                while os.path.exists( f"{PROJECT_LOCATION}/code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
+                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
                     code = random.randint( 1000, 9999 )
             except KeyError:
-                while os.path.exists( f"{PROJECT_LOCATION}/code/code-" + planguage + "-" + str( code ) + ".txt" ):
+                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + ".txt" ):
                     code = random.randint( 1000, 9999 )
 
             say_response[i] = "extrait de code " + planguage + " numéro " + str( code ) + ", enregistré sur le pc"
@@ -949,7 +949,7 @@ def treatAudioResponse( response ):
     # say_response = say_response.split( '`' )
     say_response = say_response.replace( '`', '' )
 
-    if getAudioDuration( f"{PROJECT_LOCATION}/cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
+    if getAudioDuration( "./cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
         say_response = summarized( say_response )
         Sound.generateVoice( say_response, VOICE )
     else:
@@ -1135,7 +1135,7 @@ except KeyboardInterrupt:
     for message in conversation:
         if message["role"] == "assistant":
             message["content"] = json.loads( message["content"] )
-    with open( f"{PROJECT_LOCATION}/debug.log", "w", encoding="utf-8" ) as f:
+    with open( "./debug.log", "w", encoding="utf-8" ) as f:
         json.dump( conversation, f, ensure_ascii=False, indent=2 )
 
     # Affichage formaté dans la console
