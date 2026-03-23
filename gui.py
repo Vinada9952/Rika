@@ -718,9 +718,9 @@ rika = Rika(
     "./assets/gui/Blender/Rika0001-0250.avi"
 )
 text_input_sprite = TextInputSprite(
-    "./assets/gui/Blender/text_input0001-0250.avi",
-    "./assets/gui/Blender/text_input0001-0250.avi",
-    "./assets/gui/Blender/text_input0001-0250.avi",
+    "./assets/gui/Blender/text_input0001-0005.avi",
+    "./assets/gui/Blender/text_input0001-0005.avi",
+    "./assets/gui/Blender/text_input0001-0005.avi",
     ( WIDTH // 4, HEIGHT // 4 ),
     ( WIDTH // 2, HEIGHT // 2 ),
 )
