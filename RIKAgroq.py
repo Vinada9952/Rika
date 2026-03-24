@@ -183,7 +183,7 @@ class Sound:
 
 loadPrint()#c
 
-PROTOCOLS = Json.read( "./assets/protocols/protocols.json" )
+PROTOCOLS = Json.read( Json.read( "./settings.json" )["directories"]["protocols"] )
 
 protocol_list = ""
 for protocol in PROTOCOLS:
