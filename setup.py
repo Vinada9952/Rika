@@ -1,0 +1,61 @@
+import os
+os.system( "pip install -r requirement.txt" )
+
+from RIKAgroq import Json
+os.mkdir( "./cache" )
+
+api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
+email = input( "Email de L'agent : " )
+pwd = input( "Mot de passe de l'agent pour l'email (https://myaccount.google.com/apppasswords)" )
+name = input( "Votre nom : " )
+user = input( "Votre email : " )
+
+base_settings = {
+    "assistant-name": "Rika",
+    "api-keys": [
+        api_key
+    ],
+    "max-api-retries": 50,
+    "call-names": [
+        "ikea",
+        "reka",
+        "rica",
+        "richard",
+        "rika",
+        "requin",
+        "ricardo",
+        "rik",
+        "riga",
+        "richelieu",
+        "robert",
+        "ricard"
+    ],
+    "audio": {
+        "audio": True,
+        "audio-duration-threshold": 15,
+        "voice": "fr-CA-SylvieNeural"
+    },
+    "directories": {
+        "screenshots": "screenshots/",
+        "cache": "cache/",
+        "webcam": "./cache/captured.jpg"
+    },
+    "models": {
+        "data": "llama-3.1-8b-instant",
+        "main": "openai/gpt-oss-120b",
+        "vision": "openai/gpt-oss-120b"
+    },
+    "email": {
+        "email": email,
+        "pwd": pwd,
+        "smtp": {
+            "server": "smtp.gmail.com",
+            "port": 587
+        },
+        "user-email": {
+            "name": name,
+            "email": user
+        }
+    },
+    "server-url": "localhost:5000"
+}

@@ -26,3 +26,5 @@ def setConversation():
 def getConversation():
     global conversation
     return conversation
+
+app.run( '0.0.0.0', 5000 )
