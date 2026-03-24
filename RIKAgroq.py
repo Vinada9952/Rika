@@ -1094,31 +1094,28 @@ def chat():
 
             not_understand = False
             do_response = False
-            role = "assistant"
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
                     if tool["name"] == "analyseOldImage":
                         if MAIN_MODEL != VISION_MODEL:
-                            result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                            result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
                         else:
-                            role = "user"
-                            result, do_response = getImageContent( tool["params"]["source"], False )
+                            result, do_response, role = getImageContent( tool["params"]["source"], False )
                     if tool["name"] == "analyseNewImage":
                         if MAIN_MODEL != VISION_MODEL:
-                            result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
+                            result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
                         else:
-                            role = "user"
-                            result, do_response = getImageContent( tool["params"]["source"], True )
+                            result, do_response, role = getImageContent( tool["params"]["source"], True )
                     if tool["name"] == "sendEmail":
-                        result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
+                        result, do_response, role = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
                     if tool["name"] == "openLink":
-                        result, do_response = openLink( tool["params"]["link"] )
+                        result, do_response, role = openLink( tool["params"]["link"] )
                     if tool["name"] == "getLocalisation":
-                        result, do_response = getLocalisation()
+                        result, do_response, role = getLocalisation()
                     if tool["name"] == "openApp":
-                        result, do_response = openApp( tool["params"]["app"] )
+                        result, do_response, role = openApp( tool["params"]["app"] )
                     if tool["name"] == "doProtocol":
-                        result, do_response = doProtocol( tool["params"]["protocol"] )
+                        result, do_response, role = doProtocol( tool["params"]["protocol"] )
                     if tool["name"] == "notUnderstand":
                         not_understand = True
                         break
@@ -1127,7 +1124,7 @@ def chat():
                     
                     conversation.append( 
                         {
-                            "role": "user",
+                            "role": role,
                             "content": result,
                             "name": f"{tool["name"]} tool"
                         }
