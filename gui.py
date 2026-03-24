@@ -7,7 +7,6 @@ import time
 import threading
 import cv2
 from pynput import mouse, keyboard
-import atexit
 
 
 WIDTH = pyautogui.size().width
@@ -24,10 +23,10 @@ pygame.display.set_caption( 'Pygame' )
 
 
 hwnd = pygame.display.get_wm_info()["window"]
-win32gui.SetWindowLong(
+win32gui.SetWindowLong( 
     hwnd,
     win32con.GWL_EXSTYLE,
-    (
+    ( 
         win32gui.GetWindowLong( hwnd, win32con.GWL_EXSTYLE )
         | win32con.WS_EX_LAYERED
         | win32con.WS_EX_TOOLWINDOW   # ← cache l'icône de la barre des tâches
@@ -39,19 +38,19 @@ win32gui.SetLayeredWindowAttributes(
     0,
     win32con.LWA_COLORKEY
 )
-win32gui.SetWindowPos(
+win32gui.SetWindowPos( 
     hwnd,
     win32con.HWND_TOPMOST,
     0, 0, 0, 0,
     win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
 )
 
-def has_user_activity(
+def has_user_activity( 
     detect_mouse_move: bool = True,
     detect_mouse_click: bool = True,
     detect_mouse_scroll: bool = True,
     detect_keyboard: bool = True,
-) -> bool:
+ ) -> bool:
     """
     Retourne True si au moins un événement utilisateur s'est produit
     depuis le dernier appel, False sinon.
@@ -67,17 +66,17 @@ def has_user_activity(
     """
     detected = threading.Event()
 
-    def _trigger(*_):
+    def _trigger( *_ ):
         detected.set()
 
-    mouse_listener = mouse.Listener(
+    mouse_listener = mouse.Listener( 
         on_move=_trigger if detect_mouse_move else None,
         on_click=_trigger if detect_mouse_click else None,
         on_scroll=_trigger if detect_mouse_scroll else None,
-    )
-    keyboard_listener = keyboard.Listener(
+ )
+    keyboard_listener = keyboard.Listener( 
         on_press=_trigger if detect_keyboard else None,
-    )
+ )
 
     mouse_listener.start()
     keyboard_listener.start()
@@ -89,7 +88,7 @@ def has_user_activity(
 
     return result
 
-def wrap_text(text, font, max_width):
+def wrap_text( text, font, max_width ):
     """Découpe le texte en lignes selon la largeur max en pixels."""
     if text == -1 or text == -2:
         return [""]
@@ -98,57 +97,57 @@ def wrap_text(text, font, max_width):
     current_line = ""
 
     for word in words:
-        test_line = current_line + (" " if current_line else "") + word
-        if font.size(test_line)[0] > max_width:
+        test_line = current_line + ( " " if current_line else "" ) + word
+        if font.size( test_line )[0] > max_width:
             if current_line:
-                lines.append(current_line)
+                lines.append( current_line )
             current_line = word
         else:
             current_line = test_line
 
     if current_line:
-        lines.append(current_line)
+        lines.append( current_line )
 
     return lines
 
 def forceTopmost():
-    win32gui.SetWindowPos(
+    win32gui.SetWindowPos( 
         hwnd,
         win32con.HWND_TOPMOST,
         0, 0, 0, 0,
         win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE
-    )
+ )
 
-# def onFocusGained(hwnd, callback):
-#     def _watch():
-#         was_focused = False
-#         while True:
-#             focused_hwnd = win32gui.GetForegroundWindow()
-#             is_focused = (focused_hwnd == hwnd)
+def onFocusGained( hwnd, callback ):
+    def _watch():
+        was_focused = False
+        while True:
+            focused_hwnd = win32gui.GetForegroundWindow()
+            is_focused = ( focused_hwnd == hwnd )
             
-#             if is_focused and not was_focused:
-#                 if callback is not None:
-#                     callback()
+            if is_focused and not was_focused:
+                if callback is not None:
+                    callback()
 
-#             was_focused = is_focused
-#             time.sleep(0.5)  # 0.1 → 0.5 pour éviter le spam si aucune fenêtre dispo
+            was_focused = is_focused
+            time.sleep( 0.5 )  # 0.1 → 0.5 pour éviter le spam si aucune fenêtre dispo
     
-#     t = threading.Thread(target=_watch, daemon=True)
-#     t.start()
-#     return t
+    t = threading.Thread( target=_watch, daemon=True )
+    t.start()
+    return t
 
-# def looseFocus():
-#     other_windows = []
-#     def enum_handler(h, _):
-#         if h != hwnd and win32gui.IsWindowVisible(h) and win32gui.GetWindowText(h):
-#             other_windows.append(h)
-#     win32gui.EnumWindows(enum_handler, None)
+def looseFocus():
+    other_windows = []
+    def enum_handler( h, _ ):
+        if h != hwnd and win32gui.IsWindowVisible( h ) and win32gui.GetWindowText( h ):
+            other_windows.append( h )
+    win32gui.EnumWindows( enum_handler, None )
     
-#     if other_windows:
-#         pyautogui.hotkey('alt', 'tab')
-#     else:
-#         # Minimise plutôt que de crasher
-#         win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
+    if other_windows:
+        pyautogui.hotkey( 'alt', 'tab' )
+    else:
+        # Minimise plutôt que de crasher
+        win32gui.ShowWindow( hwnd, win32con.SW_MINIMIZE )
 
 
 class Loading( pygame.sprite.Sprite ):
@@ -207,8 +206,8 @@ class Loading( pygame.sprite.Sprite ):
         scale_x = WIDTH / surface.get_width()
         
         new_width = WIDTH
-        new_height = int(surface.get_height() * scale_x)
-        surface = pygame.transform.scale(surface, (new_width, new_height))
+        new_height = int( surface.get_height() * scale_x )
+        surface = pygame.transform.scale( surface, ( new_width, new_height ) )
         
         # center vertically
         self.rect.x = 0
@@ -265,13 +264,31 @@ class SystemReady( Loading ):
         if not self.frame_updated:
             self.image = self.last_image
 
+class SystemOn( Loading ):
+    def update( self, dt ):
+        self.frame_updated = False
+        self.frame_time += dt
+
+        if self.frame_time >= self.frame_delay:
+            self.frame_time = 0
+        
+        if self.frame_number != 0:
+            self.readFrame()
+            self.image = pygame.transform.scale( self.image, ( self.rect.width/10, self.rect.height/10 ) )
+            self.rect.y = HEIGHT-HEIGHT/10
+        if self.frame_number == 50:
+            self.setToFrame( 230 )
+        
+        if not self.frame_updated:
+            self.image = self.last_image
+
 class Rika( pygame.sprite.Sprite ):
     last_image = None
     frame_updated = False
-    current_pos = (0, 0)
-    current_size = (0, 0)
-    target_pos = (0, 0)
-    target_size = (0, 0)
+    current_pos = ( 0, 0 )
+    current_size = ( 0, 0 )
+    target_pos = ( 0, 0 )
+    target_size = ( 0, 0 )
     def __init__( self, file_path ):
         super().__init__()
 
@@ -324,7 +341,7 @@ class Rika( pygame.sprite.Sprite ):
             "RGBA"
         )
         
-        surface = pygame.transform.scale(surface, (self.current_size[0], self.current_size[1]))
+        surface = pygame.transform.scale( surface, ( self.current_size[0], self.current_size[1] ) )
         
         # center vertically
         self.rect.x = self.current_pos[0]
@@ -336,7 +353,7 @@ class Rika( pygame.sprite.Sprite ):
         self.last_image = self.image
         self.frame_updated = True
 
-    def setSize(self, width, height):
+    def setSize( self, width, height ):
         self.target_size = ( width, height )
 
     def setPos( self, pos: tuple ):
@@ -354,13 +371,13 @@ class Rika( pygame.sprite.Sprite ):
         self.frame_updated = False
         # print( f"{self.current_pos=}, {self.current_size=}" )
         if ready:
-            self.current_size = (
-                self.current_size[0] + (self.target_size[0]-self.current_size[0])/10,
-                self.current_size[1] + (self.target_size[1]-self.current_size[1])/10
+            self.current_size = ( 
+                self.current_size[0] + ( self.target_size[0]-self.current_size[0] )/10,
+                self.current_size[1] + ( self.target_size[1]-self.current_size[1] )/10
             )
-            self.current_pos = (
-                self.current_pos[0] + (self.target_pos[0]-self.current_pos[0])/10,
-                self.current_pos[1] + (self.target_pos[1]-self.current_pos[1])/10
+            self.current_pos = ( 
+                self.current_pos[0] + ( self.target_pos[0]-self.current_pos[0] )/10,
+                self.current_pos[1] + ( self.target_pos[1]-self.current_pos[1] )/10
             )
             self.frame_time += dt
 
@@ -417,7 +434,7 @@ class TextInputSprite( pygame.sprite.Sprite ):
             # intercept : supprime le caractère sur la fenêtre en focus
             # en simulant un backspace AVANT que la touche arrive à destination
             # → on supprime la frappe dans la fenêtre cible avec suppress=True
-            # (voir Listener(suppress=True) plus bas)
+            # ( voir Listener( suppress=True ) plus bas )
 
             try:
                 char = key.char
@@ -434,7 +451,7 @@ class TextInputSprite( pygame.sprite.Sprite ):
 
         # suppress=True bloque la touche pour toutes les autres fenêtres
         # quand le popup est visible, le listener est recréé avec/sans suppress
-        self._listener = keyboard.Listener(
+        self._listener = keyboard.Listener( 
             on_press  = on_press,
             suppress  = False   # sera géré dynamiquement via setVisible
         )
@@ -462,7 +479,7 @@ class TextInputSprite( pygame.sprite.Sprite ):
     #             elif key == keyboard.Key.space:
     #                 self.input_text += " "
 
-    #     self._listener = keyboard.Listener(
+    #     self._listener = keyboard.Listener( 
     #         on_press = on_press,
     #         suppress = suppress
     #     )
@@ -480,8 +497,8 @@ class TextInputSprite( pygame.sprite.Sprite ):
             '6': '?',
             '7': '&',
             '8': '*',
-            '9': '(',
-            '0': ')',
+            '9': '( ',
+            '0': ' )',
             '-': '_',
             '=': '+',
             '/': '\\',
@@ -526,7 +543,7 @@ class TextInputSprite( pygame.sprite.Sprite ):
         if self._listener and self._listener.is_alive():
             self._listener.stop()
 
-        self._listener = keyboard.Listener(
+        self._listener = keyboard.Listener( 
             on_press   = on_press,
             on_release = on_release,
             suppress   = suppress
@@ -564,12 +581,12 @@ class TextInputSprite( pygame.sprite.Sprite ):
         frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
         frame_rgba[:, :, 3] = alpha
 
-        surface = pygame.image.frombuffer(
+        surface = pygame.image.frombuffer( 
             frame_rgba.tobytes(),
             frame_rgba.shape[1::-1],
             "RGBA"
         )
-        surface = pygame.transform.scale( surface, ( int(self.size[0]), int(self.size[1]) ) )
+        surface = pygame.transform.scale( surface, ( int( self.size[0] ), int( self.size[1] ) ) )
         return surface.convert_alpha()
 
     # ── update ────────────────────────────────────────────────────────────
@@ -599,7 +616,7 @@ class TextInputSprite( pygame.sprite.Sprite ):
             if frame is None:
                 self.state      = "hidden"
                 self.visible    = False
-                self.image      = pygame.Surface( (0, 0), pygame.SRCALPHA )
+                self.image      = pygame.Surface( ( 0, 0 ), pygame.SRCALPHA )
                 self.last_image = self.image
                 return
 
@@ -608,7 +625,7 @@ class TextInputSprite( pygame.sprite.Sprite ):
             cursor   = "|" if ( pygame.time.get_ticks() // 500 ) % 2 == 0 else ""
             display  = self.input_text + cursor
             rendered = self._font.render( display, True, LIGHT_BLUE )
-            tx = ( self.size[0] - rendered.get_width()  ) // 2
+            tx = ( self.size[0] - rendered.get_width() ) // 2
             ty = int( self.size[1] * 0.75 )
             surface.blit( rendered, ( tx, ty ) )
             self.image      = surface
@@ -637,7 +654,7 @@ class LoadingSprite( pygame.sprite.Sprite ):
         self.full_size = full_size
 
     def update( self, percentage_load: float, initiating ):
-        speed = (percentage_load-self.current_percent)/5
+        speed = ( percentage_load-self.current_percent )/5
         if not initiating:
             speed = -self.current_percent/4
         
@@ -658,16 +675,17 @@ ready = False
 display_rika = False
 last_movement = 0
 text = ""
+system_display = 0
 
 _detected = threading.Event()
 
-def _trigger(*_):
+def _trigger( *_ ):
     _detected.set()
 
 
 
-mouse.Listener(on_move=_trigger, on_click=_trigger, on_scroll=_trigger).start()
-keyboard.Listener(on_press=_trigger).start()
+mouse.Listener( on_move=_trigger, on_click=_trigger, on_scroll=_trigger ).start()
+keyboard.Listener( on_press=_trigger ).start()
 
 class GUI:
     def startGUI():
@@ -719,38 +737,42 @@ class GUI:
 
 all_sprite = pygame.sprite.Group()
 
-initiating_sprite = Loading(
+initiating_sprite = Loading( 
     "./assets/gui/Blender/loading0001-0250.avi"
-)
-loading_sprite = LoadingSprite(
+ )
+loading_sprite = LoadingSprite( 
     WIDTH/1.95,
     ( WIDTH/4.29, HEIGHT/26 )
-)
-ready_sprite = SystemReady(
+ )
+ready_sprite = SystemReady( 
     "./assets/gui/Blender/ready0001-0250.avi"
-)
-rika = Rika(
+ )
+system_on_sprite = SystemOn( 
+    "./assets/gui/Blender/on0001-0250.avi"
+ )
+rika = Rika( 
     "./assets/gui/Blender/Rika0001-0250.avi"
-)
-text_input_sprite = TextInputSprite(
+ )
+text_input_sprite = TextInputSprite( 
     "./assets/gui/Blender/text_input0001-0005.avi",
     "./assets/gui/Blender/text_input0001-0005.avi",
     "./assets/gui/Blender/text_input0001-0005.avi",
     ( WIDTH // 4, HEIGHT // 4 ),
     ( WIDTH // 2, HEIGHT // 2 ),
-)
+ )
 
 all_sprite.add( initiating_sprite )
 all_sprite.add( loading_sprite )
 all_sprite.add( ready_sprite )
 all_sprite.add( rika )
 all_sprite.add( text_input_sprite )
+all_sprite.add( system_on_sprite )
 
 clock = pygame.time.Clock()
 
 
 def main():
-    global running, initiating, loaded, ready, display_rika, last_movement, text
+    global running, initiating, loaded, ready, display_rika, last_movement, text, system_display
 
     while running:
         dt = clock.get_time()
@@ -761,13 +783,15 @@ def main():
                 running = False
         
         
-        if loaded == 100 and ready == False:
+        if loaded == 100 and not ready:
             ready = True
             ready_sprite.setToFrame( 1 )
         
         if text_input_sprite.visible:
             last_movement = int( time.time() )
+        
         if int( time.time() ) - last_movement > 10:
+            system_display = False
             if _detected.is_set():
                 last_movement = int( time.time() )
                 _detected.clear()
@@ -779,20 +803,27 @@ def main():
             rika.setSize( WIDTH/7, WIDTH/7 )
             if pyautogui.position().x < WIDTH/7 and pyautogui.position().y >= HEIGHT/4*3:
                 rika.setPos( ( WIDTH-WIDTH/7-20, HEIGHT-WIDTH/7-20 ) )
+                if not system_display:
+                    print( "System on" )
+                    system_display = True
+                    system_on_sprite.setToFrame( 1 )
             elif pyautogui.position().x > WIDTH/7*4 and pyautogui.position().y >= HEIGHT/4*3:
                 rika.setPos( ( 20, HEIGHT-WIDTH/7-20 ) )
+                
 
-        rika             .update( dt, ready, display_rika )
-        loading_sprite   .update( loaded, initiating )
-        initiating_sprite.update( dt, initiating )
-        ready_sprite     .update( dt )
-        text_input_sprite.update( dt )
 
-        font_size = max(12, int(36 * rika.current_size[0] / (WIDTH / 3)))
-        font = pygame.font.Font("./assets/gui/Nasalization Rg.otf", font_size)
+        rika               .update( dt, ready, display_rika )
+        loading_sprite     .update( loaded, initiating )
+        initiating_sprite  .update( dt, initiating )
+        ready_sprite       .update( dt )
+        text_input_sprite  .update( dt )
+        system_on_sprite   .update( dt )
+
+        font_size = max( 12, int( 36 * rika.current_size[0] / ( WIDTH / 3 ) ) )
+        font = pygame.font.Font( "./assets/gui/Nasalization Rg.otf", font_size )
 
         max_text_width = rika.current_size[0]
-        lines = wrap_text(text, font, max_text_width)
+        lines = wrap_text( text, font, max_text_width )
 
         # Calcule la position de base
         if rika.rect.x + rika.rect.width / 2 > WIDTH / 2:
@@ -805,8 +836,8 @@ def main():
         screen.fill( FILL_COLOR )
         if ready:
             for line in lines:
-                rendered = font.render(line, True, LIGHT_BLUE)
-                screen.blit(rendered, (text_x, text_y))
+                rendered = font.render( line, True, LIGHT_BLUE )
+                screen.blit( rendered, ( text_x, text_y ) )
                 text_y += font.get_linesize()
 
 
@@ -815,7 +846,7 @@ def main():
 
         clock.tick( 30 )
 
-# onFocusGained( hwnd, looseFocus )
+onFocusGained( hwnd, looseFocus )
 
 main_thread = threading.Thread( target=main )
 main_thread.daemon = True
@@ -847,6 +878,7 @@ def test():
     time.sleep( 5 )
 
     GUI.textInput( True )
+    
     while True:
         time.sleep( 0.5 )
         text = GUI.getInput()

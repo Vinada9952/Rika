@@ -183,7 +183,7 @@ class Sound:
 
 loadPrint()#c
 
-PROTOCOLS = Json.read( "./protocols.json" )
+PROTOCOLS = Json.read( "./assets/protocols.json" )
 
 protocol_list = ""
 for protocol in PROTOCOLS:
@@ -532,14 +532,25 @@ loadPrint()#c
 
 def askModel( model: str, message: str, thinking: str, max_retries: int ):
     global clients
+    can_think = True
     for i in range( max_retries ):
         try:
-            return random.choice( clients ).chat.completions.create(
-                model=model,
-                messages=message,
-                reasoning_effort=thinking
-            )
-        except APIStatusError:
+            if can_think:
+                return random.choice( clients ).chat.completions.create(
+                    model=model,
+                    messages=message,
+                    reasoning_effort=thinking
+                )
+            else:
+                
+                return random.choice( clients ).chat.completions.create(
+                    model=model,
+                    messages=message
+                )
+        except APIStatusError as e:
+            print( str( e ) )
+            if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
+                can_think = False
             time.sleep( 0.5 )
 
 loadPrint()#c
@@ -1083,17 +1094,20 @@ def chat():
 
             not_understand = False
             do_response = False
+            role = "assistant"
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
                     if tool["name"] == "analyseOldImage":
                         if MAIN_MODEL != VISION_MODEL:
                             result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
                         else:
+                            role = "user"
                             result, do_response = getImageContent( tool["params"]["source"], False )
                     if tool["name"] == "analyseNewImage":
                         if MAIN_MODEL != VISION_MODEL:
                             result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
                         else:
+                            role = "user"
                             result, do_response = getImageContent( tool["params"]["source"], True )
                     if tool["name"] == "sendEmail":
                         result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
@@ -1126,7 +1140,7 @@ def chat():
                     
                     conversation.append( 
                         {
-                            "role": "assistant",
+                            "role": role,
                             "content": response.choices[0].message.content
                         }
                     )
