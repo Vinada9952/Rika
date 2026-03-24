@@ -279,6 +279,7 @@ EMAIL_PASSWORD = settings["email"]["pwd"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
 USERNAME = settings["email"]["user-email"]["name"]
 CONTACT_LIST = Json.read( "./contacts.json" )
+SERVER_URL = settings["server-url"]
 
 loadPrint()#c
 
@@ -293,7 +294,7 @@ CONTACT_NAMES = "\n".join( names )
 
 loadPrint()#c
 
-data = requests.get( "https://rikavinada9952.pythonanywhere.com/getConversation" )
+data = requests.get( f"{SERVER_URL}/getConversation" )
 # print( data )
 # print( data.json() )
 # conversation = data.json()["conversation"]
@@ -663,7 +664,7 @@ def sleepSystem():
             "content": f"{moment()}"
         }
     )
-    requests.post( "https://rikavinada9952.pythonanywhere.com/setConversation", json=conversation )
+    requests.post( f"{SERVER_URL}/setConversation", json=conversation )
     Json.write( conversation, "./conversation.json" )
     Sound.waitForVoiceToFinish()
     raise ExitAgent()
