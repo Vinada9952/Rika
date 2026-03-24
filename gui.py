@@ -756,11 +756,11 @@ def main():
             if _detected.is_set():
                 last_movement = int( time.time() )
                 _detected.clear()
+                rika.setPos( ( 20, HEIGHT-WIDTH/7-20 ) )
             else:
                 rika.setSize( WIDTH/3, WIDTH/3 )
                 rika.setPos( ( WIDTH/3, HEIGHT/5 ) )
         else:
-            rika.setPos( ( 20, HEIGHT-WIDTH/7-20 ) )
             rika.setSize( WIDTH/7, WIDTH/7 )
             if pyautogui.position().x < WIDTH/7 and pyautogui.position().y >= HEIGHT/4*3:
                 rika.setPos( ( WIDTH-WIDTH/7-20, HEIGHT-WIDTH/7-20 ) )
@@ -853,4 +853,4 @@ def test():
     print( "quit" )
     GUI.quitGUI()
 
-# test()
+test()

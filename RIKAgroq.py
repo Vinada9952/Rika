@@ -2,14 +2,14 @@ import os
 import cv2
 import base64
 import json
+from json import JSONDecodeError
 import requests
 import mss
 from groq import Groq
+from groq import APIStatusError
 import threading
-from json import JSONDecodeError
 from email.mime.text import MIMEText
 import smtplib
-from groq import APIStatusError
 import datetime
 from pydub import AudioSegment
 import re
@@ -246,7 +246,6 @@ VISION_MODEL = settings["models"]["vision"]
 ASK_MODEL = settings["models"]["data"]
 MAX_RETRIES = settings["max-api-retries"]
 ASSISTANT_NAME = settings["assistant-name"]
-PROJECT_LOCATION = settings["project-location"]
 
 loadPrint()#c
 
@@ -495,21 +494,12 @@ def get_camera_index( search ):
     return -1
 
 loadPrint()#c
-
 called = False
 audio_tmp = AUDIO
 def toggleRika():
     global called, AUDIO
-    if called:
-        called = False
-        AUDIO = audio_tmp
-        try:
-            sleepSystem()
-        except ExitAgent:
-            pass
-    if not called:
-        called = True
-        AUDIO = False
+    called = True
+    AUDIO = False
 
 loadPrint()#c
 
@@ -534,6 +524,21 @@ def checkAudioCall():
         time.sleep( 1 )
 
 check_audio_call = threading.Thread( target=checkAudioCall )
+
+loadPrint()#c
+
+
+def askModel( model: str, message: str, thinking: str, max_retries: int ):
+    global clients
+    for i in range( max_retries ):
+        try:
+            return random.choice( clients ).chat.completions.create(
+                model=model,
+                messages=message,
+                reasoning_effort=thinking
+            )
+        except APIStatusError:
+            time.sleep( 0.5 )
 
 loadPrint()#c
 
@@ -633,7 +638,8 @@ loadPrint()#c
 # TOOL: sleepSystem
 # =====================
 def sleepSystem():
-    global conversation, called
+    global conversation, called, AUDIO
+    AUDIO = True
     GUI.setTextToDisplay( "" )
     GUI.textInput( False )
     GUI.displayRika( False )
@@ -676,6 +682,50 @@ def getImage( type ):
         return "Image webcam capturée"
 
     return "Type invalide"
+
+loadPrint()#c
+
+def getImageContent( type, renew ):
+    if renew:
+        getImage( type )
+    
+    if type == "screenshot":
+        files = sorted( 
+            f for f in os.listdir( SCREENSHOT_DIR )
+            if f.lower().endswith( ".jpg" )
+        )
+
+        if not files:
+            return "Aucun screenshot disponible", True
+
+        content = []
+
+        for file in files:
+            path = os.path.join( SCREENSHOT_DIR, file )
+            image_b64 = image_to_base64( path )
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_b64}"
+                    }
+                }
+            )
+
+        return content, True
+    elif type == "webcam":
+        if not os.path.exists( WEBCAM_PATH ):
+            return "Aucune image webcam disponible", True
+
+        image_b64 = image_to_base64( WEBCAM_PATH )
+        return [
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{image_b64}"
+                }
+            }
+        ], True
 
 loadPrint()#c
 
@@ -743,10 +793,7 @@ def analyseImage( type, prompt, renew ):
     else:
         return "Type invalide", True
 
-    response = random.choice( clients ).chat.completions.create( 
-        model=VISION_MODEL,
-        messages=messages
-    )
+    response = askModel( VISION_MODEL, messages, 'none', MAX_RETRIES )
 
     return response.choices[0].message.content, True
 
@@ -812,11 +859,12 @@ loadPrint()#c
 
 #     return result
 
-def summarized( response ):
-    return response
-    summary = random.choice( clients ).chat.completions.create( 
-        model=ASK_MODEL,
-        messages=[
+def summarized( response: str ):
+    if len( response.split( ' ' ) ) < 50:
+        return response
+    summary = askModel(
+        ASK_MODEL,
+        [
             {
                 "role": "system",
                 "content": """
@@ -829,7 +877,7 @@ Juste du texte brut, sans retour à la ligne.
 Ne coupe pas les phrases au milieu, garde les phrases entières.
 Raccourcis le message d'origine sans omettre d'informations importantes.
 Le résultat doit OBLIGATOIREMENT avoir moins de 50 mots
-Garde le plus d'informations importantes possible
+Garde le plus d'informations importantes possible en respectant la limite de mots
 """,
                 "name": "instructions"
             },
@@ -837,7 +885,9 @@ Garde le plus d'informations importantes possible
                 "role": "user",
                 "content": response
             }
-        ]
+        ],
+        'none',
+        MAX_RETRIES
     )
 
     try:
@@ -1014,15 +1064,7 @@ def chat():
 
             response = None
             # while True:
-            for i in range( MAX_RETRIES ):
-                try:
-                    response = random.choice( clients ).chat.completions.create( 
-                        model=MAIN_MODEL,
-                        messages=conversation
-                    )
-                    break
-                except APIStatusError as e:
-                    time.sleep( 0.5 )
+            response = askModel( MAIN_MODEL, conversation, 'high', MAX_RETRIES )
 
             content = json.loads( response.choices[0].message.content )
             conversation.append( 
@@ -1042,11 +1084,17 @@ def chat():
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
                     if tool["name"] == "analyseOldImage":
-                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                        if MAIN_MODEL != VISION_MODEL:
+                            result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                        else:
+                            result, do_response = getImageContent( tool["params"]["source"], False )
+                    if tool["name"] == "analyseNewImage":
+                        if MAIN_MODEL != VISION_MODEL:
+                            result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
+                        else:
+                            result, do_response = getImageContent( tool["params"]["source"], True )
                     if tool["name"] == "sendEmail":
                         result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
-                    if tool["name"] == "analyseNewImage":
-                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
                     if tool["name"] == "openLink":
                         result, do_response = openLink( tool["params"]["link"] )
                     if tool["name"] == "getLocalisation":
@@ -1072,15 +1120,8 @@ def chat():
                     break
                 
                 if do_response:
-                    for i in range( MAX_RETRIES ):
-                        try:
-                            response = random.choice( clients ).chat.completions.create( 
-                                model=MAIN_MODEL,
-                                messages=conversation
-                            )
-                            break
-                        except APIStatusError as e:
-                            time.sleep( 0.5 )
+                    response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES )
+                    
                     conversation.append( 
                         {
                             "role": "assistant",
