@@ -196,7 +196,7 @@ loadPrint()#c
 def doProtocol( name ):
     global PROTOCOLS
     if name == PROTOCOLS[0]:
-        sendEmail( "mariannelord@icloud.com", "Protocol Bébé Chat", "https://fr.pinterest.com/nellyglassmann/chats-mignons-cats/\n\nMiaou" )
+        sendEmail( "mariannelord@icloud.com", "Protocol Bébé Chat", "https://ca.pinterest.com/vinada9952/pour-marianne/\n\nMiaou" )
     return f"protocol {name} execution success", False
 
 
