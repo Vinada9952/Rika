@@ -13,5 +13,6 @@ screenshots/
 captured.jpg
 debug.log
 *.log
-cache/output.mp3
+output.mp3
 *.png
+.vscode
