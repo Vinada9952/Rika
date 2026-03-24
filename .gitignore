@@ -4,6 +4,7 @@ test.py
 **/Old_Rika_memory/
 **/cache/
 **/screenshots/
+**/for_RPI/
 captured.jpg
 debug.log
 *.log
@@ -11,3 +12,9 @@ output.mp3
 *.png
 .vscode
 **/protocols/
+Rikagemini.py
+sync_memories.py
+Vincent.py
+ai_test.py
+**/test/
+**/web/
