@@ -1137,7 +1137,7 @@ def chat():
                     
                     conversation.append( 
                         {
-                            "role": role,
+                            "role": "assistant",
                             "content": response.choices[0].message.content
                         }
                     )
