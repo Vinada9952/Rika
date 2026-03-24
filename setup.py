@@ -3,6 +3,7 @@ os.system( "pip install -r requirement.txt" )
 
 from RIKAgroq import Json
 os.mkdir( "./cache" )
+os.mkdir( "./assets/protocols/" )
 
 api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
 email = input( "Email de L'agent : " )
@@ -59,3 +60,6 @@ base_settings = {
     },
     "server-url": "localhost:5000"
 }
+
+Json.write( base_settings, "./settings.json" )
+Json.write( [], "./assets/protocols/protocols.json" )
