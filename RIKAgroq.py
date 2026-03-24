@@ -183,20 +183,20 @@ class Sound:
 
 loadPrint()#c
 
-PROTOCOLS = [
-    "Bébé Chat"
-]
+PROTOCOLS = Json.read( "./protocols.json" )
 
 protocol_list = ""
 for protocol in PROTOCOLS:
-    protocol_list += f"\n    -> {protocol}"
+    protocol_list += f"\n    -> {protocol["name"]}"
 
 loadPrint()#c
 
 def doProtocol( name ):
     global PROTOCOLS
-    if name == PROTOCOLS[0]:
-        sendEmail( "mariannelord@icloud.com", "Protocol Bébé Chat", "https://ca.pinterest.com/vinada9952/pour-marianne/\n\nMiaou" )
+    for i in range( len( PROTOCOLS ) ):
+        if name == PROTOCOLS[i]["name"]:
+            os.system( PROTOCOLS[i]["command"] )
+        break
     return f"protocol {name} execution success", False
 
 
@@ -498,6 +498,8 @@ called = False
 audio_tmp = AUDIO
 def toggleRika():
     global called, AUDIO
+    print( "Rika Called" )
+    # GUI.forceTopMost()
     called = True
     AUDIO = False
 

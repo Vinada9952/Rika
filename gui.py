@@ -7,8 +7,7 @@ import time
 import threading
 import cv2
 from pynput import mouse, keyboard
-import ctypes
-from ctypes import wintypes
+import atexit
 
 
 WIDTH = pyautogui.size().width
@@ -112,31 +111,44 @@ def wrap_text(text, font, max_width):
 
     return lines
 
-def onFocusGained(hwnd, callback):
-    """
-    Appelle callback() quand la fenêtre hwnd gagne le focus.
-    Lance un thread de surveillance en arrière-plan.
-    """
-    def _watch():
-        was_focused = False
-        while True:
-            focused_hwnd = win32gui.GetForegroundWindow()
-            is_focused = (focused_hwnd == hwnd)
-            
-            if is_focused and not was_focused:
-                if callback is not None:
-                    callback()
+def forceTopmost():
+    win32gui.SetWindowPos(
+        hwnd,
+        win32con.HWND_TOPMOST,
+        0, 0, 0, 0,
+        win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE
+    )
 
+# def onFocusGained(hwnd, callback):
+#     def _watch():
+#         was_focused = False
+#         while True:
+#             focused_hwnd = win32gui.GetForegroundWindow()
+#             is_focused = (focused_hwnd == hwnd)
             
-            was_focused = is_focused
-            time.sleep(0.1)
+#             if is_focused and not was_focused:
+#                 if callback is not None:
+#                     callback()
+
+#             was_focused = is_focused
+#             time.sleep(0.5)  # 0.1 → 0.5 pour éviter le spam si aucune fenêtre dispo
     
-    t = threading.Thread(target=_watch, daemon=True)
-    t.start()
-    return t
+#     t = threading.Thread(target=_watch, daemon=True)
+#     t.start()
+#     return t
 
-def looseFocus():
-    pyautogui.hotkey('alt', 'tab')
+# def looseFocus():
+#     other_windows = []
+#     def enum_handler(h, _):
+#         if h != hwnd and win32gui.IsWindowVisible(h) and win32gui.GetWindowText(h):
+#             other_windows.append(h)
+#     win32gui.EnumWindows(enum_handler, None)
+    
+#     if other_windows:
+#         pyautogui.hotkey('alt', 'tab')
+#     else:
+#         # Minimise plutôt que de crasher
+#         win32gui.ShowWindow(hwnd, win32con.SW_MINIMIZE)
 
 
 class Loading( pygame.sprite.Sprite ):
@@ -702,6 +714,9 @@ class GUI:
         global text_input_sprite
         return text_input_sprite.state
 
+    def forceTopMost():
+        forceTopmost()
+
 all_sprite = pygame.sprite.Group()
 
 initiating_sprite = Loading(
@@ -800,7 +815,7 @@ def main():
 
         clock.tick( 30 )
 
-onFocusGained( hwnd, looseFocus() )
+# onFocusGained( hwnd, looseFocus )
 
 main_thread = threading.Thread( target=main )
 main_thread.daemon = True
@@ -853,4 +868,5 @@ def test():
     print( "quit" )
     GUI.quitGUI()
 
-test()
+
+# test()
