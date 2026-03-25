@@ -3,7 +3,6 @@ import cv2
 import base64
 import json
 from json import JSONDecodeError
-import requests
 import mss
 from groq import Groq
 from groq import APIStatusError
@@ -294,6 +293,7 @@ CONTACT_NAMES = "\n".join( names )
 
 loadPrint()#c
 
+# data = Json.read( "./conversation.json" )
 data = requests.get( f"{SERVER_URL}/getConversation" )
 # print( data )
 # print( data.json() )
@@ -405,8 +405,6 @@ OUTILS DISPONIBLES :
     -> spotify
     -> teams
     -> discord
-    -> snapchat
-    -> social
     -> vs code
 
 - openLink
@@ -477,7 +475,11 @@ loadPrint()#c
 # =====================
 # SETUP
 # =====================
+for file in os.listdir( SCREENSHOT_DIR ):
+    os.remove( os.path.join( SCREENSHOT_DIR, file ) )
 os.makedirs( SCREENSHOT_DIR, exist_ok=True )
+
+loadPrint()#c
 
 def get_camera_index( search ):
 
@@ -494,7 +496,9 @@ def get_camera_index( search ):
 
     return -1
 
+
 loadPrint()#c
+
 called = False
 audio_tmp = AUDIO
 def toggleRika():
@@ -572,7 +576,7 @@ def openLink( link ):
     success = webbrowser.open( link )
     if success:
         return f"ouverture de {link} réussie", False
-    return f"ouverture de {link} raté", False, 'user'
+    return f"ouverture de {link} raté", True, 'user'
 
 loadPrint()#c
 
@@ -586,13 +590,9 @@ def openApp( app: str ):
     if app == "teams":
         os.system( "ms-teams.exe" )
     if app == "discord":
-        pyautogui.typewrite( "dscrd " )
-    if app == "snapchat":
-        pyautogui.typewrite( "snap " )
-    if app == "social":
-        pyautogui.typewrite( "rs " )
+        os.system( "C:\Users\Vinad\AppData\Local\Discord\Update.exe --processStart Discord.exe" )
     if app == "vs code":
-        pyautogui.typewrite( "vs code " )
+        os.system( "code.exe" )
     return f"ouverture de {app} réussie",  False, 'user'
     # return f"Link opened successfully ( {link} )" if webbrowser.open( link ) else "No link opened"
 
@@ -611,7 +611,7 @@ def getLocalisation():
         # print( "localisation saved" )
         return data, True, 'user'
     except Exception as e:
-        return "Erreur pour obtenir la localisation", True, 'user'
+        return "Erreur pour obtenir la localisation", False, 'user'
 
 loadPrint()#c
 
@@ -631,7 +631,7 @@ def sendEmail( receiver: str, subject: str, text: str ):
         if receiver.find( "@" ) != -1 and receiver.find( ".com" ) != -1:
             found = True
         if not found:
-            return f"aucun contact trouvé pour {receiver}", 'user'
+            return f"aucun contact trouvé pour {receiver}", True, 'user'
     msg = MIMEText( text )
     msg["Subject"] = subject
     msg["From"] = EMAIL
@@ -699,7 +699,7 @@ def getImage( type ):
 
 loadPrint()#c
 
-def getImageContent( type, renew ):
+def getImageContent( type, prompt, renew ):
     if renew:
         getImage( type )
     
@@ -712,7 +712,12 @@ def getImageContent( type, renew ):
         if not files:
             return "Aucun screenshot disponible", True, 'user'
 
-        content = []
+        content = [
+            {
+                "text": prompt,
+                "type": "text"
+            }
+        ]
 
         for file in files:
             path = os.path.join( SCREENSHOT_DIR, file )
@@ -733,6 +738,10 @@ def getImageContent( type, renew ):
 
         image_b64 = image_to_base64( WEBCAM_PATH )
         return [
+            {
+                "text": prompt,
+                "type": "text"
+            },
             {
                 "type": "image_url",
                 "image_url": {
@@ -760,7 +769,12 @@ def analyseImage( type, prompt, renew ):
         if not files:
             return "Aucun screenshot disponible", True, 'user'
 
-        content = [{"type": "text", "text": prompt}]
+        content = [
+            {
+                "type": "text",
+                "text": prompt
+            }
+        ]
 
         for file in files:
             path = os.path.join( SCREENSHOT_DIR, file )
@@ -807,6 +821,7 @@ def analyseImage( type, prompt, renew ):
     else:
         return "Type invalide", True, 'user'
 
+    print( "ask model for vision" )
     response = askModel( VISION_MODEL, messages, 'none', MAX_RETRIES )
 
     return response.choices[0].message.content, True, 'user'
@@ -876,6 +891,7 @@ loadPrint()#c
 def summarized( response: str ):
     if len( response.split( ' ' ) ) < 50:
         return response
+    print( "ask model for summary" )
     summary = askModel(
         ASK_MODEL,
         [
@@ -1078,6 +1094,7 @@ def chat():
 
             response = None
             # while True:
+            print( "ask model for chatting (1)" )
             response = askModel( MAIN_MODEL, conversation, 'high', MAX_RETRIES )
 
             content = json.loads( response.choices[0].message.content )
@@ -1101,12 +1118,12 @@ def chat():
                         if MAIN_MODEL != VISION_MODEL:
                             result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
                         else:
-                            result, do_response, role = getImageContent( tool["params"]["source"], False )
+                            result, do_response, role = getImageContent( tool["params"]["source"], tool["params"]["prompt"], False )
                     if tool["name"] == "analyseNewImage":
                         if MAIN_MODEL != VISION_MODEL:
                             result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
                         else:
-                            result, do_response, role = getImageContent( tool["params"]["source"], True )
+                            result, do_response, role = getImageContent( tool["params"]["source"], tool["params"]["prompt"], True )
                     if tool["name"] == "sendEmail":
                         result, do_response, role = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
                     if tool["name"] == "openLink":
@@ -1123,17 +1140,26 @@ def chat():
                     if tool["name"] == "sleepSystem":
                         sleepSystem()
                     
-                    conversation.append( 
-                        {
-                            "role": role,
-                            "content": result,
-                            "name": f"{tool["name"]} tool"
-                        }
-                    )
+                    if type( result ) == str:
+                        conversation.append( 
+                            {
+                                "role": role,
+                                "content": result,
+                                "name": f"{tool["name"]} tool"
+                            }
+                        )
+                    else:
+                        conversation.append( 
+                            {
+                                "role": role,
+                                "content": result,
+                            }
+                        )
                 if not_understand:
                     break
                 
                 if do_response:
+                    print( "ask model for chatting (2)" )
                     response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES )
                     
                     conversation.append( 
@@ -1186,12 +1212,13 @@ try:
 except KeyboardInterrupt:
 
     GUI.quitGUI()
+    Json.write( conversation, "./conversation.json" )
     # Sauvegarde brute pour debug
     for message in conversation:
         if message["role"] == "assistant":
             message["content"] = json.loads( message["content"] )
-    with open( "./debug.log", "w", encoding="utf-8" ) as f:
-        json.dump( conversation, f, ensure_ascii=False, indent=2 )
+    Json.write( conversation, "./debug.json" )
+    
 
     # Affichage formaté dans la console
     print( "\n📝 Debug conversation ( KeyboardInterrupt )\n" )
@@ -1201,7 +1228,6 @@ except KeyboardInterrupt:
         content = message.get( "content", "" )
 
         print( f"--- Message {i} ---" )
-        print( f"Role : {role}" )
         if name:
             print( f"Name : {name}" )
         if isinstance( content, str ):
