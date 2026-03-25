@@ -837,14 +837,14 @@ loadPrint()#c
 def removeEmojis( text ):
     emoji_pattern = re.compile(
         "["
-        "\U0001F600-\U0001F64F"  # emoticônes
-        "\U0001F300-\U0001F5FF"  # symboles & pictogrammes
-        "\U0001F680-\U0001F6FF"  # transport & cartes
-        "\U0001F1E0-\U0001F1FF"  # drapeaux
-        "\U00002700-\U000027BF"  # divers symboles
-        "\U0001F900-\U0001F9FF"  # Supplemental Symbols and Pictographs
-        "\U00002600-\U000026FF"  # Divers symboles
-        "\U00002B50-\U00002B55"  # étoiles, etc.
+        "\U0001F600-\U0001F64F"
+        "\U0001F300-\U0001F5FF"
+        "\U0001F680-\U0001F6FF"
+        "\U0001F1E0-\U0001F1FF"
+        "\U00002700-\U000027BF"
+        "\U0001F900-\U0001F9FF"
+        "\U00002600-\U000026FF"
+        "\U00002B50-\U00002B55"
         "]+",
         flags=re.UNICODE
     )
