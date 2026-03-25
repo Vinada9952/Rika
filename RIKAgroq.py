@@ -517,7 +517,6 @@ def checkAudioCall():
         if not called:
             print( "..." )
             question = Sound.listen()
-            print( question )
 
             called = False
             if type( question ) == str:
@@ -529,6 +528,10 @@ def checkAudioCall():
                             break
                     if called:
                         break
+            if not called:
+                print( question )
+            if called:
+                print( "Rika" )
         time.sleep( 1 )
 
 check_audio_call = threading.Thread( target=checkAudioCall )
