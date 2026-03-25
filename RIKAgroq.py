@@ -197,7 +197,7 @@ def doProtocol( name ):
         if name == PROTOCOLS[i]["name"]:
             os.system( PROTOCOLS[i]["command"] )
         break
-    return f"protocol {name} execution success", False
+    return f"protocol {name} execution success", False, 'user'
 
 
 loadPrint()#c
@@ -278,8 +278,8 @@ EMAIL = settings["email"]["email"]
 EMAIL_PASSWORD = settings["email"]["pwd"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
 USERNAME = settings["email"]["user-email"]["name"]
-CONTACT_LIST = Json.read( "./contacts.json" )
 SERVER_URL = settings["server-url"]
+CONTACT_LIST = Json.read( settings["directories"]["contacts"] )
 
 loadPrint()#c
 
@@ -572,7 +572,7 @@ def openLink( link ):
     success = webbrowser.open( link )
     if success:
         return f"ouverture de {link} réussie", False
-    return f"ouverture de {link} raté", False
+    return f"ouverture de {link} raté", False, 'user'
 
 loadPrint()#c
 
@@ -593,7 +593,7 @@ def openApp( app: str ):
         pyautogui.typewrite( "rs " )
     if app == "vs code":
         pyautogui.typewrite( "vs code " )
-    return f"ouverture de {app} réussie",  False
+    return f"ouverture de {app} réussie",  False, 'user'
     # return f"Link opened successfully ( {link} )" if webbrowser.open( link ) else "No link opened"
 
 # def runCommand():
@@ -609,9 +609,9 @@ def getLocalisation():
         response = requests.get( 'https://ipinfo.io/json' )
         data = str( response.json() )
         # print( "localisation saved" )
-        return data, True
+        return data, True, 'user'
     except Exception as e:
-        return "Erreur pour obtenir la localisation", True
+        return "Erreur pour obtenir la localisation", True, 'user'
 
 loadPrint()#c
 
@@ -631,7 +631,7 @@ def sendEmail( receiver: str, subject: str, text: str ):
         if receiver.find( "@" ) != -1 and receiver.find( ".com" ) != -1:
             found = True
         if not found:
-            return f"aucun contact trouvé pour {receiver}"
+            return f"aucun contact trouvé pour {receiver}", 'user'
     msg = MIMEText( text )
     msg["Subject"] = subject
     msg["From"] = EMAIL
@@ -644,7 +644,7 @@ def sendEmail( receiver: str, subject: str, text: str ):
         server.login( EMAIL, EMAIL_PASSWORD )
         server.sendmail( EMAIL, receiver, msg.as_string() )
     
-    return "Envoie du courriel réussi", False
+    return "Envoie du courriel réussi", False, 'user'
 
 loadPrint()#c
 
@@ -710,7 +710,7 @@ def getImageContent( type, renew ):
         )
 
         if not files:
-            return "Aucun screenshot disponible", True
+            return "Aucun screenshot disponible", True, 'user'
 
         content = []
 
@@ -726,10 +726,10 @@ def getImageContent( type, renew ):
                 }
             )
 
-        return content, True
+        return content, True, 'user'
     elif type == "webcam":
         if not os.path.exists( WEBCAM_PATH ):
-            return "Aucune image webcam disponible", True
+            return "Aucune image webcam disponible", True, 'user'
 
         image_b64 = image_to_base64( WEBCAM_PATH )
         return [
@@ -739,7 +739,7 @@ def getImageContent( type, renew ):
                     "url": f"data:image/jpeg;base64,{image_b64}"
                 }
             }
-        ], True
+        ], True, 'user'
 
 loadPrint()#c
 
@@ -758,7 +758,7 @@ def analyseImage( type, prompt, renew ):
         )
 
         if not files:
-            return "Aucun screenshot disponible", True
+            return "Aucun screenshot disponible", True, 'user'
 
         content = [{"type": "text", "text": prompt}]
 
@@ -783,7 +783,7 @@ def analyseImage( type, prompt, renew ):
 
     elif type == "webcam":
         if not os.path.exists( WEBCAM_PATH ):
-            return "Aucune image webcam disponible", True
+            return "Aucune image webcam disponible", True, 'user'
 
         image_b64 = image_to_base64( WEBCAM_PATH )
         messages.append(
@@ -805,11 +805,11 @@ def analyseImage( type, prompt, renew ):
         )
 
     else:
-        return "Type invalide", True
+        return "Type invalide", True, 'user'
 
     response = askModel( VISION_MODEL, messages, 'none', MAX_RETRIES )
 
-    return response.choices[0].message.content, True
+    return response.choices[0].message.content, True, 'user'
 
 loadPrint()#c
 

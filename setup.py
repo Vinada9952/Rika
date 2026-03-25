@@ -39,7 +39,9 @@ base_settings = {
     "directories": {
         "screenshots": "screenshots/",
         "cache": "cache/",
-        "webcam": "./cache/captured.jpg"
+        "webcam": "./cache/captured.jpg",
+        "protocols": "./assets/protocols/protocols.json",
+        "contacts": "./assets/contacts.json"
     },
     "models": {
         "data": "llama-3.1-8b-instant",
@@ -63,3 +65,5 @@ base_settings = {
 
 Json.write( base_settings, "./settings.json" )
 Json.write( [], "./assets/protocols/protocols.json" )
+Json.write( [], "./assets/protocols/protocols.json" )
+Json.write( [], "./assets/contacts.json" )
