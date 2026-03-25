@@ -594,11 +594,11 @@ def openApp( app: str ):
     if app == "teams":
         os.system( "ms-teams.exe" )
     if app == "discord":
-        os.system( "C:\Users\Vinad\AppData\Local\Discord\Update.exe --processStart Discord.exe" )
+        os.system( "C:/Users/Vinad/AppData/Local/Discord/Update.exe --processStart Discord.exe" )
     if app == "vs code":
         os.system( "code.exe" )
     if app == "minecraft":
-        os.system( "C:\Users\Vinad\Desktop\Minecraft.lnk" )
+        os.system( "C:/Users/Vinad/Desktop/Minecraft.lnk" )
     return f"ouverture de {app} réussie",  False, 'user'
     # return f"Link opened successfully ( {link} )" if webbrowser.open( link ) else "No link opened"
 
@@ -835,7 +835,7 @@ def analyseImage( type, prompt, renew ):
 loadPrint()#c
 
 def removeEmojis( text ):
-    emoji_pattern = re.compile( 
+    emoji_pattern = re.compile(
         "["
         "\U0001F600-\U0001F64F"  # emoticônes
         "\U0001F300-\U0001F5FF"  # symboles & pictogrammes
