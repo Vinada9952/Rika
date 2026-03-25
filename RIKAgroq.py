@@ -406,6 +406,7 @@ OUTILS DISPONIBLES :
     -> teams
     -> discord
     -> vs code
+    -> minecraft
 
 - openLink
   - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
@@ -593,6 +594,8 @@ def openApp( app: str ):
         os.system( "C:\Users\Vinad\AppData\Local\Discord\Update.exe --processStart Discord.exe" )
     if app == "vs code":
         os.system( "code.exe" )
+    if app == "minecraft":
+        os.system( "C:\Users\Vinad\Desktop\Minecraft.lnk" )
     return f"ouverture de {app} réussie",  False, 'user'
     # return f"Link opened successfully ( {link} )" if webbrowser.open( link ) else "No link opened"
 

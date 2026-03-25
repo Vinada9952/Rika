@@ -99,9 +99,8 @@ OUTILS DISPONIBLES :
     -> spotify
     -> teams
     -> discord
-    -> snapchat
-    -> social
     -> vs code
+    -> minecraft
 
 - openLink
   - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
