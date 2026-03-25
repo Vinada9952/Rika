@@ -33,7 +33,11 @@ GUI.setInit( True )
 os.system( "cls" )
 load_print = 0
 
+load_number = -1
+
 def loadPrint():
+    global load_number
+    global load_print
     # return
     def read( file_name: str ):
         return_file = []
@@ -53,11 +57,14 @@ def loadPrint():
         except FileNotFoundError:
             return FileNotFoundError
 
-    global load_print
     load_print += 1
     # f = '\n'.join( read( "C:/Users/" ) )
-    f = '\n'.join( read( f"{"C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika"}/RIKAgroq.py" ) )
-    count = f.count( "loadPrint()#c" )-1
+    if load_number == -1:
+        f = '\n'.join( read( f"{"C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika"}/RIKAgroq.py" ) )
+        count = f.count( "loadPrint()#c" )-1
+        load_number = count
+    else:
+        count = load_number
 
     bar = "[" + ( '.'*100 ) + "]"
 
@@ -79,53 +86,16 @@ loadPrint()#c
 class ExitAgent( Exception ):
     pass
 
-loadPrint()#c
-
-class Type:
-    def get_type( var ):
-        try:
-            if var == list( var ):
-                return "list"
-            elif var == str( var ):
-                return "str"
-        except TypeError:
-            try:
-                if var == int( var ):
-                    return "int"
-                elif var == float( var ):
-                    return "float"
-                elif var == bool( var ):
-                    return "bool"
-                else:
-                    return "Unknown type"
-            except TypeError:
-                return "Unknown type"
-    class file:
-        append = 'a'
-        trunc = 'w'
-        read = 'r'
-        create = 'x'
-    def list_cut( origin: str, separator: str ):
-        traitement = ""
-        origin = origin+separator
-        output = []
-        for i in range( len( origin ) ):
-            if origin[i] == separator:
-                output.append( traitement )
-                traitement = ""
-            else:
-                traitement += origin[i]
-        return output
 
 loadPrint()#c
 
 class Json:
     def write( informations: dict, json_name: str ):
         json_object = json.dumps( informations, indent=4 )
-        with open( json_name, Type.file.trunc, encoding="utf-8" ) as outfile:
+        with open( json_name, 'w', encoding="utf-8" ) as outfile:
             outfile.write( json_object )
     def read( json_name: str ):
-        with open( json_name, Type.file.read, encoding="utf-8" ) as infile:
+        with open( json_name, 'r', encoding="utf-8" ) as infile:
             informations = json.load( infile )
         return informations
 
@@ -195,7 +165,7 @@ def doProtocol( name ):
     for i in range( len( PROTOCOLS ) ):
         if name == PROTOCOLS[i]["name"]:
             os.system( PROTOCOLS[i]["command"] )
-        break
+            break
     return f"protocol {name} execution success", False, 'user'
 
 
@@ -594,7 +564,7 @@ def openApp( app: str ):
     if app == "teams":
         os.system( "ms-teams.exe" )
     if app == "discord":
-        os.system( "C:/Users/Vinad/AppData/Local/Discord/Update.exe --processStart Discord.exe" )
+        os.system( f"{os.path.expanduser("~")}/AppData/Local/Discord/Update.exe --processStart Discord.exe" )
     if app == "vs code":
         os.system( "code.exe" )
     if app == "minecraft":
@@ -617,7 +587,7 @@ def getLocalisation():
         # print( "localisation saved" )
         return data, True, 'user'
     except Exception as e:
-        return "Erreur pour obtenir la localisation", False, 'user'
+        return "Erreur pour obtenir la localisation", True, 'user'
 
 loadPrint()#c
 
@@ -702,59 +672,6 @@ def getImage( type ):
         return "Image webcam capturée"
 
     return "Type invalide"
-
-loadPrint()#c
-
-def getImageContent( type, prompt, renew ):
-    if renew:
-        getImage( type )
-    
-    if type == "screenshot":
-        files = sorted( 
-            f for f in os.listdir( SCREENSHOT_DIR )
-            if f.lower().endswith( ".jpg" )
-        )
-
-        if not files:
-            return "Aucun screenshot disponible", True, 'user'
-
-        content = [
-            {
-                "text": prompt,
-                "type": "text"
-            }
-        ]
-
-        for file in files:
-            path = os.path.join( SCREENSHOT_DIR, file )
-            image_b64 = image_to_base64( path )
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{image_b64}"
-                    }
-                }
-            )
-
-        return content, True, 'user'
-    elif type == "webcam":
-        if not os.path.exists( WEBCAM_PATH ):
-            return "Aucune image webcam disponible", True, 'user'
-
-        image_b64 = image_to_base64( WEBCAM_PATH )
-        return [
-            {
-                "text": prompt,
-                "type": "text"
-            },
-            {
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/jpeg;base64,{image_b64}"
-                }
-            }
-        ], True, 'user'
 
 loadPrint()#c
 
@@ -1121,29 +1038,23 @@ def chat():
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
                     if tool["name"] == "analyseOldImage":
-                        if MAIN_MODEL != VISION_MODEL:
-                            result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
-                        else:
-                            result, do_response, role = getImageContent( tool["params"]["source"], tool["params"]["prompt"], False )
-                    if tool["name"] == "analyseNewImage":
-                        if MAIN_MODEL != VISION_MODEL:
-                            result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
-                        else:
-                            result, do_response, role = getImageContent( tool["params"]["source"], tool["params"]["prompt"], True )
-                    if tool["name"] == "sendEmail":
+                        result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                    elif tool["name"] == "analyseNewImage":
+                        result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
+                    elif tool["name"] == "sendEmail":
                         result, do_response, role = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
-                    if tool["name"] == "openLink":
+                    elif tool["name"] == "openLink":
                         result, do_response, role = openLink( tool["params"]["link"] )
-                    if tool["name"] == "getLocalisation":
+                    elif tool["name"] == "getLocalisation":
                         result, do_response, role = getLocalisation()
-                    if tool["name"] == "openApp":
+                    elif tool["name"] == "openApp":
                         result, do_response, role = openApp( tool["params"]["app"] )
-                    if tool["name"] == "doProtocol":
+                    elif tool["name"] == "doProtocol":
                         result, do_response, role = doProtocol( tool["params"]["protocol"] )
-                    if tool["name"] == "notUnderstand":
+                    elif tool["name"] == "notUnderstand":
                         not_understand = True
                         break
-                    if tool["name"] == "sleepSystem":
+                    elif tool["name"] == "sleepSystem":
                         sleepSystem()
                     
                     if type( result ) == str:
