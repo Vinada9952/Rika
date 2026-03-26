@@ -628,11 +628,14 @@ class TextInputSprite( pygame.sprite.Sprite ):
             surface  = frame.copy()
             cursor   = "|" if ( pygame.time.get_ticks() // 500 ) % 2 == 0 else ""
             display  = self.input_text + cursor
-            rendered = self._font.render( display, True, LIGHT_BLUE )
-            # rendered = self._font.render( wrapText( display, self._font, WIDTH/2 ), True, LIGHT_BLUE )
-            tx = ( self.size[0] - rendered.get_width() ) // 2
+            # rendered = self._font.render( display, True, LIGHT_BLUE )
             ty = int( self.size[1] * 0.75 )
-            surface.blit( rendered, ( tx, ty ) )
+            lines = wrapText( display, self._font, WIDTH/2 )
+            for i, line in enumerate( lines ):
+                rendered = self._font.render( line, True, LIGHT_BLUE )
+                tx = ( self.size[0] - rendered.get_width() ) // 2
+                modifier = rendered.get_height() * i
+                surface.blit( rendered, ( tx, ty+modifier ) )
             self.image      = surface
             self.last_image = surface
 
@@ -751,27 +754,27 @@ all_sprite = pygame.sprite.Group()
 
 initiating_sprite = Loading( 
     "./assets/gui/Blender/loading0001-0250.avi"
- )
+)
 loading_sprite = LoadingSprite( 
     WIDTH/1.95,
     ( WIDTH/4.29, HEIGHT/26 )
- )
+)
 ready_sprite = SystemReady( 
     "./assets/gui/Blender/ready0001-0250.avi"
- )
+)
 system_on_sprite = SystemOn( 
     "./assets/gui/Blender/on0001-0250.avi"
- )
+)
 rika = Rika( 
     "./assets/gui/Blender/Rika0001-0250.avi"
- )
+)
 text_input_sprite = TextInputSprite( 
     "./assets/gui/Blender/text_input0001-0005.avi",
     "./assets/gui/Blender/text_input0001-0005.avi",
     "./assets/gui/Blender/text_input0001-0005.avi",
     ( WIDTH // 4, HEIGHT // 4 ),
     ( WIDTH // 2, HEIGHT // 2 ),
- )
+)
 
 all_sprite.add( initiating_sprite )
 all_sprite.add( loading_sprite )
