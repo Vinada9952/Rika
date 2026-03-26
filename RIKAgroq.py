@@ -748,7 +748,7 @@ def analyseImage( type, prompt, renew ):
     print( "ask model for vision" )
     response = askModel( VISION_MODEL, messages, 'high', MAX_RETRIES )
 
-    return response.choices[0].message.content, True
+    return f"voici l'image. Fait ce que {USERNAME} te demande de faire avec : " + response.choices[0].message.content, True
 
 loadPrint()#c
 
@@ -899,12 +899,6 @@ def moment():
     minute = datetime.datetime.now().strftime( "%M" )
     return str( f"{ans=} {mois=} {jour=} {heure=} {minute=}" )
 
-loadPrint()#c
-
-def getAudioDuration( file_path ):
-    audio = AudioSegment.from_file( file_path )
-    duration_seconds = audio.duration_seconds
-    return duration_seconds
 
 loadPrint()#c
 
@@ -953,12 +947,8 @@ def treatAudioResponse( response ):
     # say_response = say_response.split( '`' )
     say_response = say_response.replace( '`', '' )
 
-    if getAudioDuration( "./cache/output.mp3" ) > AUDIO_DURATION_LIMIT:
-        say_response = summarized( say_response )
-        Sound.generateVoice( say_response, VOICE )
-    else:
-        Sound.waitForVoiceToFinish()
-        Sound.generateVoice( say_response, VOICE )
+    Sound.waitForVoiceToFinish()
+    Sound.generateVoice( say_response, VOICE )
     Sound.playVoice()
 
 loadPrint()#c
@@ -1030,11 +1020,10 @@ def chat():
             )
             treated_text = treadTextResponse( content["message"] )
             
-            if len( content["tools"] ) == 0:
-                print( "RIKA >", treated_text )
-                GUI.setTextToDisplay( treated_text )
-                if AUDIO:
-                    treatAudioResponse( content["message"] )
+            print( "RIKA >", treated_text )
+            GUI.setTextToDisplay( treated_text )
+            if AUDIO:
+                treatAudioResponse( content["message"] )
             not_understand = False
             do_response = False
             while len( content["tools"] ) != 0:
@@ -1083,10 +1072,6 @@ def chat():
                     content["tools"] = []
                     break
                 if do_response:
-                    print( "RIKA >", treated_text )
-                    GUI.setTextToDisplay( treated_text )
-                    if AUDIO:
-                        treatAudioResponse( content["message"] )
                     print( "ask model for chatting (2)" )
                     response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES )
                     
