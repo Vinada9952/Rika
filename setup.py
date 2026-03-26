@@ -50,7 +50,7 @@ base_settings = {
     "models": {
         "data": "llama-3.1-8b-instant",
         "main": "openai/gpt-oss-120b",
-        "vision": "openai/gpt-oss-120b"
+        "vision": "meta-llama/llama-4-scout-17b-16e-instruct"
     },
     "email": {
         "email": email,
