@@ -2,15 +2,30 @@ import os
 os.system( "pip install -r requirement.txt" )
 
 from RIKAgroq import Json
+from RIKAgroq import Sound
 os.mkdir( "./cache" )
 os.mkdir( "./cache/screenshots" )
 os.mkdir( "./assets/protocols/" )
 
 api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
+assistant_name = input( "Nom de l'agent : " )
 email = input( "Email de L'agent : " )
 pwd = input( "Mot de passe de l'agent pour l'email (https://myaccount.google.com/apppasswords)" )
 name = input( "Votre nom : " )
 user = input( "Votre email : " )
+
+call_names = []
+calibration = 0
+while True:
+    print( "Disez le nom de l'agent dans votre microphone..." )
+    listen = Sound.listen()
+    print( "patientez..." )
+    if listen not in call_names:
+        call_names.append( listen )
+    else:
+        calibration += 1
+    if calibration == 5:
+        break
 
 base_settings = {
     "assistant-name": "Rika",
@@ -19,20 +34,7 @@ base_settings = {
     ],
     "max-api-retries": 10,
     "call": {
-        "names": [
-            "ikea",
-            "reka",
-            "rica",
-            "richard",
-            "rika",
-            "requin",
-            "ricardo",
-            "rik",
-            "riga",
-            "richelieu",
-            "robert",
-            "ricard"
-        ],
+        "names": call_names,
         "hotkey": "ctrl+alt+r"
     },
     "audio": {
