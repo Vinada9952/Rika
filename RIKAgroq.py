@@ -166,7 +166,7 @@ def doProtocol( name ):
         if name == PROTOCOLS[i]["name"]:
             os.system( PROTOCOLS[i]["command"] )
             break
-    return f"protocol {name} execution success", False, 'user'
+    return f"protocol {name} execution success", False
 
 
 loadPrint()#c
@@ -551,7 +551,7 @@ def openLink( link ):
     success = webbrowser.open( link )
     if success:
         return f"ouverture de {link} réussie", False
-    return f"ouverture de {link} raté", True, 'user'
+    return f"ouverture de {link} raté", True
 
 loadPrint()#c
 
@@ -570,7 +570,7 @@ def openApp( app: str ):
         os.system( "code.exe" )
     if app == "minecraft":
         os.system( "C:/Users/Vinad/Desktop/Minecraft.lnk" )
-    return f"ouverture de {app} réussie",  False, 'user'
+    return f"ouverture de {app} réussie",  False
     # return f"Link opened successfully ( {link} )" if webbrowser.open( link ) else "No link opened"
 
 # def runCommand():
@@ -586,9 +586,9 @@ def getLocalisation():
         response = requests.get( 'https://ipinfo.io/json' )
         data = str( response.json() )
         # print( "localisation saved" )
-        return data, True, 'user'
+        return data, True
     except Exception as e:
-        return "Erreur pour obtenir la localisation", True, 'user'
+        return "Erreur pour obtenir la localisation", True
 
 loadPrint()#c
 
@@ -608,7 +608,7 @@ def sendEmail( receiver: str, subject: str, text: str ):
         if receiver.find( "@" ) != -1 and receiver.find( ".com" ) != -1:
             found = True
         if not found:
-            return f"aucun contact trouvé pour {receiver}", True, 'user'
+            return f"aucun contact trouvé pour {receiver}", True
     msg = MIMEText( text )
     msg["Subject"] = subject
     msg["From"] = EMAIL
@@ -621,7 +621,7 @@ def sendEmail( receiver: str, subject: str, text: str ):
         server.login( EMAIL, EMAIL_PASSWORD )
         server.sendmail( EMAIL, receiver, msg.as_string() )
     
-    return "Envoie du courriel réussi", False, 'user'
+    return "Envoie du courriel réussi", False
 
 loadPrint()#c
 
@@ -691,7 +691,7 @@ def analyseImage( type, prompt, renew ):
         )
 
         if not files:
-            return "Aucun screenshot disponible", True, 'user'
+            return "Aucun screenshot disponible", True
 
         content = [
             {
@@ -721,7 +721,7 @@ def analyseImage( type, prompt, renew ):
 
     elif type == "webcam":
         if not os.path.exists( WEBCAM_PATH ):
-            return "Aucune image webcam disponible", True, 'user'
+            return "Aucune image webcam disponible", True
 
         image_b64 = image_to_base64( WEBCAM_PATH )
         messages.append(
@@ -743,12 +743,12 @@ def analyseImage( type, prompt, renew ):
         )
 
     else:
-        return "Type invalide", True, 'user'
+        return "Type invalide", True
 
     print( "ask model for vision" )
     response = askModel( VISION_MODEL, messages, 'high', MAX_RETRIES )
 
-    return response.choices[0].message.content, True, 'user'
+    return response.choices[0].message.content, True
 
 loadPrint()#c
 
@@ -1029,54 +1029,64 @@ def chat():
                 }
             )
             treated_text = treadTextResponse( content["message"] )
-            print( "RIKA >", treated_text )
-            GUI.setTextToDisplay( treated_text )
-            if AUDIO:
-                treatAudioResponse( content["message"] )
-
+            
+            if len( content["tools"] ) == 0:
+                print( "RIKA >", treated_text )
+                GUI.setTextToDisplay( treated_text )
+                if AUDIO:
+                    treatAudioResponse( content["message"] )
             not_understand = False
             do_response = False
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
+                    print( f"{tool["name"]} tool" )
                     if tool["name"] == "analyseOldImage":
-                        result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False ) or do_response
                     elif tool["name"] == "analyseNewImage":
-                        result, do_response, role = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
+                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True ) or do_response
                     elif tool["name"] == "sendEmail":
-                        result, do_response, role = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
+                        result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] ) or do_response
                     elif tool["name"] == "openLink":
-                        result, do_response, role = openLink( tool["params"]["link"] )
+                        result, do_response = openLink( tool["params"]["link"] ) or do_response
                     elif tool["name"] == "getLocalisation":
-                        result, do_response, role = getLocalisation()
+                        result, do_response = getLocalisation() or do_response
                     elif tool["name"] == "openApp":
-                        result, do_response, role = openApp( tool["params"]["app"] )
+                        result, do_response = openApp( tool["params"]["app"] ) or do_response
                     elif tool["name"] == "doProtocol":
-                        result, do_response, role = doProtocol( tool["params"]["protocol"] )
+                        result, do_response = doProtocol( tool["params"]["protocol"] ) or do_response
                     elif tool["name"] == "notUnderstand":
                         not_understand = True
                         break
                     elif tool["name"] == "sleepSystem":
                         sleepSystem()
-                    
-                    if type( result ) == str:
-                        conversation.append( 
-                            {
-                                "role": role,
-                                "content": result,
-                                "name": f"{tool["name"]} tool"
-                            }
-                        )
                     else:
-                        conversation.append( 
-                            {
-                                "role": role,
-                                "content": result,
-                            }
-                        )
+                        result = f"No tool found for {tool["name"]}"
+                    
+                    if not not_understand:
+
+                        if type( result ) == str:
+                            conversation.append( 
+                                {
+                                    "role": "user",
+                                    "content": result,
+                                    "name": f"{tool["name"]} tool"
+                                }
+                            )
+                        else:
+                            conversation.append( 
+                                {
+                                    "role": role,
+                                    "content": result,
+                                }
+                            )
                 if not_understand:
+                    content["tools"] = []
                     break
-                
                 if do_response:
+                    print( "RIKA >", treated_text )
+                    GUI.setTextToDisplay( treated_text )
+                    if AUDIO:
+                        treatAudioResponse( content["message"] )
                     print( "ask model for chatting (2)" )
                     response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES )
                     
