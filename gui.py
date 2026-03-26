@@ -3,6 +3,7 @@ import win32gui
 import win32con
 import win32api
 import pyautogui
+import pygetwindow as gw
 import time
 import threading
 import cv2
@@ -19,7 +20,7 @@ LIGHT_BLUE = ( 3, 232, 252 )
 
 pygame.init()
 screen = pygame.display.set_mode( ( WIDTH, HEIGHT ) )
-pygame.display.set_caption( 'Pygame' )
+pygame.display.set_caption( 'Rika' )
 
 
 hwnd = pygame.display.get_wm_info()["window"]
@@ -45,50 +46,51 @@ win32gui.SetWindowPos(
     win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
 )
 
-def has_user_activity( 
-    detect_mouse_move: bool = True,
-    detect_mouse_click: bool = True,
-    detect_mouse_scroll: bool = True,
-    detect_keyboard: bool = True,
- ) -> bool:
-    """
-    Retourne True si au moins un événement utilisateur s'est produit
-    depuis le dernier appel, False sinon.
 
-    Args:
-        detect_mouse_move:   Inclure les mouvements souris.
-        detect_mouse_click:  Inclure les clics souris.
-        detect_mouse_scroll: Inclure le scroll souris.
-        detect_keyboard:     Inclure les touches clavier.
+# def hasUserActivity( 
+#     detect_mouse_move: bool = True,
+#     detect_mouse_click: bool = True,
+#     detect_mouse_scroll: bool = True,
+#     detect_keyboard: bool = True,
+#  ) -> bool:
+#     """
+#     Retourne True si au moins un événement utilisateur s'est produit
+#     depuis le dernier appel, False sinon.
 
-    Returns:
-        bool: True si une activité correspondante a été détectée.
-    """
-    detected = threading.Event()
+#     Args:
+#         detect_mouse_move:   Inclure les mouvements souris.
+#         detect_mouse_click:  Inclure les clics souris.
+#         detect_mouse_scroll: Inclure le scroll souris.
+#         detect_keyboard:     Inclure les touches clavier.
 
-    def _trigger( *_ ):
-        detected.set()
+#     Returns:
+#         bool: True si une activité correspondante a été détectée.
+#     """
+#     detected = threading.Event()
 
-    mouse_listener = mouse.Listener( 
-        on_move=_trigger if detect_mouse_move else None,
-        on_click=_trigger if detect_mouse_click else None,
-        on_scroll=_trigger if detect_mouse_scroll else None,
- )
-    keyboard_listener = keyboard.Listener( 
-        on_press=_trigger if detect_keyboard else None,
- )
+#     def _trigger( *_ ):
+#         detected.set()
 
-    mouse_listener.start()
-    keyboard_listener.start()
+#     mouse_listener = mouse.Listener( 
+#         on_move=_trigger if detect_mouse_move else None,
+#         on_click=_trigger if detect_mouse_click else None,
+#         on_scroll=_trigger if detect_mouse_scroll else None,
+#  )
+#     keyboard_listener = keyboard.Listener( 
+#         on_press=_trigger if detect_keyboard else None,
+#  )
 
-    result = detected.is_set()
+#     mouse_listener.start()
+#     keyboard_listener.start()
 
-    mouse_listener.stop()
-    keyboard_listener.stop()
+#     result = detected.is_set()
 
-    return result
+#     mouse_listener.stop()
+#     keyboard_listener.stop()
 
-def wrap_text( text, font, max_width ):
+#     return result
+
+def wrapText( text, font, max_width ):
     """Découpe le texte en lignes selon la largeur max en pixels."""
     if text == -1 or text == -2:
         return [""]
@@ -119,9 +121,11 @@ def forceTopmost():
  )
 
 def onFocusGained( hwnd, callback ):
+    global running
     def _watch():
+        global running
         was_focused = False
-        while True:
+        while running:
             focused_hwnd = win32gui.GetForegroundWindow()
             is_focused = ( focused_hwnd == hwnd )
             
@@ -235,7 +239,7 @@ class Loading( pygame.sprite.Sprite ):
             self.frame_time = 0
 
         # print( f"{initiating=}, {self.frame_number=}, {self.frame_total=}" )
-        if initiating == True:
+        if initiating:
             if self.frame_number != 230:
                 self.readFrame()
         if initiating == False:
@@ -625,6 +629,7 @@ class TextInputSprite( pygame.sprite.Sprite ):
             cursor   = "|" if ( pygame.time.get_ticks() // 500 ) % 2 == 0 else ""
             display  = self.input_text + cursor
             rendered = self._font.render( display, True, LIGHT_BLUE )
+            # rendered = self._font.render( wrapText( display, self._font, WIDTH/2 ), True, LIGHT_BLUE )
             tx = ( self.size[0] - rendered.get_width() ) // 2
             ty = int( self.size[1] * 0.75 )
             surface.blit( rendered, ( tx, ty ) )
@@ -682,7 +687,14 @@ _detected = threading.Event()
 def _trigger( *_ ):
     _detected.set()
 
-
+def focusWindow():
+    return
+    print( "focus window" )
+    window = gw.getWindowsWithTitle( "Rika" )
+    if window:
+        win = window[0]
+        win.restore()   # si minimisée
+        win.activate()  # focus
 
 mouse.Listener( on_move=_trigger, on_click=_trigger, on_scroll=_trigger ).start()
 keyboard.Listener( on_press=_trigger ).start()
@@ -788,6 +800,7 @@ def main():
             ready_sprite.setToFrame( 1 )
         
         if text_input_sprite.visible:
+            focusWindow()
             last_movement = int( time.time() )
         
         if int( time.time() ) - last_movement > 10:
@@ -804,6 +817,7 @@ def main():
             if pyautogui.position().x < WIDTH/7 and pyautogui.position().y >= HEIGHT/4*3:
                 rika.setPos( ( WIDTH-WIDTH/7-20, HEIGHT-WIDTH/7-20 ) )
                 if not system_display:
+                    focusWindow()
                     print( "System on" )
                     system_display = True
                     system_on_sprite.setToFrame( 1 )
@@ -823,7 +837,7 @@ def main():
         font = pygame.font.Font( "./assets/gui/Nasalization Rg.otf", font_size )
 
         max_text_width = rika.current_size[0]
-        lines = wrap_text( text, font, max_text_width )
+        lines = wrapText( text, font, max_text_width )
 
         # Calcule la position de base
         if rika.rect.x + rika.rect.width / 2 > WIDTH / 2:
@@ -901,4 +915,4 @@ def test():
     GUI.quitGUI()
 
 
-# test()
+test()
