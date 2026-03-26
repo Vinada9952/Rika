@@ -187,7 +187,8 @@ clients = [
 
 loadPrint()#c
 
-call_names = settings["call-names"]
+call_names = settings["call"]["names"]
+CALL_HOTKEY = settings["call"]["hotkey"]
 
 loadPrint()#c
 
@@ -745,7 +746,7 @@ def analyseImage( type, prompt, renew ):
         return "Type invalide", True, 'user'
 
     print( "ask model for vision" )
-    response = askModel( VISION_MODEL, messages, 'none', MAX_RETRIES )
+    response = askModel( VISION_MODEL, messages, 'high', MAX_RETRIES )
 
     return response.choices[0].message.content, True, 'user'
 
@@ -1102,7 +1103,7 @@ loadPrint()#c
 try:
     if __name__ == "__main__":
         print( "🤖 RIKA" )
-        keyboard.add_hotkey( "ctrl+alt+r", toggleRika )
+        keyboard.add_hotkey( CALL_HOTKEY, toggleRika )
         check_audio_call.start()
         while True:
             # question = input( "...\n" )
