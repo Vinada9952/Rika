@@ -1,4 +1,3 @@
-Make getImageContent work, because for now, it doesn't
 gui crashes when all windows are minimized
 make it easier to change apps that Rika can open
 upload files
