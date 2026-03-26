@@ -1,31 +1,55 @@
 import os
-os.system( "pip install -r requirement.txt" )
-
 from RIKAgroq import Json
 from RIKAgroq import Sound
-os.mkdir( "./cache" )
-os.mkdir( "./cache/screenshots" )
-os.mkdir( "./assets/protocols/" )
 
-assistant_name = input( "Nom de l'agent : " )
+os.system( "pip install -r requirement.txt" )
+os.makedirs( "./cache", True )
+os.makedirs( "./cache/screenshots", True )
+os.makedirs( "./assets/protocols/", True )
+
 api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
-email = input( "Email de L'agent : " )
-pwd = input( "Mot de passe de l'agent pour l'email (https://myaccount.google.com/apppasswords)" )
 name = input( "Votre nom : " )
 user = input( "Votre email : " )
 
-call_names = []
-calibration = 0
-while True:
-    print( "Disez le nom de l'agent dans votre microphone..." )
-    listen = Sound.listen()
-    print( "patientez..." )
-    if listen not in call_names:
-        call_names.append( listen )
-    else:
-        calibration += 1
-    if calibration == 5:
-        break
+ask = input( "Voulez vous modifier le nom de l'agent ? (o/n) : " )
+if ask == 'o':
+    assistant_name = input( "Nom de l'agent : " )
+    call_names = []
+    calibration = 0
+    while True:
+        print( "Disez le nom de l'agent dans votre microphone..." )
+        listen = Sound.listen()
+        print( "patientez..." )
+        if listen not in call_names:
+            call_names.append( listen )
+        else:
+            calibration += 1
+        if calibration == 5:
+            break
+else:
+    assistant_name = "Rika"
+    call_names = [
+        "ikea",
+        "reka",
+        "rica",
+        "richard",
+        "rika",
+        "requin",
+        "ricardo",
+        "rik",
+        "riga",
+        "richelieu",
+        "robert",
+        "ricard"
+    ]
+
+ask = input( "Voulez vous mettre un email pour l'agent ? (o/n) : " )
+if ask.lower() == 'o':
+    email = input( "Email de L'agent : " )
+    pwd = input( "Mot de passe de l'agent pour l'email (https://myaccount.google.com/apppasswords)" )
+else:
+    email = "No Email Available"
+    pwd = "No Email Available"
 
 base_settings = {
     "assistant-name": "Rika",
