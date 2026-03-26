@@ -1029,7 +1029,7 @@ def chat():
                 }
             )
             treated_text = treadTextResponse( content["message"] )
-            print( "🤖 >", treated_text )
+            print( "RIKA >", treated_text )
             GUI.setTextToDisplay( treated_text )
             if AUDIO:
                 treatAudioResponse( content["message"] )
@@ -1089,7 +1089,7 @@ def chat():
                     content = json.loads( response.choices[0].message.content )
                     treated_text = treadTextResponse( content["message"] )
                     GUI.setTextToDisplay( treated_text )
-                    print( "🤖 >", treated_text )
+                    print( "RIKA >", treated_text )
                     if AUDIO:
                         treatAudioResponse( content["message"] )
                 else:
@@ -1102,7 +1102,7 @@ loadPrint()#c
 # =====================
 try:
     if __name__ == "__main__":
-        print( "🤖 RIKA" )
+        # print( "" )
         keyboard.add_hotkey( CALL_HOTKEY, toggleRika )
         check_audio_call.start()
         while True:
