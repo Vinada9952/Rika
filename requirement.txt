@@ -16,3 +16,5 @@ psutil
 Flask
 pywin32
 pynput
+spotipy
+pyaudio
