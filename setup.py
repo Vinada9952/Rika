@@ -50,9 +50,10 @@ base_settings = {
         "contacts": "./assets/contacts.json"
     },
     "models": {
-        "data": "llama-3.1-8b-instant",
         "main": "openai/gpt-oss-120b",
-        "vision": "meta-llama/llama-4-scout-17b-16e-instruct"
+        "data": "llama-3.1-8b-instant",
+        "vision": "meta-llama/llama-4-scout-17b-16e-instruct",
+        "web": "groq/compound"
     },
     "email": {
         "email": email,

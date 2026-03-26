@@ -106,7 +106,7 @@ OUTILS DISPONIBLES :
   - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
   - Avant de l'utiliser, vérifie toi-même sur internet si le lien fonctionne
   - params:
-    -> link (string): lien à ouvrir dans un navigateur pour montrer à l'utilisateur
+    -> query (string): Description du lien (ex: dernière vidéo de mon youtuber préféré)
   - exemples de cas d'utilisation:
     -> Je veux voir une vidéo youtube
     -> trouve moi les scores des olympiques

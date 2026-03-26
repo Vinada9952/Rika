@@ -214,6 +214,7 @@ loadPrint()#c
 MAIN_MODEL = settings["models"]["main"]
 VISION_MODEL = settings["models"]["vision"]
 ASK_MODEL = settings["models"]["data"]
+WEB_MODEL = settings["models"]["web"]
 MAX_RETRIES = settings["max-api-retries"]
 ASSISTANT_NAME = settings["assistant-name"]
 
@@ -383,7 +384,7 @@ OUTILS DISPONIBLES :
   - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
   - Avant de l'utiliser, vérifie toi-même sur internet si le lien fonctionne
   - params:
-    -> link (string): lien à ouvrir dans un navigateur pour montrer à l'utilisateur
+    -> query (string): Description du lien (ex: dernière vidéo de mon youtuber préféré)
   - exemples de cas d'utilisation:
     -> Je veux voir une vidéo youtube
     -> trouve moi les scores des olympiques
@@ -510,7 +511,7 @@ check_audio_call = threading.Thread( target=checkAudioCall )
 loadPrint()#c
 
 
-def askModel( model: str, message: str, thinking: str, max_retries: int ):
+def askModel( model: str, message: dict, thinking: str, max_retries: int ):
     global clients
     can_think = True
     for i in range( max_retries ):
@@ -520,13 +521,13 @@ def askModel( model: str, message: str, thinking: str, max_retries: int ):
                     model=model,
                     messages=message,
                     reasoning_effort=thinking
-                )
+                ).choices[0].message.content
             else:
                 
                 return random.choice( clients ).chat.completions.create(
                     model=model,
                     messages=message
-                )
+                ).choices[0].message.content
         except APIStatusError as e:
             print( str( e ) )
             if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
@@ -547,7 +548,26 @@ loadPrint()#c
 # =====================
 # TOOL: openLink
 # =====================
-def openLink( link ):
+def openLink( query: str ):
+    link = askModel(
+        WEB_MODEL,
+        [
+            {
+                "role": "system",
+                "content": """
+Ton role est de donner un lien web à entrer dans un navigateur.
+Tu dois uniquement donner le lien web et rien d'autre.
+Le lien que tu vas donner doit corresprondre le plus possible à la demande de l'utilisateur
+"""
+            },
+            {
+                "role": "user",
+                "content": query
+            }
+        ],
+        "high",
+        MAX_RETRIES
+    )
     success = webbrowser.open( link )
     if success:
         return f"ouverture de {link} réussie", False
@@ -748,7 +768,7 @@ def analyseImage( type, prompt, renew ):
     print( "ask model for vision" )
     response = askModel( VISION_MODEL, messages, 'high', MAX_RETRIES )
 
-    return f"voici l'image. Fait ce que {USERNAME} te demande de faire avec : " + response.choices[0].message.content, True
+    return f"voici l'image. Fait ce que {USERNAME} te demande de faire avec : " + response, True
 
 loadPrint()#c
 
@@ -845,9 +865,9 @@ Garde le plus d'informations importantes possible en respectant la limite de mot
     )
 
     try:
-        return json.loads( summary.choices[0].message.content )["message"]
+        return json.loads( summary )["message"]
     except JSONDecodeError:
-        return summary.choices[0].message.content
+        return summary
 
 loadPrint()#c
 
@@ -1011,11 +1031,11 @@ def chat():
             print( "ask model for chatting (1)" )
             response = askModel( MAIN_MODEL, conversation, 'high', MAX_RETRIES )
 
-            content = json.loads( response.choices[0].message.content )
+            content = json.loads( response )
             conversation.append( 
                 {
                     "role": "assistant",
-                    "content": response.choices[0].message.content
+                    "content": response
                 }
             )
             treated_text = treadTextResponse( content["message"] )
@@ -1036,7 +1056,7 @@ def chat():
                     elif tool["name"] == "sendEmail":
                         result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] ) or do_response
                     elif tool["name"] == "openLink":
-                        result, do_response = openLink( tool["params"]["link"] ) or do_response
+                        result, do_response = openLink( tool["params"]["query"] ) or do_response
                     elif tool["name"] == "getLocalisation":
                         result, do_response = getLocalisation() or do_response
                     elif tool["name"] == "openApp":
@@ -1078,10 +1098,10 @@ def chat():
                     conversation.append( 
                         {
                             "role": "assistant",
-                            "content": response.choices[0].message.content
+                            "content": response
                         }
                     )
-                    content = json.loads( response.choices[0].message.content )
+                    content = json.loads( response )
                     treated_text = treadTextResponse( content["message"] )
                     GUI.setTextToDisplay( treated_text )
                     print( "RIKA >", treated_text )
