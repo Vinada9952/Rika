@@ -3,6 +3,7 @@ os.system( "pip install -r requirement.txt" )
 
 from RIKAgroq import Json
 os.mkdir( "./cache" )
+os.mkdir( "./cache/screenshots" )
 os.mkdir( "./assets/protocols/" )
 
 api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
@@ -16,28 +17,31 @@ base_settings = {
     "api-keys": [
         api_key
     ],
-    "max-api-retries": 50,
-    "call-names": [
-        "ikea",
-        "reka",
-        "rica",
-        "richard",
-        "rika",
-        "requin",
-        "ricardo",
-        "rik",
-        "riga",
-        "richelieu",
-        "robert",
-        "ricard"
-    ],
+    "max-api-retries": 10,
+    "call": {
+        "names": [
+            "ikea",
+            "reka",
+            "rica",
+            "richard",
+            "rika",
+            "requin",
+            "ricardo",
+            "rik",
+            "riga",
+            "richelieu",
+            "robert",
+            "ricard"
+        ],
+        "hotkey": "ctrl+alt+r"
+    },
     "audio": {
         "audio": True,
         "audio-duration-threshold": 15,
         "voice": "fr-CA-SylvieNeural"
     },
     "directories": {
-        "screenshots": "screenshots/",
+        "screenshots": "/cache/screenshots/",
         "cache": "cache/",
         "webcam": "./cache/captured.jpg",
         "protocols": "./assets/protocols/protocols.json",
