@@ -123,7 +123,8 @@ base_settings = {
         "url": None,
         "set-conversation": "setConversation",
         "get-conversation": "getConversation"
-    }
+    },
+    "color": [ 3, 232, 252 ]
 }
 
 Json.write( base_settings, "./settings.json" )

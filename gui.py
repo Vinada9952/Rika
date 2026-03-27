@@ -8,6 +8,17 @@ import time
 import threading
 import cv2
 from pynput import mouse, keyboard
+import json
+
+class Json:
+    def write( informations: dict, json_name: str ):
+        json_object = json.dumps( informations, indent=4 )
+        with open( json_name, 'w', encoding="utf-8" ) as outfile:
+            outfile.write( json_object )
+    def read( json_name: str ):
+        with open( json_name, 'r', encoding="utf-8" ) as infile:
+            informations = json.load( infile )
+        return informations
 
 
 WIDTH = pyautogui.size().width
@@ -16,7 +27,7 @@ HEIGHT = pyautogui.size().height
 print( f"{WIDTH=}, {HEIGHT=}" )
 
 FILL_COLOR = ( 0, 0, 0 )
-LIGHT_BLUE = ( 3, 232, 252 )
+LIGHT_BLUE = tuple( Json.read( "./settings.json" )["color"] )
 
 pygame.init()
 screen = pygame.display.set_mode( ( WIDTH, HEIGHT ) )
