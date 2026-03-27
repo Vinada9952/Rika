@@ -41,15 +41,15 @@ def loadPrint():
     def read( file_name: str ):
         return_file = []
         try:
-            file = open( file_name, "r", encoding='utf-8' )
+            file = open( file_name, 'r', encoding="utf-8" )
             brut_file = file.read()+'\n'
             file.close()
-            traitement = ""
+            traitement = ''
             for i in range( len( brut_file ) ):
                 for j in range( len( brut_file[i] ) ):
                     if brut_file[i][j] == '\n':
                         return_file.append( traitement )
-                        traitement = ""
+                        traitement = ''
                     else:
                         traitement += brut_file[i][j]
             return return_file
@@ -65,11 +65,11 @@ def loadPrint():
     else:
         count = load_number
 
-    bar = "[" + ( '.'*100 ) + "]"
+    bar = '[' + ( '.'*100 ) + ']'
 
 
     for i in range( int( load_print*100/count ) ):
-        bar = bar.replace( ".", "#", 1 )
+        bar = bar.replace( '.', '#', 1 )
 
     percentage = load_print*100/count
 
@@ -126,7 +126,7 @@ class Sound:
 
 
     async def _generateVoice( text, voice ):
-        text = "   " + text.replace( "*", "" ).replace( "\n", ".     " )
+        text = "   " + text.replace( '*', '' ).replace( '\n', ".     " )
         if type( voice ) == str:
             communicate = edge_tts.Communicate( text, voice )
             await communicate.save( "./cache/output.mp3" )
@@ -153,7 +153,7 @@ loadPrint()#c
 
 PROTOCOLS = Json.read( Json.read( "./settings.json" )["directories"]["protocols"] )
 
-protocol_list = ""
+protocol_list = ''
 for protocol in PROTOCOLS:
     protocol_list += f"\n    -> {protocol["name"]}"
 
@@ -242,7 +242,7 @@ for contact in CONTACT_LIST:
     language = contact["language"]
     names.append( f"    -> {name} ({relation}) - Langue parlé : {language}" )
 
-CONTACT_NAMES = "\n".join( names )
+CONTACT_NAMES = '\n'.join( names )
 
 loadPrint()#c
 
@@ -275,31 +275,31 @@ Tu DOIS répondre STRICTEMENT en JSON, SANS AUCUN TEXTE EN DEHORS.
 
 FORMAT OBLIGATOIRE :
 Cas sans action :
-{"{"}
+{'{'}
   "message": "ce que tu dis à l'utilisateur",
   "tools": []
-{"}"}
+{'}'}
 
 Cas avec action(s) :
 
-{"{"}
+{'{'}
   "message": "ce que tu dis à l'utilisateur",
   "tools": [
-    {"{"}
+    {'{'}
       "name": "openLink",
-      "params": {"{"}
+      "params": {'{'}
         "link": "https://www.google.com/search?q=latest+news+about+ai"
-      {"}"}
-    {"}"},
-    {"{"}
+      {'}'}
+    {'}'},
+    {'{'}
       "name": "analyseImage",
-      "params": {"{"}
+      "params": {'{'}
         "source": "screenshot",
         "prompt": "Décris ce que tu vois sur tous les écrans"
-      {"}"}
-    {"}"}
+      {'}'}
+    {'}'}
   ]
-{"}"}
+{'}'}
 
 OUTILS DISPONIBLES :
 
@@ -375,7 +375,6 @@ OUTILS DISPONIBLES :
     -> trouve moi une carte de Montréal
 
 - sendEmail
-  - Envoyer un email depuis l'adresse {EMAIL}
   - À utiliser uniquement lorsque demandé ou en cas d'urgence
   - params:
     -> receiver (string): destinataire
@@ -587,7 +586,7 @@ loadPrint()#c
 # =====================
 def getLocalisation():
     try:
-        response = requests.get( 'https://ipinfo.io/json' )
+        response = requests.get( "https://ipinfo.io/json" )
         data = str( response.json() )
         # print( "localisation saved" )
         return data, True
@@ -609,7 +608,7 @@ def sendEmail( receiver: str, subject: str, text: str ):
                 receiver = contact["email"]
                 found = True
                 break
-        if receiver.find( "@" ) != -1 and receiver.find( ".com" ) != -1:
+        if receiver.find( '@' ) != -1 and receiver.find( ".com" ) != -1:
             found = True
         if not found:
             return f"aucun contact trouvé pour {receiver}", True
@@ -635,7 +634,7 @@ loadPrint()#c
 def sleepSystem():
     global conversation, called, AUDIO
     AUDIO = True
-    GUI.setTextToDisplay( "" )
+    GUI.setTextToDisplay( '' )
     GUI.textInput( False )
     GUI.displayRika( False )
     called = False
@@ -751,7 +750,7 @@ def analyseImage( type, prompt, renew ):
         return "Type invalide", True
 
     print( "ask model for vision" )
-    response = askModel( VISION_MODEL, messages, 'high', MAX_RETRIES )
+    response = askModel( VISION_MODEL, messages, "high", MAX_RETRIES )
 
     return f"voici l'image. Fait ce que {USERNAME} te demande de faire avec : " + response, True
 
@@ -759,7 +758,7 @@ loadPrint()#c
 
 def removeEmojis( text ):
     emoji_pattern = re.compile(
-        "["
+        '['
         "\U0001F600-\U0001F64F"
         "\U0001F300-\U0001F5FF"
         "\U0001F680-\U0001F6FF"
@@ -845,7 +844,7 @@ Garde le plus d'informations importantes possible en respectant la limite de mot
                 "content": response
             }
         ],
-        'none',
+        "none",
         MAX_RETRIES
     )
 
@@ -908,7 +907,7 @@ def moment():
 loadPrint()#c
 
 def treadTextResponse( response: str ):
-    return response.replace( '**', '' )
+    return response.replace( "**", '' )
 
 loadPrint()#c
 
@@ -923,7 +922,7 @@ def treatAudioResponse( response ):
     say_response = say_response.replace( '\n', '.' )
 
 
-    say_response = say_response.split( '```' )
+    say_response = say_response.split( "```" )
     code = 0
     for i in range( len( say_response ) ):
         if i % 2 == 1:
@@ -933,12 +932,12 @@ def treatAudioResponse( response ):
             del extracted_code[0]
             extracted_code = "\n".join( extracted_code )
 
-            planguage = extracted_code.split( '\n' )[0].replace( '```', '' )
+            planguage = extracted_code.split( '\n' )[0].replace( "```", '' )
             try:
-                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + "." + file_extensions[planguage.lower()] ):
+                while os.path.exists( "./code/code-" + planguage + '-' + str( code ) + '.' + file_extensions[planguage.lower()] ):
                     code = random.randint( 1000, 9999 )
             except KeyError:
-                while os.path.exists( "./code/code-" + planguage + "-" + str( code ) + ".txt" ):
+                while os.path.exists( "./code/code-" + planguage + '-' + str( code ) + ".txt" ):
                     code = random.randint( 1000, 9999 )
 
             say_response[i] = "extrait de code " + planguage + " numéro " + str( code ) + ", enregistré sur le pc"
@@ -959,10 +958,10 @@ def treatAudioResponse( response ):
 loadPrint()#c
 
 def getUserInput():
-    user_input = ""
+    user_input = ''
     if AUDIO:
         Sound.waitForVoiceToFinish()
-        print( "YOU > ", end="" )
+        print( "YOU > ", end='' )
         user_input = Sound.listen()
         print( user_input )
     else:
@@ -1014,7 +1013,7 @@ def chat():
             response = None
             # while True:
             print( "ask model for chatting (1)" )
-            response = askModel( MAIN_MODEL, conversation, 'high', MAX_RETRIES )
+            response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES )
 
             content = json.loads( response )
             conversation.append( 
@@ -1143,8 +1142,8 @@ except KeyboardInterrupt:
     print( "\n📝 Debug conversation ( KeyboardInterrupt )\n" )
     for i, message in enumerate( conversation, start=1 ):
         role = message.get( "role", "unknown" )
-        name = message.get( "name", "" )
-        content = message.get( "content", "" )
+        name = message.get( "name", '' )
+        content = message.get( "content", '' )
 
         print( f"--- Message {i} ---" )
         if name:

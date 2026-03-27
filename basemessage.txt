@@ -113,7 +113,6 @@ OUTILS DISPONIBLES :
     -> trouve moi une carte de Montréal
 
 - sendEmail
-  - Envoyer un email depuis l'adresse {EMAIL}
   - À utiliser uniquement lorsque demandé ou en cas d'urgence
   - params:
     -> receiver (string): destinataire
