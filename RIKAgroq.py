@@ -223,10 +223,18 @@ SMTP_SERVER = settings["email"]["smtp"]["server"]
 SMTP_PORT = settings["email"]["smtp"]["port"]
 EMAIL = settings["email"]["email"]
 EMAIL_PASSWORD = settings["email"]["pwd"]
-USER_EMAIL = settings["email"]["user-email"]["email"]
+
+loadPrint()#c
+
 USERNAME = settings["email"]["user-email"]["name"]
-SERVER_URL = settings["server-url"]
+USER_EMAIL = settings["email"]["user-email"]["email"]
 CONTACT_LIST = Json.read( settings["directories"]["contacts"] )
+
+loadPrint()#c
+
+SERVER_URL = settings["server"]["url"]
+SET_CONVERSATION = settings["server"]["set-conversation"]
+GET_CONVERSATION = settings["server"]["get-conversation"]
 
 loadPrint()#c
 
@@ -251,7 +259,7 @@ loadPrint()#c
 
 conversation = Json.read( "./conversation.json" )
 if SERVER_URL:
-    data = requests.get( f"{SERVER_URL}/getConversation" )
+    data = requests.get( f"{SERVER_URL}/{GET_CONVERSATION}" )
     conversation = data.json()
     del data
 # data = Json.read( "./conversation.json" )
@@ -663,7 +671,7 @@ def sleepSystem():
     #     }
     # )
     if SERVER_URL:
-        requests.post( f"{SERVER_URL}/setConversation", json=conversation )
+        requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
     Json.write( conversation, "./conversation.json" )
     Sound.waitForVoiceToFinish()
     raise ExitAgent()

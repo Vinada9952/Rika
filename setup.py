@@ -119,7 +119,11 @@ base_settings = {
             "email": user
         }
     },
-    "server-url": None
+    "server": {
+        "url": None,
+        "set-conversation": "setConversation",
+        "get-conversation": "getConversation"
+    }
 }
 
 Json.write( base_settings, "./settings.json" )
