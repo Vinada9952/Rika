@@ -1,6 +1,7 @@
 gui crashes when all windows are minimized
 make it easier to change apps that Rika can open
 upload files
+tool save file
 spotify API
 recognize music
 mode incognito
