@@ -21,4 +21,5 @@ _NOTE:_ L'input au clavier ne fonctionnera pas dans d'autres applications si le 
 pour désactiver Rika, simplement lui dire au revoir ou lui demander de se mettre en veille
 
 *TROUBLESHOOTING*
+
 M'envoyer les fichiers log.log et debug.json en me mentionnant l'erreur
