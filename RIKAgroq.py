@@ -637,7 +637,9 @@ def sendEmail( receiver: str, subject: str, text: str ):
             server.starttls()
             server.login( EMAIL, EMAIL_PASSWORD )
             server.sendmail( EMAIL, receiver, msg.as_string() )
+        log( "Email sent", "", 1 )
     except Exception as e:
+        log( "Email error", str( e ), 3 )
         return "Envoie du courriel raté"
     
     return "Envoie du courriel réussi", False
