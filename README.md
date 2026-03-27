@@ -12,6 +12,7 @@
 - Sauvegarder et ouvrir un fichier
 
 **OPTIONS**
+
 Certains paramètres peuvent être modifié dans `settings.json`
 L'agent peut détecter tout seul si on lui parle ou pas
 Overlay hi-tech
