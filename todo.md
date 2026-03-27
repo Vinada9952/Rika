@@ -17,3 +17,4 @@ make video resume
 make ui to change settings
 put color in settings
 assistant can read mails
+assistant can send documents in mails
