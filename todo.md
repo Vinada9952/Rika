@@ -15,3 +15,5 @@ user's note for ai
 write README.md
 make video resume
 make ui to change settings
+put color in settings
+assistant can read mails
