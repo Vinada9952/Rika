@@ -4,6 +4,7 @@ import base64
 import json
 from json import JSONDecodeError
 import mss
+import subprocess
 from groq import Groq
 from groq import APIStatusError
 import threading
@@ -60,7 +61,7 @@ def loadPrint():
     load_print += 1
     # f = '\n'.join( read( "C:/Users/" ) )
     if load_number == -1:
-        f = '\n'.join( read( f"{"C:/Users/Vinad/Documents/informatique/programmation/python/Projets/Autres/SmartHouse/Rika"}/RIKAgroq.py" ) )
+        f = '\n'.join( read( __file__ ) )
         count = f.count( "loadPrint()#c" )-1
         load_number = count
     else:
@@ -164,7 +165,7 @@ def doProtocol( name ):
     global PROTOCOLS
     for i in range( len( PROTOCOLS ) ):
         if name == PROTOCOLS[i]["name"]:
-            os.system( PROTOCOLS[i]["command"] )
+            subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
             break
     return f"protocol {name} execution success", False
 
@@ -476,7 +477,7 @@ called = False
 audio_tmp = AUDIO
 def toggleRika():
     global called, AUDIO
-    print( "Rika Called" )
+    print( f"{ASSISTANT_NAME} Called" )
     # GUI.forceTopMost()
     called = True
     AUDIO = False
@@ -503,7 +504,7 @@ def checkAudioCall():
             if not called:
                 print( question )
             if called:
-                print( "Rika" )
+                print( ASSISTANT_NAME )
         time.sleep( 1 )
 
 check_audio_call = threading.Thread( target=checkAudioCall )
@@ -1040,7 +1041,7 @@ def chat():
             )
             treated_text = treadTextResponse( content["message"] )
             
-            print( "RIKA >", treated_text )
+            print( f"{ASSISTANT_NAME} >", treated_text )
             GUI.setTextToDisplay( treated_text )
             if AUDIO:
                 treatAudioResponse( content["message"] )
@@ -1104,7 +1105,7 @@ def chat():
                     content = json.loads( response )
                     treated_text = treadTextResponse( content["message"] )
                     GUI.setTextToDisplay( treated_text )
-                    print( "RIKA >", treated_text )
+                    print( f"{ASSISTANT_NAME} >", treated_text )
                     if AUDIO:
                         treatAudioResponse( content["message"] )
                 else:
