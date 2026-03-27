@@ -18,3 +18,6 @@ make ui to change settings
 put color in settings
 assistant can read mails
 assistant can send documents in mails
+fix webcam index
+either make the shortcur every prompt in write mode or make the shortcut work in write mode
+fix notUnderstand
