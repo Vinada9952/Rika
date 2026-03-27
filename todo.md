@@ -14,3 +14,5 @@ script to update settings to newer version
 notifications
 user's note for ai
 write README.md
+make video resume
+make ui to change settings
