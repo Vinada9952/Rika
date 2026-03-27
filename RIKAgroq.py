@@ -3,6 +3,7 @@ from email.mime.text import MIMEText
 from json import JSONDecodeError
 from groq import APIStatusError
 import speech_recognition as sr
+from plyer import notification
 from PIL import Image
 from groq import Groq
 from gui import GUI
@@ -517,6 +518,15 @@ check_audio_call = threading.Thread( target=checkAudioCall )
 
 loadPrint()#c
 
+def sendNotification(title, message):
+    notification.notify(
+        title=title,
+        message=message,
+        app_name='MonApp',
+        timeout=3
+    )
+
+loadPrint()#c
 
 def askModel( model: str, message: dict, thinking: str, max_retries: int ):
     global clients
@@ -670,6 +680,7 @@ def sendEmail( receiver: str, subject: str, text: str ):
             server.starttls()
             server.login( EMAIL, EMAIL_PASSWORD )
             server.sendmail( EMAIL, receiver, msg.as_string() )
+        sendNotification( "Email envoyé", f"email envoyé à {receiver}" )
         log( "Email sent", "", 1 )
     except Exception as e:
         log( "Email error", str( e ), 3 )
