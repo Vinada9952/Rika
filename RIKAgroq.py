@@ -406,6 +406,19 @@ OUTILS DISPONIBLES :
     -> protocol (string): Nom du protocol
   - liste de protocol:{protocol_list}
 
+- saveFile
+  - Sauvegarder un fichier texte
+  - À utiliser pour sauvegarder un fichier texte, un gros contenu texte ou un script
+  - Donne toujours le résultat d'une réponse, qui n'est pas simplement une information ou la confirmation d'un outil, dans l'outil saveFile
+  - params:
+    -> name (string): Nom du fichier
+    -> content (string): Contenu du fichier
+  - exemple d'utilisation:
+    -> Fait moi un script...
+    -> Écrit moi un poème...
+    -> Fait moi un rapport...
+    -> Affiche moi un résumé...
+
 RÈGLES IMPORTANTES :
 - Ne JAMAIS écrire autre chose que du JSON.
 - Répond uniquement et uniquement en français.
@@ -599,6 +612,18 @@ def doProtocol( name ):
             subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
             break
     return f"protocol {name} execution success", False
+
+loadPrint()#c
+
+def saveFile( name, content ):
+    if os.path.exists( f"{os.path.expanduser("~")}/Downloads/{name}" ):
+        return f"Le fichier {name} existe déjà", True
+    file = open( f"{os.path.expanduser("~")}/Downloads/{name}", 'w' )
+    file.write( content )
+    file.close()
+    subprocess.Popen( ["notepad", f"{os.path.expanduser("~")}/Downloads/{name}"], creationflags=subprocess.DETACHED_PROCESS, shell=True)
+    # os.system( f"notepad {os.path.expanduser("~")}/Downloads/{name}" )
+    return f"Le fichier {name} a bien été créé", False
 
 loadPrint()#c
 
@@ -1073,6 +1098,8 @@ def chat():
                         result, do_response = openApp( tool["params"]["app"] ) or do_response
                     elif tool["name"] == "doProtocol":
                         result, do_response = doProtocol( tool["params"]["protocol"] ) or do_response
+                    elif tool["name"] == "saveFile":
+                        result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] )
                     elif tool["name"] == "notUnderstand":
                         not_understand = True
                         break
