@@ -149,24 +149,19 @@ class Sound:
             pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
 
-loadPrint()#c
-
-PROTOCOLS = Json.read( Json.read( "./settings.json" )["directories"]["protocols"] )
-
-protocol_list = ''
-for protocol in PROTOCOLS:
-    protocol_list += f"\n    -> {protocol["name"]}"
 
 loadPrint()#c
 
-def doProtocol( name ):
-    global PROTOCOLS
-    for i in range( len( PROTOCOLS ) ):
-        if name == PROTOCOLS[i]["name"]:
-            subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
-            break
-    return f"protocol {name} execution success", False
-
+logs = []
+def log( message, info, level ):
+    logs.append(
+        {
+            "level": level,
+            "message": message,
+            "info": info
+        }
+    )
+    Json.write( logs, "log.log" )
 
 loadPrint()#c
 
@@ -232,6 +227,14 @@ USER_EMAIL = settings["email"]["user-email"]["email"]
 USERNAME = settings["email"]["user-email"]["name"]
 SERVER_URL = settings["server-url"]
 CONTACT_LIST = Json.read( settings["directories"]["contacts"] )
+
+loadPrint()#c
+
+PROTOCOLS = Json.read( Json.read( "./settings.json" )["directories"]["protocols"] )
+
+protocol_list = ''
+for protocol in PROTOCOLS:
+    protocol_list += f"\n    -> {protocol["name"]}"
 
 loadPrint()#c
 
@@ -581,6 +584,16 @@ def openApp( app: str ):
 
 loadPrint()#c
 
+def doProtocol( name ):
+    global PROTOCOLS
+    for i in range( len( PROTOCOLS ) ):
+        if name == PROTOCOLS[i]["name"]:
+            subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
+            break
+    return f"protocol {name} execution success", False
+
+loadPrint()#c
+
 # =====================
 # TOOL: getLocalisation
 # =====================
@@ -619,10 +632,13 @@ def sendEmail( receiver: str, subject: str, text: str ):
 
     # print( f"{receiver=}, {subject=}, {text=}" )
 
-    with smtplib.SMTP( SMTP_SERVER, SMTP_PORT ) as server:
-        server.starttls()
-        server.login( EMAIL, EMAIL_PASSWORD )
-        server.sendmail( EMAIL, receiver, msg.as_string() )
+    try:
+        with smtplib.SMTP( SMTP_SERVER, SMTP_PORT ) as server:
+            server.starttls()
+            server.login( EMAIL, EMAIL_PASSWORD )
+            server.sendmail( EMAIL, receiver, msg.as_string() )
+    except Exception as e:
+        return "Envoie du courriel raté"
     
     return "Envoie du courriel réussi", False
 
