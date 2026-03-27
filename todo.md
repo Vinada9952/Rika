@@ -14,3 +14,4 @@ script to change the agent's name
 script to update settings to newer version
 Notifications
 user's note for ai
+write README.md
