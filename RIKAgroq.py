@@ -1,31 +1,29 @@
-import os
-import cv2
-import base64
-import json
-from json import JSONDecodeError
-import mss
-import subprocess
-from groq import Groq
-from groq import APIStatusError
-import threading
-from email.mime.text import MIMEText
-import smtplib
-import datetime
-from pydub import AudioSegment
-import re
-import random
-import keyboard
-from PIL import Image
-import requests
-import time
-import pyautogui
-import speech_recognition as sr
 from pygrabber.dshow_graph import FilterGraph
-import webbrowser
-import edge_tts
+from email.mime.text import MIMEText
+from json import JSONDecodeError
+from groq import APIStatusError
+import speech_recognition as sr
+from PIL import Image
+from groq import Groq
 from gui import GUI
-import pygame
+import webbrowser
+import subprocess
+import threading
+import requests
+import edge_tts
+import keyboard
+import datetime
 import asyncio
+import smtplib
+import base64
+import pygame
+import random
+import json
+import time
+import cv2
+import mss
+import os
+import re
 
 GUI.startGUI()
 
@@ -185,30 +183,12 @@ clients = [
     Groq( api_key=n )
     for n in API_KEYS
 ]
+del API_KEYS
 
 loadPrint()#c
 
 call_names = settings["call"]["names"]
 CALL_HOTKEY = settings["call"]["hotkey"]
-
-loadPrint()#c
-
-# prononciation = {
-#     "C#": "C sharp",
-#     "macOS": "maque O.S.",
-#     "Linux": "Linuxe",
-#     "_": " ",
-#     "tuê": "touè",
-#     "Tuê": "Touè",
-#     "Minh": "Migne",
-#     "minh": "Migne",
-#     "Rika": "Ri-k",
-#     "rika": "Ri-k",
-#     "Chambly": "Chanbly",
-#     "Donald Trump": "`Donald Trump`",
-#     "Los Angeles": "Los Angel",
-#     "DroidCam": "Droïd Came"
-# }
 
 loadPrint()#c
 
@@ -266,12 +246,15 @@ CONTACT_NAMES = "\n".join( names )
 
 loadPrint()#c
 
+conversation = Json.read( "./conversation.json" )
+if SERVER_URL:
+    data = requests.get( f"{SERVER_URL}/getConversation" )
+    conversation = data.json()
+    del data
 # data = Json.read( "./conversation.json" )
-data = requests.get( f"{SERVER_URL}/getConversation" )
 # print( data )
 # print( data.json() )
 # conversation = data.json()["conversation"]
-conversation = data.json()
 # print( conversation  )
 
 loadPrint()#c
@@ -662,7 +645,8 @@ def sleepSystem():
             "content": f"{moment()}"
         }
     )
-    requests.post( f"{SERVER_URL}/setConversation", json=conversation )
+    if SERVER_URL:
+        requests.post( f"{SERVER_URL}/setConversation", json=conversation )
     Json.write( conversation, "./conversation.json" )
     Sound.waitForVoiceToFinish()
     raise ExitAgent()
@@ -1112,6 +1096,7 @@ def chat():
                     break
 
 loadPrint()#c
+time.sleep( 0.5 )
 
 # =====================
 # START

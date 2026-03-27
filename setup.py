@@ -1,8 +1,36 @@
 import os
-from RIKAgroq import Json
-from RIKAgroq import Sound
-
 os.system( "pip install -r requirement.txt" )
+import json
+import speech_recognition as sr
+
+def listen( language: str = "fr-FR" ):
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            try:
+                r.adjust_for_ambient_noise( 1 )
+            except AssertionError:
+                pass
+            # r.adjust_for_ambient_noise( 1 )
+            audio_data = r.listen( source=source, phrase_time_limit=10 )
+        try:
+            text = r.recognize_google( audio_data, language=language )
+            text = str( text )
+            return text
+        except sr.UnknownValueError:
+            return -1
+        except sr.RequestError:
+            return -2
+
+class Json:
+    def write( informations: dict, json_name: str ):
+        json_object = json.dumps( informations, indent=4 )
+        with open( json_name, 'w', encoding="utf-8" ) as outfile:
+            outfile.write( json_object )
+    def read( json_name: str ):
+        with open( json_name, 'r', encoding="utf-8" ) as infile:
+            informations = json.load( infile )
+        return informations
+
 os.makedirs( "./cache", True )
 os.makedirs( "./cache/screenshots", True )
 os.makedirs( "./assets/protocols/", True )
@@ -17,8 +45,8 @@ if ask == 'o':
     call_names = []
     calibration = 0
     while True:
-        print( "Disez le nom de l'agent dans votre microphone..." )
-        listen = Sound.listen()
+        print( "Dites le nom de l'agent dans votre microphone..." )
+        listen = listen()
         print( "patientez..." )
         if listen not in call_names:
             call_names.append( listen )
@@ -91,7 +119,7 @@ base_settings = {
             "email": user
         }
     },
-    "server-url": "localhost:5000"
+    "server-url": None
 }
 
 Json.write( base_settings, "./settings.json" )
