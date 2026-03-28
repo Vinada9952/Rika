@@ -503,7 +503,7 @@ def checkAudioCall():
                 calls = question.lower().split( ' ' )
                 for call_name in call_names:
                     for call in calls:
-                        if call.find( call_name ) != -1:
+                        if call.find( call_name.lower() ) != -1:
                             called = True
                             break
                     if called:

@@ -27,7 +27,8 @@ HEIGHT = pyautogui.size().height
 print( f"{WIDTH=}, {HEIGHT=}" )
 
 FILL_COLOR = ( 0, 0, 0 )
-LIGHT_BLUE = tuple( Json.read( "./settings.json" )["color"] )
+LIGHT_BLUE = tuple( Json.read( "./settings.json" )["gui"]["color"] )
+FONT = Json.read( "./settings.json" )["gui"]["font"]
 
 pygame.init()
 screen = pygame.display.set_mode( ( WIDTH, HEIGHT ) )
@@ -435,7 +436,7 @@ class TextInputSprite( pygame.sprite.Sprite ):
         self.image = pygame.Surface( ( 0, 0 ), pygame.SRCALPHA )
         self.rect  = pygame.Rect( pos[0], pos[1], size[0], size[1] )
 
-        self._font = pygame.font.Font( "./assets/gui/Nasalization Rg.otf", 28 )
+        self._font = pygame.font.Font( FONT, 28 )
 
         self._listener = None
         self._start_listener()
@@ -848,7 +849,7 @@ def main():
         system_on_sprite   .update( dt )
 
         font_size = max( 12, int( 36 * rika.current_size[0] / ( WIDTH / 3 ) ) )
-        font = pygame.font.Font( "./assets/gui/Nasalization Rg.otf", font_size )
+        font = pygame.font.Font( FONT, font_size )
 
         max_text_width = rika.current_size[0]
         lines = wrapText( text, font, max_text_width )
@@ -929,4 +930,4 @@ def test():
     GUI.quitGUI()
 
 
-# test()
+test()
