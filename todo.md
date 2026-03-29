@@ -22,3 +22,4 @@ fix webcam index
 either make the shortcur every prompt in write mode or make the shortcut work in write mode
 fix notUnderstand
 fix analyseImage when just ask to analyse image
+add sonor effects when assistant activates and deactivate
