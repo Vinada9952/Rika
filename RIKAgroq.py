@@ -1,4 +1,6 @@
 from pygrabber.dshow_graph import FilterGraph
+from email.utils import parsedate_to_datetime
+from email.header import decode_header
 from email.mime.text import MIMEText
 from json import JSONDecodeError
 from groq import APIStatusError
@@ -16,9 +18,11 @@ import keyboard
 import datetime
 import asyncio
 import smtplib
+import imaplib
 import base64
 import pygame
 import random
+import email
 import json
 import math
 import time
@@ -225,6 +229,18 @@ SMTP_SERVER = settings["email"]["smtp"]["server"]
 SMTP_PORT = settings["email"]["smtp"]["port"]
 EMAIL = settings["email"]["email"]
 EMAIL_PASSWORD = settings["email"]["pwd"]
+IMAP_SERVERS = {
+    "gmail.com":      ("imap.gmail.com", 993),
+    "googlemail.com": ("imap.gmail.com", 993),
+    "outlook.com":    ("imap-mail.outlook.com", 993),
+    "hotmail.com":    ("imap-mail.outlook.com", 993),
+    "live.com":       ("imap-mail.outlook.com", 993),
+    "msn.com":        ("imap-mail.outlook.com", 993),
+    "yahoo.com":      ("imap.mail.yahoo.com", 993),
+    "yahoo.fr":       ("imap.mail.yahoo.com", 993),
+    "icloud.com":     ("imap.mail.me.com", 993),
+    "me.com":         ("imap.mail.me.com", 993),
+}
 
 loadPrint()#c
 
@@ -445,11 +461,12 @@ RÈGLES IMPORTANTES :
 - Ne dis JAMAIS les paramètres utilisés pour les outils.
 - Ne fait JAMAIS de résumé de conversation, sauf quand je te le demande.
 - Si une action est requise (ex: envoyer un email, ouvrir une app, ouvrir un lien, analyser une image), la réponse est invalide si aucun outil n'est appelé.
+- Dès que tu reçois un email, dit le à l'utilisateur et un résumé de son contenu, et fait le pour chaque email/
 - Il est INTERDIT de simuler une action dans le message sans appeler l'outil correspondant.
 - Si une action est nécéssaire, ne te contente pas juste de répondre, FAIT l'action
 - Ne met pas de mise en page ou des choses dans le genre pour faire des tableaux, titres en gras, ressort un texte simple destiné à être affiché dans le terminal
 - Essaie de faire les messages les plus courts possibles
-- Ta réponse est fait pour être dite à l'oral. Garde des caractères normaux pouvant être dit par un module TTS.
+- Ta réponse est fait pour être dite à l'oral. Garde des caractères normaux pouvant être dit par un module TTS. C'est à dire, ne met pas de parenthèses et autres trucs du genre
 """
 
 conversation[0] = {
@@ -811,6 +828,122 @@ def getLocalisation() -> dict:
             "comparison":       _compare(ip_data, win_data),
         }
     ), True
+
+loadPrint()#c
+
+def _decode_header(value: str) -> str:
+    if not value:
+        return ""
+    parts = decode_header(value)
+    result = []
+    for part, charset in parts:
+        if isinstance(part, bytes):
+            result.append(part.decode(charset or "utf-8", errors="replace"))
+        else:
+            result.append(str(part))
+    return " ".join(result).strip()
+
+
+def _extract_body(msg: email.message.Message) -> dict:
+    plain, html = [], []
+    if msg.is_multipart():
+        for part in msg.walk():
+            if "attachment" in str(part.get("Content-Disposition", "")):
+                continue
+            payload = part.get_payload(decode=True)
+            if payload is None:
+                continue
+            charset = part.get_content_charset() or "utf-8"
+            text = payload.decode(charset, errors="replace")
+            if part.get_content_type() == "text/plain":
+                plain.append(text)
+            elif part.get_content_type() == "text/html":
+                html.append(text)
+    else:
+        payload = msg.get_payload(decode=True)
+        if payload:
+            charset = msg.get_content_charset() or "utf-8"
+            text = payload.decode(charset, errors="replace")
+            if msg.get_content_type() == "text/html":
+                html.append(text)
+            else:
+                plain.append(text)
+    return {"plain": "\n".join(plain).strip(), "html": "\n".join(html).strip()}
+
+
+def _get_attachments(msg: email.message.Message) -> list:
+    attachments = []
+    if msg.is_multipart():
+        for part in msg.walk():
+            if "attachment" in str(part.get("Content-Disposition", "")):
+                attachments.append(_decode_header(part.get_filename() or "unknown"))
+    return attachments
+
+
+def getEmail(address: str, password: str, folder: str = "INBOX") -> list[dict]:
+    """
+    Retourne un array de dicts représentant chaque email non lu.
+
+    Paramètres
+    ----------
+    address  : adresse email complète (ex: moi@gmail.com)
+    password : mot de passe d'application
+    folder   : dossier IMAP à lire (INBOX par défaut)
+
+    Retour
+    ------
+    [
+        {
+            "id":          "42",
+            "date":        "2024-03-15T10:30:00+00:00",
+            "from":        "Alice <alice@example.com>",
+            "to":          "Bob <bob@example.com>",
+            "subject":     "Bonjour",
+            "body_plain":  "Contenu texte brut",
+            "body_html":   "<p>Contenu HTML</p>",
+            "attachments": ["document.pdf"]
+        },
+        ...
+    ]
+    """
+    domain = address.split("@")[-1].lower()
+    host, port = IMAP_SERVERS.get(domain, (f"imap.{domain}", 993))
+
+    imap = imaplib.IMAP4_SSL(host, port)
+    imap.login(address, password)
+    imap.select(folder)
+
+    _, data = imap.search(None, "UNSEEN")
+    ids = data[0].split()
+
+    emails = []
+    for uid in ids:
+        _, raw = imap.fetch(uid, "(RFC822)")
+        if not raw or raw[0] is None:
+            continue
+        msg = email.message_from_bytes(raw[0][1])
+        body = _extract_body(msg)
+
+        date_str = msg.get("Date", "")
+        try:
+            date = parsedate_to_datetime(date_str).isoformat()
+        except Exception:
+            date = date_str
+
+        emails.append({
+            "id":          uid.decode(),
+            "date":        date,
+            "from":        _decode_header(msg.get("From", "")),
+            "to":          _decode_header(msg.get("To", "")),
+            "subject":     _decode_header(msg.get("Subject", "")),
+            "content-plain":  body["plain"],
+            "content-HTML":   body["html"],
+            "attachments": _get_attachments(msg),
+        })
+
+    imap.close()
+    imap.logout()
+    return emails
 
 loadPrint()#c
 
@@ -1221,6 +1354,15 @@ def chat():
     # )
 
     while True:
+
+        conversation.append(
+            {
+                "role": "user",
+                "content": "Vous avez reçu des emails :\n\n" + json.dumps( getEmail( EMAIL, EMAIL_PASSWORD ), indent=4 ),
+                "name": "getEmail tool"
+            }
+        )
+
         user_input = getUserInput()
         
         if type( user_input ) == str:

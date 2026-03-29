@@ -13,7 +13,6 @@ script to update settings to newer version with settings template
 notifications
 user's note for ai
 make assistant resum video screenshot or webcam
-assistant can read mails
 assistant can send documents in mails
 fix webcam index
 either make the shortcur every prompt in write mode or make the shortcut work in write mode
