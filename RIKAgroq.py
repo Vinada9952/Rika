@@ -553,28 +553,32 @@ def sendNotification(title, message):
 
 loadPrint()#c
 
-def askModel( model: str, message: dict, thinking: str, max_retries: int ):
+def askModel( model: str, message: dict, thinking: str, max_retries: int, json_mode: bool ):
     global clients
     can_think = True
     for i in range( max_retries ):
         try:
             if can_think:
-                return random.choice( clients ).chat.completions.create(
+                ans = random.choice( clients ).chat.completions.create(
                     model=model,
                     messages=message,
                     reasoning_effort=thinking
                 ).choices[0].message.content
             else:
-                
-                return random.choice( clients ).chat.completions.create(
+                ans = random.choice( clients ).chat.completions.create(
                     model=model,
                     messages=message
                 ).choices[0].message.content
+            if json_mode:
+                response = json.loads( ans )
+            return ans
         except APIStatusError as e:
             print( str( e ) )
             if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
                 can_think = False
-            time.sleep( 0.5 )
+        except JSONDecodeError as e:
+            print( str( e ) )
+            print( ans )
 
 loadPrint()#c
 
@@ -603,7 +607,8 @@ def webSearch( query: str ):
             }
         ],
         "high",
-        MAX_RETRIES
+        MAX_RETRIES,
+        False
     )
     return result, True
 
@@ -630,7 +635,8 @@ Le lien que tu vas donner doit corresprondre le plus possible à la demande de l
             }
         ],
         "high",
-        MAX_RETRIES
+        MAX_RETRIES,
+        False
     )
     success = webbrowser.open( link )
     if success:
@@ -1117,7 +1123,7 @@ def analyseImage( type, prompt, renew ):
         return "Type invalide", True
 
     print( "ask model for vision" )
-    response = askModel( VISION_MODEL, messages, "high", MAX_RETRIES )
+    response = askModel( VISION_MODEL, messages, "high", MAX_RETRIES, False )
 
     return f"voici l'image. Fait ce que {USERNAME} te demande de faire avec : " + response, True
 
@@ -1212,7 +1218,8 @@ Garde le plus d'informations importantes possible en respectant la limite de mot
             }
         ],
         "none",
-        MAX_RETRIES
+        MAX_RETRIES,
+        True
     )
 
     try:
