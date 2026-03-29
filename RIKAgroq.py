@@ -20,6 +20,7 @@ import base64
 import pygame
 import random
 import json
+import math
 import time
 import cv2
 import mss
@@ -419,6 +420,12 @@ OUTILS DISPONIBLES :
     -> Écrit moi un poème...
     -> Fait moi un rapport...
     -> Affiche moi un résumé...
+  
+- webSearch
+  - Faire une recherche sur le web
+  - params:
+    -> query (string): Ce que tu veux savoir
+  - Tu peux l'utiliser à n'importe quel moment, sans avoir besoin d'autorisation
 
 RÈGLES IMPORTANTES :
 - Ne JAMAIS écrire autre chose que du JSON.
@@ -562,6 +569,28 @@ def image_to_base64( path ):
 
 loadPrint()#c
 
+def webSearch( query: str ):
+    result = askModel(
+        WEB_MODEL,
+        [
+            {
+                "role": "system",
+                "content": """
+    Va chercher sur internet la réponse à la question de l'utilisateur.
+    """
+            },
+            {
+                "role": "user",
+                "content": query
+            }
+        ],
+        "high",
+        MAX_RETRIES
+    )
+    return result, True
+
+loadPrint()#c
+
 # =====================
 # TOOL: openLink
 # =====================
@@ -640,14 +669,148 @@ loadPrint()#c
 # =====================
 # TOOL: getLocalisation
 # =====================
-def getLocalisation():
-    try:
-        response = requests.get( "https://ipinfo.io/json" )
-        data = str( response.json() )
-        # print( "localisation saved" )
-        return data, True
-    except Exception as e:
-        return "Erreur pour obtenir la localisation", True
+# def getLocalisation():
+#     try:
+#         response = requests.get( "https://ipinfo.io/json" )
+#         data = str( response.json() )
+#         # print( "localisation saved" )
+#         return data, True
+#     except Exception as e:
+#         return "Erreur pour obtenir la localisation", True
+
+def getLocalisation() -> dict:
+    """
+    Retourne un dictionnaire avec :
+      - ip_location      : position approximative via IP
+      - windows_location : position précise via le service Windows (GPS/Wi-Fi)
+      - comparison       : écart entre les deux sources
+      - generated_at     : horodatage UTC
+    """
+
+    def _get_ip() -> dict:
+        try:
+            resp = requests.get(
+                "http://ip-api.com/json/",
+                params={"fields": "status,message,country,regionName,city,"
+                                   "zip,lat,lon,isp,org,query"},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if data.get("status") != "success":
+                raise ValueError(data.get("message", "Réponse inattendue"))
+            return str(
+                {
+                    "method": "ip",
+                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                    "ip_address": data.get("query"),
+                    "isp": data.get("isp"),
+                    "organisation": data.get("org"),
+                    "country": data.get("country"),
+                    "region": data.get("regionName"),
+                    "city": data.get("city"),
+                    "zip": data.get("zip"),
+                    "latitude": data.get("lat"),
+                    "longitude": data.get("lon"),
+                    "accuracy_note": "Précision typique : ville (~5-50 km)",
+                }
+            ), True
+        except Exception as exc:
+            return str({"method": "ip", "error": str(exc)}), True
+
+    def _get_windows() -> dict:
+        try:
+            import win32com.client
+        except ImportError:
+            return str( {"method": "windows",
+                    "error": "pywin32 non installé (pip install pywin32)"} ), True
+        try:
+            locator = win32com.client.Dispatch("Windows.Devices.Geolocation.Geolocator")
+
+            access = locator.RequestAccessAsync()
+            deadline = time.time() + 10
+            while access.Status != 4 and time.time() < deadline:
+                time.sleep(0.1)
+            if access.Status == 4 and access.GetResults() != 0:
+                return str( {"method": "windows", "error": "Accès à la localisation refusé"} ), True
+
+            locator.DesiredAccuracy = 0
+            locator.DesiredAccuracyInMeters = 10
+
+            op = locator.GetGeopositionAsync()
+            deadline = time.time() + 30
+            while op.Status != 4 and time.time() < deadline:
+                time.sleep(0.2)
+            if op.Status != 4:
+                return str( {"method": "windows", "error": "Délai dépassé (30 s)"} ), True
+
+            pos   = op.GetResults()
+            coord = pos.Coordinate
+            geo   = coord.Point.Position
+
+            accuracy = getattr(coord, "Accuracy", None)
+            alt_acc  = getattr(coord, "AltitudeAccuracy", None)
+            speed    = getattr(coord, "Speed",   None)
+            heading  = getattr(coord, "Heading", None)
+            src_map  = {0: "Unknown", 1: "Cellular", 2: "Satellite",
+                        3: "WiFi", 4: "IPAddress", 5: "Default",
+                        6: "Obfuscated", 7: "Other"}
+            source = src_map.get(getattr(coord, "PositionSource", -1), "Unknown")
+
+            return str(
+                {
+                    "method": "windows",
+                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                    "latitude":            geo.Latitude,
+                    "longitude":           geo.Longitude,
+                    "altitude_m":          geo.Altitude if geo.Altitude != 0 else None,
+                    "accuracy_m":          round(accuracy, 2) if accuracy else None,
+                    "altitude_accuracy_m": round(alt_acc, 2)  if alt_acc  else None,
+                    "speed_ms":            round(speed, 2)    if speed    else None,
+                    "heading_deg":         round(heading, 1)  if heading  else None,
+                    "position_source":     source,
+                    "accuracy_note":       "Précision typique : GPS ~5 m, Wi-Fi ~15-40 m",
+                }
+            ), True
+        except Exception as exc:
+            return str( {"method": "windows", "error": str(exc)} ), True
+
+    def _compare(ip: dict, win: dict) -> dict:
+        if "error" in ip or "error" in win:
+            return str( {"note": "Comparaison impossible (données manquantes)"} ), True
+        try:
+            R = 6371.0
+            phi1, phi2 = math.radians(ip["latitude"]),  math.radians(win["latitude"])
+            dlat = math.radians(win["latitude"]  - ip["latitude"])
+            dlon = math.radians(win["longitude"] - ip["longitude"])
+            a = math.sin(dlat/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlon/2)**2
+            dist = round(R * 2 * math.asin(math.sqrt(a)), 3)
+            return str(
+                {
+                    "distance_km": dist,
+                    "distance_note": (
+                        "Écart faible" if dist < 5 else
+                        "Écart modéré" if dist < 20 else
+                        "Écart important"
+                    ),
+                    "win_accuracy_m": win.get("accuracy_m"),
+                    "win_source":     win.get("position_source"),
+                }
+            ), True
+        except Exception as exc:
+            return str( {"note": f"Calcul impossible : {exc}"} ), True
+
+    ip_data  = _get_ip()
+    win_data = _get_windows()
+
+    return str(
+        {
+            "generated_at":     datetime.datetime.utcnow().isoformat() + "Z",
+            "ip_location":      ip_data,
+            "windows_location": win_data,
+            "comparison":       _compare(ip_data, win_data),
+        }
+    ), True
 
 loadPrint()#c
 
@@ -1110,7 +1273,9 @@ def chat():
                     elif tool["name"] == "doProtocol":
                         result, do_response = doProtocol( tool["params"]["protocol"] ) or do_response
                     elif tool["name"] == "saveFile":
-                        result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] )
+                        result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] ),
+                    elif tool["name"] == "webSearch":
+                        result, do_response = webSearch( tool["params"]["query"] ) or do_response
                     elif tool["name"] == "notUnderstand":
                         not_understand = True
                         break

@@ -145,6 +145,12 @@ OUTILS DISPONIBLES :
     -> Écrit moi un poème...
     -> Fait moi un rapport...
     -> Affiche moi un résumé...
+  
+- webSearch
+  - Faire une recherche sur le web
+  - params:
+    -> query (string): Ce que tu veux savoir
+  - Tu peux l'utiliser à n'importe quel moment, sans avoir besoin d'autorisation
 
 RÈGLES IMPORTANTES :
 - Ne JAMAIS écrire autre chose que du JSON.
