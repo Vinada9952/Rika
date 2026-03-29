@@ -27,6 +27,7 @@ import json
 import math
 import time
 import cv2
+import sys
 import mss
 import os
 import re
@@ -256,7 +257,7 @@ GET_CONVERSATION = settings["server"]["get-conversation"]
 
 loadPrint()#c
 
-PROTOCOLS = Json.read( Json.read( "./settings.json" )["directories"]["protocols"] )
+PROTOCOLS = [ { "name": settings["reset-protocol-name"], "command": "/delete-memory" } ] + Json.read( settings["directories"]["protocols"] )
 
 protocol_list = ''
 for protocol in PROTOCOLS:
@@ -662,9 +663,16 @@ def openApp( app: str ):
 loadPrint()#c
 
 def doProtocol( name ):
-    global PROTOCOLS
+    global PROTOCOLS, conversation
     for i in range( len( PROTOCOLS ) ):
         if name == PROTOCOLS[i]["name"]:
+            if PROTOCOLS[i]["command"] == "/delete-memory":
+                conversation = [ conversation[0] ]
+                sleepSystem( False )
+                Sound.generateVoice( "Vous aurez besoin de relançer mon programme", VOICE )
+                Sound.playVoice()
+                Sound.waitForVoiceToFinish()
+                sys.exit( 0 )
             subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
             break
     return f"protocol {name} execution success", False
@@ -989,7 +997,7 @@ loadPrint()#c
 # =====================
 # TOOL: sleepSystem
 # =====================
-def sleepSystem():
+def sleepSystem( exception ):
     global conversation, called, AUDIO
     AUDIO = True
     GUI.setTextToDisplay( '' )
@@ -1006,7 +1014,8 @@ def sleepSystem():
         requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
     Json.write( conversation, "./conversation.json" )
     Sound.waitForVoiceToFinish()
-    raise ExitAgent()
+    if exception:
+        raise ExitAgent()
     # exit( 0 )
 
 loadPrint()#c
@@ -1422,7 +1431,7 @@ def chat():
                         not_understand = True
                         break
                     elif tool["name"] == "sleepSystem":
-                        sleepSystem()
+                        sleepSystem( True )
                     else:
                         result = f"No tool found for {tool["name"]}"
                     

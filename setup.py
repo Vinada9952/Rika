@@ -124,7 +124,12 @@ base_settings = {
         "set-conversation": "setConversation",
         "get-conversation": "getConversation"
     },
-    "color": [ 3, 232, 252 ]
+    "color": [ 3, 232, 252 ],
+    "reset-protocol-name": "No Way Home",
+    "gui":{
+        "color": [ 3, 232, 252 ],
+        "font": "./assets/gui/Nasalization Rg.otf"
+    }
 }
 
 Json.write( base_settings, "./settings.json" )
