@@ -1424,7 +1424,7 @@ def chat():
                     elif tool["name"] == "doProtocol":
                         result, do_response = doProtocol( tool["params"]["protocol"] ) or do_response
                     elif tool["name"] == "saveFile":
-                        result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] ),
+                        result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] )
                     elif tool["name"] == "webSearch":
                         result, do_response = webSearch( tool["params"]["query"] ) or do_response
                     elif tool["name"] == "notUnderstand":

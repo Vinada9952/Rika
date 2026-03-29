@@ -19,4 +19,3 @@ either make the shortcur every prompt in write mode or make the shortcut work in
 fix notUnderstand
 fix analyseImage when just ask to analyse image
 add sonor effects when assistant activates and deactivate
-insert no way home in standart protocols
