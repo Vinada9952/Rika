@@ -1841,6 +1841,7 @@ def treatAudioResponse( response ):
 loadPrint()#c
 
 def getUserInput():
+    print( "getting input" )
     user_input = ''
     if AUDIO:
         Sound.waitForVoiceToFinish()
@@ -1861,7 +1862,8 @@ def getUserInput():
             if user_input:
                 GUI.textInput( False )
                 break
-    return user_input
+        print( f"User input: {user_input}" )
+        return user_input
 
 loadPrint()#c
 
@@ -1870,6 +1872,7 @@ loadPrint()#c
 # =====================
 def chat():
     global conversation
+    print( "called" )
 
     # conversation.append(
     #     {
@@ -1879,6 +1882,8 @@ def chat():
     # )
 
     while True:
+        
+        print( "getting emails" )
 
         email = getEmail( EMAIL, EMAIL_PASSWORD )
 
