@@ -1517,7 +1517,7 @@ def sendEmail( receiver: str, subject: str, text: str ):
         log( "Email sent", "", 1 )
     except Exception as e:
         log( "Email error", str( e ), 3 )
-        return "Envoie du courriel raté"
+        return "Envoie du courriel raté", True
     
     return "Envoie du courriel réussi", False
 
@@ -1943,29 +1943,30 @@ def chat():
                 treatAudioResponse( content["message"] )
             not_understand = False
             do_response = False
+            last_do_response = last_do_response
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
                     print( f"{tool["name"]} tool" )
                     if tool["name"] == "analyseOldImage":
-                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False ) or do_response
+                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
                     elif tool["name"] == "analyseNewImage":
-                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True ) or do_response
+                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
                     elif tool["name"] == "sendEmail":
-                        result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] ) or do_response
+                        result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
                     elif tool["name"] == "openLink":
-                        result, do_response = openLink( tool["params"]["query"] ) or do_response
+                        result, do_response = openLink( tool["params"]["query"] )
                     elif tool["name"] == "getLocalisation":
-                        result, do_response = getLocalisation() or do_response
+                        result, do_response = getLocalisation()
                     elif tool["name"] == "openApp":
-                        result, do_response = openApp( tool["params"]["app"] ) or do_response
+                        result, do_response = openApp( tool["params"]["app"] )
                     elif tool["name"] == "doProtocol":
-                        result, do_response = doProtocol( tool["params"]["protocol"] ) or do_response
+                        result, do_response = doProtocol( tool["params"]["protocol"] )
                     elif tool["name"] == "recognizeMusic":
-                        result, do_response = recognizeMusic() or do_response
+                        result, do_response = recognizeMusic()
                     elif tool["name"] == "saveFile":
                         result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] )
                     elif tool["name"] == "webSearch":
-                        result, do_response = webSearch( tool["params"]["query"] ) or do_response
+                        result, do_response = webSearch( tool["params"]["query"] )
                     elif tool["name"] == "notUnderstand":
                         not_understand = True
                         break
@@ -1991,6 +1992,8 @@ def chat():
                                     "content": result,
                                 }
                             )
+                    do_response = do_response or last_do_response
+                    last_do_response = do_response
                 if not_understand:
                     content["tools"] = []
                     break
