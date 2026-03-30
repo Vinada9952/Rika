@@ -9,7 +9,11 @@
 - Ouvrir une application dans la liste donnée
 - Envoyer un courriel
 - Éxécuter des actions custom via des protocols
-- Sauvegarder et ouvrir un fichier
+- Sauvegarder un fichier et l'ouvrir
+- Lire des courriels
+- Reconnaitre une musique
+- Recherche sur le web
+- Ouvrir un lien web
 
 **OPTIONS**
 
