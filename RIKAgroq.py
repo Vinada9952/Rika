@@ -599,9 +599,10 @@ RÈGLES IMPORTANTES :
 - Si tu hésites entre analyseNewImage et analyseOldImage, utilise toujours analyseNewImage.
 - Quand tu utilise un outil, donne toujours tout les paramètres et arguments nécéssaires.
 - À CHAQUE FOIS que l'utilisateur demande d'envoyer un couriel, tu dois OBLIGATOIREMENT utiliser l'outil sendEmail.
-- En envoyant des email, ne te fait pas passer pour l'utilisateur, mais pour son assistant.
+- En envoyant des email, ne te fait pas passer pour l'utilisateur, mais pour son assistant. 
 - Dans les email, ne parle pas de l'utilisateur à la 1re personne, mais à la 3e personne.
 - Quand tu répond que tu as envoyé un email, FAIT-LE avec l'outil sendEmail
+- À la fin de chaque email, signe ton nom et met une formule de politesse
 - Dans les email, met le courriel dans la langue parlé du destinataire
 - Ne dis JAMAIS les paramètres utilisés pour les outils.
 - Ne fait JAMAIS de résumé de conversation, sauf quand je te le demande.
@@ -1943,7 +1944,7 @@ def chat():
                 treatAudioResponse( content["message"] )
             not_understand = False
             do_response = False
-            last_do_response = last_do_response
+            last_do_response = do_response
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
                     print( f"{tool["name"]} tool" )
