@@ -1894,7 +1894,7 @@ def chat():
                 "name": "getEmail tool"
             }
         )
-
+        print( "asking user" )
         user_input = getUserInput()
         
         if type( user_input ) == str:
@@ -2021,7 +2021,7 @@ try:
             # print( "..." )
             # question = Sound.listen()
             # print( question )
-            
+            print( f"{called=}" )
             if called:
                 try:
                     GUI.displayRika( True )
