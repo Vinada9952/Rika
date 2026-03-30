@@ -1870,7 +1870,7 @@ def getUserInput():
                 GUI.textInput( False )
                 break
         print( f"User input: {user_input}" )
-        return user_input
+    return user_input
 
 loadPrint()#c
 

@@ -51,15 +51,15 @@ while True:
         calibration = 0
         while True:
             print( "Dites le nom de l'agent dans votre microphone..." )
-            listen = listen()
+            listened = listen()
             print( "patientez..." )
-            if listen not in call_names:
-                call_names.append( listen )
+            if listened not in call_names:
+                call_names.append( listened )
             else:
                 calibration += 1
             if calibration == 5:
                 break
-        settings["calls"]["names"] = call_names
+        settings["call"]["names"] = call_names
         settings["assistant-name"] = assistant_name
     elif choice == '2':
         settings["email"]["email"] = input( "Email de L'agent : " )
