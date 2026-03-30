@@ -1088,10 +1088,17 @@ Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésite
 
 loadPrint()#c
 
+class Substitute:
+    def join():
+        return
+
+loadPrint()#c
+
 def openApp( app ):
+    global get_all_apps_thread
     print( f"searching for {app}..." )
     get_all_apps_thread.join()
-    del get_all_apps_thread
+    get_all_apps_thread = Substitute()
     search = searchApp( APPLICATIONS, app )
     return appPath( search, app ), False
 # def openApp( app: str ):
