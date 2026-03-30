@@ -23,6 +23,7 @@ import keyboard
 import datetime
 import asyncio
 import smtplib
+import logging
 import imaplib
 import base64
 import pygame
@@ -1303,6 +1304,10 @@ def getLocalisation() -> dict:
 
 loadPrint()#c
 
+logger = logging.getLogger(__name__)
+
+loadPrint()#c
+
 def _decode_header(value: str) -> str:
     if not value:
         return ""
@@ -1315,6 +1320,7 @@ def _decode_header(value: str) -> str:
             result.append(str(part))
     return " ".join(result).strip()
 
+loadPrint()#c
 
 def _extract_body(msg: email.message.Message) -> dict:
     plain, html = [], []
@@ -1342,6 +1348,7 @@ def _extract_body(msg: email.message.Message) -> dict:
                 plain.append(text)
     return {"plain": "\n".join(plain).strip(), "html": "\n".join(html).strip()}
 
+loadPrint()#c
 
 def _get_attachments(msg: email.message.Message) -> list:
     attachments = []
@@ -1351,29 +1358,59 @@ def _get_attachments(msg: email.message.Message) -> list:
                 attachments.append(_decode_header(part.get_filename() or "unknown"))
     return attachments
 
+loadPrint()#c
 
-def getEmail(address: str, password: str, folder: str = "INBOX") -> list[dict]:
+def _connect(host: str, port: int, address: str, password: str) -> imaplib.IMAP4_SSL:
+    """Open a fresh authenticated IMAP connection."""
+    imap = imaplib.IMAP4_SSL(host, port)
+    imap.login(address, password)
+    return imap
+
+loadPrint()#c
+
+def _safe_logout(imap: imaplib.IMAP4_SSL) -> None:
+    """Best-effort close/logout — never raises."""
+    try:
+        imap.close()
+    except Exception:
+        pass
+    try:
+        imap.logout()
+    except Exception:
+        pass
+
+loadPrint()#c
+
+def getEmail(
+    address: str,
+    password: str,
+    folder: str = "INBOX",
+    retries: int = 3,
+    retry_delay: float = 2.0,
+) -> list[dict]:
     """
     Retourne un array de dicts représentant chaque email non lu.
 
     Paramètres
     ----------
-    address  : adresse email complète (ex: moi@gmail.com)
-    password : mot de passe d'application
-    folder   : dossier IMAP à lire (INBOX par défaut)
+    address     : adresse email complète (ex: moi@gmail.com)
+    password    : mot de passe d'application
+    folder      : dossier IMAP à lire (INBOX par défaut)
+    retries     : nombre de tentatives en cas d'erreur IMAP
+    retry_delay : secondes d'attente entre chaque tentative
 
     Retour
     ------
     [
         {
-            "id":          "42",
-            "date":        "2024-03-15T10:30:00+00:00",
-            "from":        "Alice <alice@example.com>",
-            "to":          "Bob <bob@example.com>",
-            "subject":     "Bonjour",
-            "body_plain":  "Contenu texte brut",
-            "body_html":   "<p>Contenu HTML</p>",
-            "attachments": ["document.pdf"]
+            "id":           "42",
+            "date":         "2024-03-15T10:30:00+00:00",
+            "from":         "Alice <alice@example.com>",
+            "to":           "Bob <bob@example.com>",
+            "subject":      "Bonjour",
+            "content-plain": "Contenu texte brut",
+            "content-HTML":  "<p>Contenu HTML</p>",
+            "attachments":  ["document.pdf"]
         },
         ...
     ]
@@ -1381,41 +1418,55 @@ def getEmail(address: str, password: str, folder: str = "INBOX") -> list[dict]:
     domain = address.split("@")[-1].lower()
     host, port = IMAP_SERVERS.get(domain, (f"imap.{domain}", 993))
 
-    imap = imaplib.IMAP4_SSL(host, port)
-    imap.login(address, password)
-    imap.select(folder)
+    last_exc: Exception | None = None
 
-    _, data = imap.search(None, "UNSEEN")
-    ids = data[0].split()
-
-    emails = []
-    for uid in ids:
-        _, raw = imap.fetch(uid, "(RFC822)")
-        if not raw or raw[0] is None:
-            continue
-        msg = email.message_from_bytes(raw[0][1])
-        body = _extract_body(msg)
-
-        date_str = msg.get("Date", "")
+    for attempt in range(1, retries + 1):
+        imap: imaplib.IMAP4_SSL | None = None
         try:
-            date = parsedate_to_datetime(date_str).isoformat()
-        except Exception:
-            date = date_str
+            imap = _connect(host, port, address, password)
+            imap.select(folder)
 
-        emails.append({
-            "id":          uid.decode(),
-            "date":        date,
-            "from":        _decode_header(msg.get("From", "")),
-            "to":          _decode_header(msg.get("To", "")),
-            "subject":     _decode_header(msg.get("Subject", "")),
-            "content-plain":  body["plain"],
-            "content-HTML":   body["html"],
-            "attachments": _get_attachments(msg),
-        })
+            _, data = imap.search(None, "UNSEEN")
+            ids = data[0].split()
 
-    imap.close()
-    imap.logout()
-    return emails
+            emails = []
+            for uid in ids:
+                _, raw = imap.fetch(uid, "(RFC822)")
+                if not raw or raw[0] is None:
+                    continue
+                msg = email.message_from_bytes(raw[0][1])
+                body = _extract_body(msg)
+
+                date_str = msg.get("Date", "")
+                try:
+                    date = parsedate_to_datetime(date_str).isoformat()
+                except Exception:
+                    date = date_str
+
+                emails.append({
+                    "id":            uid.decode(),
+                    "date":          date,
+                    "from":          _decode_header(msg.get("From", "")),
+                    "to":            _decode_header(msg.get("To", "")),
+                    "subject":       _decode_header(msg.get("Subject", "")),
+                    "content-plain": body["plain"],
+                    "content-HTML":  body["html"],
+                    "attachments":   _get_attachments(msg),
+                })
+
+            return emails  # success — exit immediately
+
+        except (imaplib.IMAP4.abort, imaplib.IMAP4.error, OSError) as exc:
+            last_exc = exc
+            logger.warning("IMAP attempt %d/%d failed: %s", attempt, retries, exc)
+            if imap is not None:
+                _safe_logout(imap)
+            if attempt < retries:
+                time.sleep(retry_delay)
+
+    raise ConnectionError(
+        f"IMAP connection failed after {retries} attempts: {last_exc}"
+    ) from last_exc
 
 loadPrint()#c
 
@@ -1829,10 +1880,12 @@ def chat():
 
     while True:
 
+        email = getEmail( EMAIL, EMAIL_PASSWORD )
+
         conversation.append(
             {
                 "role": "user",
-                "content": "Vous avez reçu des emails :\n\n" + json.dumps( getEmail( EMAIL, EMAIL_PASSWORD ), indent=4 ),
+                "content": "Vous avez reçu des emails :\n\n" + json.dumps( email, indent=4 ),
                 "name": "getEmail tool"
             }
         )

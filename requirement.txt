@@ -12,6 +12,7 @@ shazamio
 keyboard
 pywin32
 spotipy
+logging
 pyaudio
 Pillow
 pygame
