@@ -92,15 +92,9 @@ OUTILS DISPONIBLES :
     -> Relis le code sur l'image
 
 - openApp
-  - ouvrir une application dans la liste des applications autorisés
+  - ouvrir une application
   - params:
     -> app (string): application à ouvrir
-  - applications autorisés:
-    -> spotify
-    -> teams
-    -> discord
-    -> vs code
-    -> minecraft
 
 - openLink
   - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien

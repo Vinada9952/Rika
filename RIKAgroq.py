@@ -29,6 +29,7 @@ import base64
 import pygame
 import random
 import email
+import glob
 import json
 import math
 import time
@@ -162,6 +163,128 @@ class Sound:
             pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
 
+loadPrint()#c
+
+def _get_apps_windows() -> list[dict]:
+    search_dirs = [
+        os.environ.get("ProgramFiles",      r"C:\Program Files"),
+        os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+        os.path.expanduser(r"~\AppData\Local"),
+        os.path.expanduser(r"~\AppData\Roaming"),
+    ]
+
+    seen = set()
+    apps = []
+
+    for d in search_dirs:
+        if not d or not os.path.isdir(d):
+            continue
+        for exe in glob.glob(os.path.join(d, "**", "*.exe"), recursive=True):
+            name = os.path.splitext(os.path.basename(exe))[0]
+            if name in seen:
+                continue
+            seen.add(name)
+            apps.append({"name": name, "path": exe})
+
+    return sorted(apps, key=lambda x: x["name"].lower())
+
+loadPrint()#c
+
+# ── macOS ─────────────────────────────────────────────────────────────────────
+
+def _get_apps_macos() -> list[dict]:
+    apps = []
+    search_dirs = ["/Applications", os.path.expanduser("~/Applications")]
+
+    for directory in search_dirs:
+        if not os.path.isdir(directory):
+            continue
+        for entry in os.scandir(directory):
+            if not entry.name.endswith(".app"):
+                continue
+
+            name = entry.name.removesuffix(".app")
+            macos_dir = os.path.join(entry.path, "Contents", "MacOS")
+            exe_path = entry.path  # fallback = le bundle .app
+
+            if os.path.isdir(macos_dir):
+                for exe in os.scandir(macos_dir):
+                    if os.access(exe.path, os.X_OK):
+                        exe_path = exe.path
+                        break
+
+            apps.append({"name": name, "path": exe_path})
+
+    return sorted(apps, key=lambda x: x["name"].lower())
+
+loadPrint()#c
+
+# ── Linux ─────────────────────────────────────────────────────────────────────
+
+def _get_apps_linux() -> list[dict]:
+    import configparser
+
+    apps = []
+    seen = set()
+    desktop_dirs = [
+        "/usr/share/applications",
+        "/usr/local/share/applications",
+        os.path.expanduser("~/.local/share/applications"),
+        "/var/lib/snapd/desktop/applications",
+        "/var/lib/flatpak/exports/share/applications",
+        os.path.expanduser("~/.local/share/flatpak/exports/share/applications"),
+    ]
+
+    for directory in desktop_dirs:
+        if not os.path.isdir(directory):
+            continue
+        for entry in os.scandir(directory):
+            if not entry.name.endswith(".desktop"):
+                continue
+
+            config = configparser.ConfigParser(strict=False)
+            try:
+                config.read(entry.path, encoding="utf-8")
+            except Exception:
+                continue
+
+            if "Desktop Entry" not in config:
+                continue
+
+            section = config["Desktop Entry"]
+            if section.get("NoDisplay", "false").lower() == "true":
+                continue
+            if section.get("Type", "") != "Application":
+                continue
+
+            name = section.get("Name", "").strip()
+            exec_cmd = section.get("Exec", "").strip()
+
+            if not name or name in seen:
+                continue
+
+            exe_path = exec_cmd.split("%")[0].strip().split()[0] if exec_cmd else ""
+            seen.add(name)
+            apps.append({"name": name, "path": exe_path})
+
+    return sorted(apps, key=lambda x: x["name"].lower())
+
+def getAllApps() -> list[dict]:
+    """
+    Retourne la liste de toutes les applications installées sur l'ordinateur.
+    Compatible Windows, macOS et Linux.
+
+    Returns:
+        list[dict]: Liste de dicts avec les clés 'name' et 'path'.
+    """
+    platform = sys.platform
+
+    if platform == "win32":
+        return _get_apps_windows()
+    elif platform == "darwin":
+        return _get_apps_macos()
+    else:
+        return _get_apps_linux()
 
 loadPrint()#c
 
@@ -277,6 +400,10 @@ PROTOCOLS = [ { "name": settings["reset-protocol-name"], "command": "/delete-mem
 protocol_list = ''
 for protocol in PROTOCOLS:
     protocol_list += f"\n    -> {protocol["name"]}"
+
+loadPrint()#c
+
+APPLICATIONS = getAllApps()
 
 loadPrint()#c
 
@@ -399,15 +526,9 @@ OUTILS DISPONIBLES :
     -> Relis le code sur l'image
 
 - openApp
-  - ouvrir une application dans la liste des applications autorisés
+  - ouvrir une application
   - params:
     -> app (string): application à ouvrir
-  - applications autorisés:
-    -> spotify
-    -> teams
-    -> discord
-    -> vs code
-    -> minecraft
 
 - openLink
   - UTILISATION OBLIGATOIRE si l'utilisateur demande un lien
@@ -909,19 +1030,79 @@ loadPrint()#c
 # =====================
 # TOOL: openApp
 # =====================
-def openApp( app: str ):
-    app = app.lower()
-    if app == "spotify":
-        os.system( "spotify.exe" )
-    if app == "teams":
-        os.system( "ms-teams.exe" )
-    if app == "discord":
-        os.system( f"{os.path.expanduser("~")}/AppData/Local/Discord/Update.exe --processStart Discord.exe" )
-    if app == "vs code":
-        os.system( "code.exe" )
-    if app == "minecraft":
-        os.system( f"{os.path.expanduser("~")}/Desktop/Minecraft.lnk" )
-    return f"ouverture de {app} réussie",  False
+def launchApp( app ):
+    subprocess.Popen( [app["path"]], creationflags=subprocess.DETACHED_PROCESS, shell=True)
+    return "Application lancé avec succès"
+
+loadPrint()#c
+
+def searchApp( apps: list, name: str ):
+    found = []
+    for app in apps:
+        for word in name.lower().split( ' ' ):
+            if word in app["name"].lower():
+                found.append( app )
+                break
+    return found
+
+loadPrint()#c
+
+def appPath( apps, app: str ):
+    print( f"{apps=}" )
+    while True:
+        path = askModel(
+            model="llama-3.1-8b-instant",
+            message=[
+                {
+                    "role": "system",
+                    "content": f"""
+Voici une liste d'applications :
+{json.dumps(apps, indent=4, ensure_ascii=False)}
+L'utilisateur va te donner un nom d'application, et tu dois UNIQUEMENT ressortir le nom de l'application.
+Tu dois ressortir UNIQUEMENT le nom, rien d'autre.
+Le nom de l'application doit correspondre à un des noms dans la liste avec la clé "name".
+Les applications n'ont pas tout le temps le même nom, tu dois donc choisir l'application qui correspond le mieux à la demande de l'utilisateur, en te basant sur la liste d'applications que je t'ai donnée.
+Ne ressort RIEN D'AUTRE que le nom, absolument rien d'autre, pas ton raisonnement, par tes doutes, uniquement un nom valide pour l'exécution de l'application demandée par l'utilisateur.
+Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésites
+"""
+                },
+                {
+                    "role": "user",
+                    "content": app
+                }
+            ],
+            thinking="high",
+            max_retries=10,
+            json_mode=False
+        )
+        print( f"Found path: {path}" )
+        found = False
+        for i in range( len( apps ) ):
+            if apps[i]["name"] == path:
+                found = True
+                return launchApp( apps[i] )
+        if found:
+            break
+
+loadPrint()#c
+
+def openApp( app ):
+    print( f"searching for {app}..." )
+    search = searchApp( APPLICATIONS, app )
+    return appPath( search, app ), False
+# def openApp( app: str ):
+#     app = app.lower()
+#     if app == "spotify":
+#         os.system( "spotify.exe" )
+#     if app == "teams":
+#         os.system( "ms-teams.exe" )
+#     if app == "discord":
+#         os.system( f"{os.path.expanduser("~")}/AppData/Local/Discord/Update.exe --processStart Discord.exe" )
+#     if app == "vs code":
+#         os.system( "code.exe" )
+#     if app == "minecraft":
+#         os.system( f"{os.path.expanduser("~")}/Desktop/Minecraft.lnk" )
+#     return f"ouverture de {app} réussie",  False
     # return f"Link opened successfully ( {link} )" if webbrowser.open( link ) else "No link opened"
 
 # def runCommand():
