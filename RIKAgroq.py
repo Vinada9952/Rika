@@ -403,7 +403,12 @@ for protocol in PROTOCOLS:
 
 loadPrint()#c
 
-APPLICATIONS = getAllApps()
+def getAllAppsThread():
+    global APPLICATIONS
+    APPLICATIONS = getAllApps()
+
+get_all_apps_thread = threading.Thread( target=getAllAppsThread )
+get_all_apps_thread.start()
 
 loadPrint()#c
 
@@ -1085,6 +1090,8 @@ loadPrint()#c
 
 def openApp( app ):
     print( f"searching for {app}..." )
+    get_all_apps_thread.join()
+    del get_all_apps_thread
     search = searchApp( APPLICATIONS, app )
     return appPath( search, app ), False
 # def openApp( app: str ):
