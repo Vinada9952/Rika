@@ -6,7 +6,7 @@
 - Obtenir la localisation
 - Capture automatique de l'écran et analyse
 - Capture automatique de la webcam et analyse
-- Ouvrir une application dans la liste donnée
+- Ouvrir une application installé sur l'ordinateur
 - Envoyer un courriel
 - Éxécuter des actions custom via des protocols
 - Sauvegarder un fichier et l'ouvrir
