@@ -2,7 +2,6 @@ gui crashes when all windows are minimized
 make it easier to change apps that Rika can open (maybe put all the computer's apps)
 upload files
 spotify API
-recognize music
 mode incognito
 add output diagram in Json
 connect to school portal
@@ -19,3 +18,4 @@ either make the shortcur every prompt in write mode or make the shortcut work in
 fix notUnderstand
 fix analyseImage when just ask to analyse image
 add sonor effects when assistant activates and deactivate
+make auto no way home when all tokens used

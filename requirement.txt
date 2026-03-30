@@ -1,10 +1,14 @@
 SpeechRecognition
 opencv-python
+pyaudiowpatch
+sounddevice
 pyautogui
+soundfile
 pygrabber
 edge-tts
 requests
 geocoder
+shazamio
 keyboard
 pywin32
 spotipy
@@ -15,6 +19,7 @@ pynput
 psutil
 pydub
 geopy
+numpy
 Flask
 plyer
 groq

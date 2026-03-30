@@ -5,13 +5,19 @@ from email.mime.text import MIMEText
 from json import JSONDecodeError
 from groq import APIStatusError
 import speech_recognition as sr
+from pydub import AudioSegment
 from plyer import notification
+from shazamio import Shazam
+import soundfile as sf
 from PIL import Image
 from groq import Groq
+import pyaudiowpatch
 from gui import GUI
+import numpy as np
 import webbrowser
 import subprocess
 import threading
+import tempfile
 import requests
 import edge_tts
 import keyboard
@@ -223,6 +229,15 @@ file_extensions = {
     "batch": "bat",
     "css": "css"
 }
+
+loadPrint()#c
+
+SAMPLE_RATE            = 44100
+DURATION               = 8
+TIMEOUT                = 12
+SPEAKER_SILENCE_THRESH = 0.005
+MIC_SILENCE_THRESH     = 0.0005  # beaucoup plus sensible que le speaker
+MIC_GAIN               = 5.0     # multiplie le volume du micro (augmente si encore trop faible)
 
 loadPrint()#c
 
@@ -444,6 +459,9 @@ OUTILS DISPONIBLES :
     -> query (string): Ce que tu veux savoir
   - Tu peux l'utiliser à n'importe quel moment, sans avoir besoin d'autorisation
 
+- recognizeMusic
+  - Reconaitre la musique qui joue
+
 RÈGLES IMPORTANTES :
 - Ne JAMAIS écrire autre chose que du JSON.
 - Répond uniquement et uniquement en français.
@@ -455,14 +473,14 @@ RÈGLES IMPORTANTES :
 - Si tu hésites entre analyseNewImage et analyseOldImage, utilise toujours analyseNewImage.
 - Quand tu utilise un outil, donne toujours tout les paramètres et arguments nécéssaires.
 - À CHAQUE FOIS que l'utilisateur demande d'envoyer un couriel, tu dois OBLIGATOIREMENT utiliser l'outil sendEmail.
-- En envoyant des email, ne te fait pas passer pour l'utilisateur, mais pour son assistant. 
+- En envoyant des email, ne te fait pas passer pour l'utilisateur, mais pour son assistant.
 - Dans les email, ne parle pas de l'utilisateur à la 1re personne, mais à la 3e personne.
 - Quand tu répond que tu as envoyé un email, FAIT-LE avec l'outil sendEmail
 - Dans les email, met le courriel dans la langue parlé du destinataire
 - Ne dis JAMAIS les paramètres utilisés pour les outils.
 - Ne fait JAMAIS de résumé de conversation, sauf quand je te le demande.
 - Si une action est requise (ex: envoyer un email, ouvrir une app, ouvrir un lien, analyser une image), la réponse est invalide si aucun outil n'est appelé.
-- Dès que tu reçois un email, dit le à l'utilisateur et un résumé de son contenu, et fait le pour chaque email/
+- Dès que tu reçois un email, dit le à l'utilisateur et un résumé de son contenu, et fait le pour chaque email. Si l'utilisateur n'a pas reçu d'email, n'en parle pas
 - Il est INTERDIT de simuler une action dans le message sans appeler l'outil correspondant.
 - Si une action est nécéssaire, ne te contente pas juste de répondre, FAIT l'action
 - Ne met pas de mise en page ou des choses dans le genre pour faire des tableaux, titres en gras, ressort un texte simple destiné à être affiché dans le terminal
@@ -611,6 +629,247 @@ def webSearch( query: str ):
         False
     )
     return result, True
+
+loadPrint()#c
+
+def rms(audio: np.ndarray) -> float:
+    return float(np.sqrt(np.mean(audio ** 2)))
+
+loadPrint()#c
+
+def get_default_wasapi_loopback_device(p: pyaudiowpatch.PyAudio) -> dict | None:
+    try:
+        return p.get_default_wasapi_loopback()
+    except Exception as e:
+        pass
+
+    for i in range(p.get_device_count()):
+        dev = p.get_device_info_by_index(i)
+        if dev.get("isLoopbackDevice", False):
+            return dev
+
+    return None
+
+loadPrint()#c
+
+def _record_worker(device_index: int, sample_rate: int, channels: int,
+                   duration: int, result_holder: list, error_holder: list) -> None:
+    """Enregistrement dans un thread séparé avec sa propre instance PyAudio."""
+    p = pyaudiowpatch.PyAudio()
+    try:
+        frames = []
+        stream = p.open(
+            format=pyaudiowpatch.paInt16,
+            channels=channels,
+            rate=sample_rate,
+            input=True,
+            input_device_index=device_index,
+            frames_per_buffer=1024,
+        )
+
+        num_chunks = int(sample_rate / 1024 * duration)
+        for _ in range(num_chunks):
+            data = stream.read(1024, exception_on_overflow=False)
+            frames.append(data)
+
+        stream.stop_stream()
+        stream.close()
+
+        raw   = b"".join(frames)
+        audio = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+
+        if channels == 2:
+            audio = audio.reshape(-1, 2).mean(axis=1)
+
+        if sample_rate != SAMPLE_RATE:
+            try:
+                from scipy.signal import resample_poly
+                from math import gcd
+                g = gcd(SAMPLE_RATE, sample_rate)
+                audio = resample_poly(audio, SAMPLE_RATE // g, sample_rate // g)
+            except ImportError:
+                new_len = int(len(audio) * SAMPLE_RATE / sample_rate)
+                audio = np.interp(
+                    np.linspace(0, len(audio) - 1, new_len),
+                    np.arange(len(audio)),
+                    audio
+                )
+
+        result_holder.append(audio)
+
+    except Exception as e:
+        error_holder.append(str(e))
+    finally:
+        p.terminate()
+
+loadPrint()#c
+
+def record_with_timeout(device_index: int, sample_rate: int, channels: int,
+                        duration: int, label: str) -> np.ndarray | None:
+    """Lance l'enregistrement dans un thread avec un timeout strict."""
+    result_holder = []
+    error_holder  = []
+
+    t = threading.Thread(
+        target=_record_worker,
+        args=(device_index, sample_rate, channels, duration, result_holder, error_holder),
+        daemon=True,
+    )
+    t.start()
+    t.join(timeout=TIMEOUT)
+
+    if t.is_alive():
+        return None
+
+    if error_holder:
+        return None
+
+    return result_holder[0] if result_holder else None
+
+loadPrint()#c
+
+def record_loopback(device_info: dict, duration: int = DURATION) -> np.ndarray | None:
+    sample_rate = int(device_info["defaultSampleRate"])
+    channels    = min(int(device_info["maxInputChannels"]), 2)
+    dev_index   = int(device_info["index"])
+
+    return record_with_timeout(dev_index, sample_rate, channels, duration, "speaker")
+
+loadPrint()#c
+
+def record_default_mic(duration: int = DURATION) -> np.ndarray | None:
+    p = pyaudiowpatch.PyAudio()
+    try:
+        dev_info    = p.get_default_input_device_info()
+        sample_rate = int(dev_info["defaultSampleRate"])
+        dev_index   = int(dev_info["index"])
+    except Exception as e:
+        return None
+    finally:
+        p.terminate()
+
+    audio = record_with_timeout(dev_index, sample_rate, 1, duration, "micro")
+    if audio is not None:
+        audio = np.clip(audio * MIC_GAIN, -1.0, 1.0)
+    return audio
+
+loadPrint()#c
+
+async def identify(audio: np.ndarray, label: str = "") -> dict | None:
+    shazam = Shazam()
+
+    # Sauvegarde debug WAV (pour vérifier ce qui est envoyé à Shazam)
+    debug_wav = f"debug_{label}.wav" if label else "debug.wav"
+    sf.write(debug_wav, audio, SAMPLE_RATE)
+
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        sf.write(tmp_path, audio, SAMPLE_RATE)
+        result = await shazam.recognize(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+
+    if result and result.get("matches"):
+        return result
+    return None
+
+loadPrint()#c
+
+def extract_track_info(result: dict) -> dict:
+    track = result.get("track", {})
+
+    name   = track.get("title", "Inconnu")
+    artist = track.get("subtitle", "Inconnu")
+
+    # Album
+    sections = track.get("sections", [])
+    album = "Inconnu"
+    for section in sections:
+        for meta in section.get("metadata", []):
+            if meta.get("title", "").lower() == "album":
+                album = meta.get("text", "Inconnu")
+
+    # Genre
+    genres_obj = track.get("genres", {})
+    genre = genres_obj.get("primary", "Inconnu")
+
+    # Année de publication
+    publication = "Inconnu"
+    for section in sections:
+        for meta in section.get("metadata", []):
+            if meta.get("title", "").lower() in ("released", "year", "année", "date de sortie"):
+                publication = meta.get("text", "Inconnu")
+
+    # Spotify URI — dans hub.providers
+    spotify = "Inconnu"
+    for provider in track.get("hub", {}).get("providers", []):
+        if provider.get("type") == "SPOTIFY":
+            for action in provider.get("actions", []):
+                uri = action.get("uri", "")
+                if uri.startswith("spotify:"):
+                    spotify = uri
+                    break
+
+    return {
+        "name":        name,
+        "artist":      artist,
+        "album":       album,
+        "genre":       genre,
+        "publication": publication,
+        "spotify":     spotify,
+    }
+
+loadPrint()#c
+
+async def _recognize_music_async() -> dict:
+    speaker_audio = None
+    mic_audio     = None
+    output        = {"note": "aucune musique détectée"}
+
+    # ── Étape 1 : Speaker par défaut Windows (loopback WASAPI) ────────────────
+    p = pyaudiowpatch.PyAudio()
+    loopback_device = get_default_wasapi_loopback_device(p)
+    p.terminate()
+
+    if loopback_device:
+
+        speaker_audio = record_loopback(loopback_device)
+
+        if speaker_audio is not None:
+            level = rms(speaker_audio)
+
+            if level > SPEAKER_SILENCE_THRESH:
+                result = await identify(speaker_audio, "speaker")
+                if result:
+                    info = extract_track_info(result)
+                    output = {**info, "note": "musique détectée par speaker"}
+                    # Reconnu : sauvegarde et fin, micro ignoré
+                    mic_audio = record_default_mic()
+                    return output
+
+    # ── Étape 2 : Microphone par défaut ───────────────────────────────────────
+    mic_audio = record_default_mic()
+
+    if mic_audio is not None:
+        level = rms(mic_audio)
+
+        if level > MIC_SILENCE_THRESH:
+            result = await identify(mic_audio, "micro")
+            if result:
+                info = extract_track_info(result)
+                output = {**info, "note": "musique détectée par micro"}
+            else:
+                output = {"note": "musique non reconnue"}
+
+
+    return output
+
+loadPrint()#c
+
+def recognizeMusic() -> dict:
+    """Point d'entrée public. Retourne un dict avec les infos de la musique détectée."""
+    return str( asyncio.run(_recognize_music_async()) ), True
 
 loadPrint()#c
 
@@ -1396,7 +1655,7 @@ def chat():
             response = None
             # while True:
             print( "ask model for chatting (1)" )
-            response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES )
+            response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, True )
 
             content = json.loads( response )
             conversation.append( 
@@ -1430,6 +1689,8 @@ def chat():
                         result, do_response = openApp( tool["params"]["app"] ) or do_response
                     elif tool["name"] == "doProtocol":
                         result, do_response = doProtocol( tool["params"]["protocol"] ) or do_response
+                    elif tool["name"] == "recognizeMusic":
+                        result, do_response = recognizeMusic() or do_response
                     elif tool["name"] == "saveFile":
                         result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] )
                     elif tool["name"] == "webSearch":
@@ -1464,7 +1725,7 @@ def chat():
                     break
                 if do_response:
                     print( "ask model for chatting (2)" )
-                    response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES )
+                    response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, True )
                     
                     conversation.append( 
                         {
