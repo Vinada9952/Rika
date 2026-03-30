@@ -11,6 +11,7 @@ User can choose language of assistant
 script to update settings to newer version with settings template
 notifications
 user's note for ai
+mac adaptation (and maybe linux)
 make assistant resum video screenshot or webcam
 assistant can send documents in mails
 fix webcam index
