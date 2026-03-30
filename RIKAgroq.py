@@ -5,7 +5,6 @@ from email.mime.text import MIMEText
 from json import JSONDecodeError
 from groq import APIStatusError
 import speech_recognition as sr
-from pydub import AudioSegment
 from plyer import notification
 from shazamio import Shazam
 import soundfile as sf
@@ -881,10 +880,6 @@ loadPrint()#c
 async def identify(audio: np.ndarray, label: str = "") -> dict | None:
     shazam = Shazam()
 
-    # Sauvegarde debug WAV (pour vérifier ce qui est envoyé à Shazam)
-    debug_wav = f"debug_{label}.wav" if label else "debug.wav"
-    sf.write(debug_wav, audio, SAMPLE_RATE)
-
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp_path = tmp.name
     try:
@@ -1117,8 +1112,8 @@ def doProtocol( name ):
             if PROTOCOLS[i]["command"] == "/delete-memory":
                 conversation = [ conversation[0] ]
                 sleepSystem( False )
-                Sound.generateVoice( "Vous aurez besoin de relançer mon programme", VOICE )
                 Sound.waitForVoiceToFinish()
+                Sound.generateVoice( "Vous aurez besoin de relançer mon programme", VOICE )
                 Sound.playVoice()
                 Sound.waitForVoiceToFinish()
                 sys.exit( 0 )
@@ -1139,8 +1134,8 @@ def autoEraseConversation():
     with open( f"{os.path.expanduser("~")}/Downloads/{file_name}", 'w', encoding="utf-8" ) as f:
         json.dump( conversation, f, indent=4, ensure_ascii=False )
     if AUDIO:
-        Sound.generateVoice( text, VOICE )
         Sound.waitForVoiceToFinish()
+        Sound.generateVoice( text, VOICE )
         Sound.playVoice()
     doProtocol( settings["reset-protocol-name"] )
 
@@ -1787,8 +1782,8 @@ def treatAudioResponse( response ):
     # say_response = say_response.split( '`' )
     say_response = say_response.replace( '`', '' )
 
-    Sound.generateVoice( say_response, VOICE )
     Sound.waitForVoiceToFinish()
+    Sound.generateVoice( say_response, VOICE )
     Sound.playVoice()
 
 loadPrint()#c
