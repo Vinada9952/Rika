@@ -129,10 +129,12 @@ base_settings = {
     "gui":{
         "color": [ 3, 232, 252 ],
         "font": "./assets/gui/Nasalization Rg.otf"
-    }
+    },
+    "reset-protocol-name": "Mémoire Saturée"
 }
 
 Json.write( base_settings, "./settings.json" )
 Json.write( [], "./assets/protocols/protocols.json" )
 Json.write( [], "./assets/protocols/protocols.json" )
 Json.write( [], "./assets/contacts.json" )
+Json.write( [], "./assets/conversation.json" )

@@ -21,3 +21,4 @@ fix analyseImage when just ask to analyse image
 add sonor effects when assistant activates and deactivate
 make auto no way home when all tokens used
 fix recognizeMusic when already recognize with speaker, no need to do it with mic
+make askModel function to detect if something is path, json or link

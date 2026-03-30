@@ -1,6 +1,7 @@
 import speech_recognition as sr
 import json
 import webbrowser
+import os
 
 class Json:
     def write( informations: dict, json_name: str ):
@@ -38,7 +39,10 @@ while True:
     print( "2. Email de l'agent" )
     print( "3. Clés API" )
     print( "4. Changer la voix" )
-    print( "5. Quitter" )
+    print( "5. Changer le raccourcis clavier" )
+    print( "6. Nom du protocol pour effacer la mémoire" )
+    print( "7. Changer les paramètres de l'interface graphique" )
+    print( "8. Quitter" )
     choice = input( "> " )
 
     if choice == '1':
@@ -68,8 +72,46 @@ while True:
         webbrowser.open( "https://tts.travisvn.com" )
         settings["audio"]["voice"] = input( "Nouvelle voix : " )
     elif choice == '5':
+        settings["call"]["hotkey"] = input( "Nouveau raccourcis clavier : " )
+    elif choice == '6':
+        settings["reset-protocol-name"] = input( "Nouveau nom : " )
+    elif choice == '7':
+        final_settings = {}
+        while True:
+            try:
+                r = int( input( "Quantité de rouge : " ) )
+                if 0 <= r <= 255:
+                    break
+            except ValueError:
+                print( "Valeur non accepté" )
+        
+        while True:
+            try:
+                g = int( input( "Quantité de vert : " ) )
+                if 0 <= g <= 255:
+                    break
+            except ValueError:
+                print( "Valeur non accepté" )
+        
+        while True:
+            try:
+                b = int( input( "Quantité de bleu : " ) )
+                if 0 <= b <= 255:
+                    break
+            except ValueError:
+                print( "Valeur non accepté" )
+        
+        while True:
+            font = input( "Police d'écriture : " )
+            if os.path.exists( font ):
+                break
+        settings["gui"] = {
+            "color": [r, g, b],
+            "font": font
+        }
+    elif choice == '8':
         break
     else:
-        print( "choix non accepté" )
+        print( "choix non valide" )
 
 Json.write( settings, "./settings.json" )

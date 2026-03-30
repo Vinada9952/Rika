@@ -920,7 +920,7 @@ def openApp( app: str ):
     if app == "vs code":
         os.system( "code.exe" )
     if app == "minecraft":
-        os.system( "C:/Users/Vinad/Desktop/Minecraft.lnk" )
+        os.system( f"{os.path.expanduser("~")}/Desktop/Minecraft.lnk" )
     return f"ouverture de {app} réussie",  False
     # return f"Link opened successfully ( {link} )" if webbrowser.open( link ) else "No link opened"
 
