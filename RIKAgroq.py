@@ -658,11 +658,11 @@ loadPrint()#c
 def checkAudioCall():
     global called
     while True:
+        print( f"check if called by audio : {called=}" )
         if not called:
             print( "..." )
             question = Sound.listen()
 
-            called = False
             if type( question ) == str:
                 calls = question.lower().split( ' ' )
                 for call_name in call_names:
