@@ -594,6 +594,8 @@ def askModel( model: str, message: dict, thinking: str, max_retries: int, json_m
             print( str( e ) )
             if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
                 can_think = False
+            if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
+                autoEraseConversation()
         except JSONDecodeError as e:
             print( str( e ) )
             print( ans )
@@ -935,12 +937,32 @@ def doProtocol( name ):
                 conversation = [ conversation[0] ]
                 sleepSystem( False )
                 Sound.generateVoice( "Vous aurez besoin de relançer mon programme", VOICE )
+                Sound.waitForVoiceToFinish()
                 Sound.playVoice()
                 Sound.waitForVoiceToFinish()
                 sys.exit( 0 )
+                print( "Veuillez relancer le programme..." )
+                Sound.generateVoice( "Veuillez relancer le programme...", VOICE )
+                Sound.playVoice()
             subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
             break
     return f"protocol {name} execution success", False
+
+loadPrint()#c
+
+def autoEraseConversation():
+    file_name = "conversation" + str(time.time()) + ".json"
+    text = f"Votre historique est trop gros, nous allons l'effacer. Si vous voulez conserver certains éléments, le tout sera enregistré dans {file_name} dans votre dossier Téléchargements"
+    print( text )
+    GUI.setTextToDisplay( text )
+    with open( f"{os.path.expanduser("~")}/Downloads/{file_name}", 'w', encoding="utf-8" ) as f:
+        json.dump( conversation, f, indent=4, ensure_ascii=False )
+    if AUDIO:
+        Sound.generateVoice( text, VOICE )
+        Sound.waitForVoiceToFinish()
+        Sound.playVoice()
+    doProtocol( settings["reset-protocol-name"] )
+
 
 loadPrint()#c
 
@@ -1584,8 +1606,8 @@ def treatAudioResponse( response ):
     # say_response = say_response.split( '`' )
     say_response = say_response.replace( '`', '' )
 
-    Sound.waitForVoiceToFinish()
     Sound.generateVoice( say_response, VOICE )
+    Sound.waitForVoiceToFinish()
     Sound.playVoice()
 
 loadPrint()#c
@@ -1644,7 +1666,7 @@ def chat():
 
             # print( f"{type( conversation )=}" )
             # print( f"{conversation=}" )
-            conversation.append( 
+            conversation.append(
                 {
                     "role": "user",
                     "content": user_input,
