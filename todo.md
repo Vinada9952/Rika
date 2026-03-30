@@ -1,5 +1,4 @@
 gui crashes when all windows are minimized
-make it easier to change apps that Rika can open (maybe put all the computer's apps)
 upload files
 spotify API
 mode incognito

@@ -21,6 +21,7 @@ pydub
 geopy
 numpy
 Flask
+scipy
 plyer
 groq
 mss

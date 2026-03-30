@@ -1044,7 +1044,7 @@ loadPrint()#c
 
 def appPath( apps, app: str ):
     print( f"{apps=}" )
-    while True:
+    for i in range( MAX_RETRIES ):
         path = askModel(
             model="llama-3.1-8b-instant",
             message=[
@@ -1078,6 +1078,7 @@ Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésite
                 return launchApp( apps[i] )
         if found:
             break
+    return f"Impossible de trouver l'application {app}", True
 
 loadPrint()#c
 
