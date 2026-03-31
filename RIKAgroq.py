@@ -774,9 +774,9 @@ class Model:
                         model=model,
                         messages=message
                     ).choices[0].message.content
-                log( "Verifying if response is correct", f"Response: {ans}, Verification: {verification.name()}", 'info' )
+                log( "Verifying if response is correct", f"Response: {ans}, Verification: {verification.__name__}", 'info' )
                 if not verification( ans ):
-                    raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.name()}, response is {ans}" )
+                    raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__()}, response is {ans}" )
                 return ans
             except APIStatusError as e:
                 print( str( e ) )
@@ -790,8 +790,6 @@ class Model:
     
     class Verification:
         def isJson( object ):
-            def name():
-                return "isJson"
             try:
                 json.loads( object )
                 return True
@@ -799,21 +797,15 @@ class Model:
                 return False
         
         def isPath( path ):
-            def name():
-                return "isPath"
             return os.path.exists( path )
 
         def isLink( link ):
-            def name():
-                return "isLink"
             if link.find( "http" ) == 0:
                 return True
             if link.find( "www" ) != -1:
                 return True
         
         def rawResponse( a ):
-            def name():
-                return "rawResponse"
             return True
 
 
