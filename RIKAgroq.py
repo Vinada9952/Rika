@@ -39,8 +39,6 @@ import mss
 import os
 import re
 
-from web.server import VOICE
-
 GUI.startGUI()
 
 GUI.setInit( True )
