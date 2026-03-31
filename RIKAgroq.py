@@ -39,6 +39,8 @@ import mss
 import os
 import re
 
+from web.server import VOICE
+
 GUI.startGUI()
 
 GUI.setInit( True )
@@ -189,6 +191,20 @@ class Sound:
         while pygame.mixer.music.get_busy():
             pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
+
+loadPrint()#c
+
+def april_fools_rickroll():
+    today = datetime.datetime.now()
+    
+    if today.day == 1 and today.month == 4:
+        try:
+            subprocess.Popen( ["curl", "ASCII.live/rick"], creationflags=subprocess.DETACHED_PROCESS, shell=True)
+            if AUDIO:
+                Sound.generateVoice( "Activation du protocol April Fools", VOICE )
+                Sound.playVoice()
+        except Exception as e:
+            print("Erreur lors de l'exécution de curl :", e)
 
 loadPrint()#c
 
@@ -1965,6 +1981,8 @@ loadPrint()#c
 # =====================
 def chat():
     global conversation, treating_response
+    
+    april_fools_rickroll()
     # print( "called" )
 
     # conversation.append(
