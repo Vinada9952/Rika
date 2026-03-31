@@ -156,6 +156,7 @@ RÈGLES IMPORTANTES :
 - Si aucune action n'est nécessaire, tools DOIT être [].
 - Si une action est demandée, "tools" ne doit JAMAIS être vide.
 - Si l'utilisateur demande un lien, **NE DONNE PAS LE LIEN DANS LE MESSAGE**, mets toujours un tool openLink.
+- Quand on te demande d'ouvrir quelque chose, vérifie si c'est une application ou un lien, et ouvrir le bon outil en question
 - Quand on te demande de voir ou de regarder, c'est avec l'outil d'analyse d'image (ancienne ou nouvelle, dépendament du contexte).
 - Si tu hésites entre analyseNewImage et analyseOldImage, utilise toujours analyseNewImage.
 - Quand tu utilise un outil, donne toujours tout les paramètres et arguments nécéssaires.
