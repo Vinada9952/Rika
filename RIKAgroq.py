@@ -99,6 +99,10 @@ loadPrint()#c
 class ExitAgent( Exception ):
     pass
 
+loadPrint()#c
+
+class NotValidResponse( Exception ):
+    pass
 
 loadPrint()#c
 
@@ -111,6 +115,29 @@ class Json:
         with open( json_name, 'r', encoding="utf-8" ) as infile:
             informations = json.load( infile )
         return informations
+
+loadPrint()#c
+
+class ThreadWithReturnValue( threading.Thread ):
+    
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, Verbose=None):
+        threading.Thread.__init__(self, group, target, name, args, kwargs)
+        self._return = None
+
+    def run(self):
+        if self._target is not None:
+            self._return = self._target(*self._args,
+                                                **self._kwargs)
+    def join(self, *args):
+        threading.Thread.join(self, *args)
+        return self._return
+
+loadPrint()#c
+
+class Substitute:
+    def join(self, *args, **kwargs):
+        return
 
 loadPrint()#c
 
@@ -158,7 +185,7 @@ class Sound:
     def playVoice():
         return asyncio.run( Sound._playVoice() )
     
-    def waitForVoiceToFinish():
+    def awaitForVoiceToFinish():
         while pygame.mixer.music.get_busy():
             pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
@@ -166,12 +193,7 @@ class Sound:
 loadPrint()#c
 
 def _get_apps_windows() -> list[dict]:
-    search_dirs = [
-        os.environ.get("ProgramFiles",      r"C:\Program Files"),
-        os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
-        os.path.expanduser(r"~\AppData\Local"),
-        os.path.expanduser(r"~\AppData\Roaming"),
-    ]
+    search_dirs = SEARCH_DIRS
 
     seen = set()
     apps = []
@@ -383,6 +405,23 @@ IMAP_SERVERS = {
 
 loadPrint()#c
 
+SEARCH_DIRS = []
+for element in settings["apps-path"]["get-env"]:
+    SEARCH_DIRS.append(
+        os.environ.get(
+            element["key"],
+            element["default"]
+        )
+    )
+for element in settings["apps-path"]["expand-user"]:
+    SEARCH_DIRS.append(
+        os.path.expanduser( element )
+    )
+for element in settings["apps-path"]["normal"]:
+    SEARCH_DIRS.append( element )
+
+loadPrint()#c
+
 USERNAME = settings["email"]["user-email"]["name"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
 CONTACT_LIST = Json.read( settings["directories"]["contacts"] )
@@ -409,6 +448,10 @@ def getAllAppsThread():
 
 get_all_apps_thread = threading.Thread( target=getAllAppsThread )
 get_all_apps_thread.start()
+
+loadPrint()#c
+
+treating_response = Substitute()
 
 loadPrint()#c
 
@@ -664,7 +707,7 @@ loadPrint()#c
 def checkAudioCall():
     global called
     while True:
-        print( f"check if called by audio : {called=}" )
+        # print( f"check if called by audio : {called=}" )
         if not called:
             print( "..." )
             question = Sound.listen()
@@ -698,34 +741,53 @@ def sendNotification(title, message):
 
 loadPrint()#c
 
-def askModel( model: str, message: dict, thinking: str, max_retries: int, json_mode: bool ):
-    global clients
-    can_think = True
-    for i in range( max_retries ):
-        try:
-            if can_think:
-                ans = random.choice( clients ).chat.completions.create(
-                    model=model,
-                    messages=message,
-                    reasoning_effort=thinking
-                ).choices[0].message.content
-            else:
-                ans = random.choice( clients ).chat.completions.create(
-                    model=model,
-                    messages=message
-                ).choices[0].message.content
-            if json_mode:
-                response = json.loads( ans )
-            return ans
-        except APIStatusError as e:
-            print( str( e ) )
-            if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
-                can_think = False
-            if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
-                autoEraseConversation()
-        except JSONDecodeError as e:
-            print( str( e ) )
-            print( ans )
+class Model:
+    def askModel( model: str, message: dict, thinking: str, max_retries: int, verification ):
+        global clients
+        can_think = True
+        for i in range( max_retries ):
+            try:
+                if can_think:
+                    ans = random.choice( clients ).chat.completions.create(
+                        model=model,
+                        messages=message,
+                        reasoning_effort=thinking
+                    ).choices[0].message.content
+                else:
+                    ans = random.choice( clients ).chat.completions.create(
+                        model=model,
+                        messages=message
+                    ).choices[0].message.content
+                if not verification( ans ):
+                    raise NotValidResponse( "The ai's response doesn't match or respect the output specifications" )
+                return ans
+            except APIStatusError as e:
+                print( str( e ) )
+                if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
+                    can_think = False
+                if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
+                    autoEraseConversation()
+    
+    class Verification:
+        def isJson( object ):
+            try:
+                json.loads( object )
+                return True
+            except JSONDecodeError:
+                return False
+        
+        def isPath( path ):
+            return os.path.exists( path )
+
+        def isLink( link ):
+            if link.find( "http" ) == 0:
+                return True
+            if link.find( "www" ) != -1:
+                return True
+        
+        def rawResponse( a ):
+            return True
+
 
 loadPrint()#c
 
@@ -739,14 +801,14 @@ def image_to_base64( path ):
 loadPrint()#c
 
 def webSearch( query: str ):
-    result = askModel(
+    result = Model.askModel(
         WEB_MODEL,
         [
             {
                 "role": "system",
                 "content": """
-    Va chercher sur internet la réponse à la question de l'utilisateur.
-    """
+Va chercher sur internet la réponse à la question de l'utilisateur.
+"""
             },
             {
                 "role": "user",
@@ -755,7 +817,7 @@ def webSearch( query: str ):
         ],
         "high",
         MAX_RETRIES,
-        False
+        Model.Verification.rawResponse
     )
     return result, True
 
@@ -1002,7 +1064,7 @@ loadPrint()#c
 # TOOL: openLink
 # =====================
 def openLink( query: str ):
-    link = askModel(
+    link = Model.askModel(
         WEB_MODEL,
         [
             {
@@ -1020,7 +1082,7 @@ Le lien que tu vas donner doit corresprondre le plus possible à la demande de l
         ],
         "high",
         MAX_RETRIES,
-        False
+        Model.Verification.isLink
     )
     success = webbrowser.open( link )
     if success:
@@ -1052,9 +1114,9 @@ loadPrint()#c
 def appPath( apps, app: str ):
     print( f"{apps=}" )
     for i in range( MAX_RETRIES ):
-        path = askModel(
-            model="llama-3.1-8b-instant",
-            message=[
+        path = Model.askModel(
+            "llama-3.1-8b-instant",
+            [
                 {
                     "role": "system",
                     "content": f"""
@@ -1073,9 +1135,9 @@ Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésite
                     "content": app
                 }
             ],
-            thinking="high",
-            max_retries=10,
-            json_mode=False
+            "high",
+            MAX_RETRIES,
+            Model.Verification.rawResponse
         )
         print( f"Found path: {path}" )
         found = False
@@ -1086,12 +1148,6 @@ Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésite
         if found:
             break
     return f"Impossible de trouver l'application {app}", True
-
-loadPrint()#c
-
-class Substitute:
-    def join():
-        return
 
 loadPrint()#c
 
@@ -1479,9 +1535,10 @@ def getEmail(
             if attempt < retries:
                 time.sleep(retry_delay)
 
-    raise ConnectionError(
-        f"IMAP connection failed after {retries} attempts: {last_exc}"
-    ) from last_exc
+    return []
+    # raise ConnectionError(
+    #     f"IMAP connection failed after {retries} attempts: {last_exc}"
+    # ) from last_exc
 
 loadPrint()#c
 
@@ -1647,7 +1704,7 @@ def analyseImage( type, prompt, renew ):
         return "Type invalide", True
 
     print( "ask model for vision" )
-    response = askModel( VISION_MODEL, messages, "high", MAX_RETRIES, False )
+    response = Model.askModel( VISION_MODEL, messages, "high", MAX_RETRIES, False, Model.Verification.rawResponse )
 
     return f"voici l'image. Fait ce que {USERNAME} te demande de faire avec : " + response, True
 
@@ -1717,7 +1774,7 @@ def summarized( response: str ):
     if len( response.split( ' ' ) ) < 50:
         return response
     print( "ask model for summary" )
-    summary = askModel(
+    summary = Model.askModel(
         ASK_MODEL,
         [
             {
@@ -1743,7 +1800,8 @@ Garde le plus d'informations importantes possible en respectant la limite de mot
         ],
         "none",
         MAX_RETRIES,
-        True
+        True,
+        Model.Verification.isJson
     )
 
     try:
@@ -1856,7 +1914,7 @@ def treatAudioResponse( response ):
 loadPrint()#c
 
 def getUserInput():
-    print( "getting input" )
+    # print( "getting input" )
     user_input = ''
     if AUDIO:
         Sound.waitForVoiceToFinish()
@@ -1877,8 +1935,17 @@ def getUserInput():
             if user_input:
                 GUI.textInput( False )
                 break
-        print( f"User input: {user_input}" )
+        # print( f"User input: {user_input}" )
     return user_input
+
+loadPrint()#c
+
+def treatResponse( response ):
+    treated_text = treadTextResponse( response )
+    print( f"{ASSISTANT_NAME} >", treated_text )
+    GUI.setTextToDisplay( treated_text )
+    if AUDIO:
+        treatAudioResponse( response )
 
 loadPrint()#c
 
@@ -1886,8 +1953,8 @@ loadPrint()#c
 # MAIN LOOP
 # =====================
 def chat():
-    global conversation
-    print( "called" )
+    global conversation, treating_response
+    # print( "called" )
 
     # conversation.append(
     #     {
@@ -1898,20 +1965,24 @@ def chat():
 
     while True:
         
-        print( "getting emails" )
+        # print( "getting emails" )
 
-        email = getEmail( EMAIL, EMAIL_PASSWORD )
-
-        conversation.append(
-            {
-                "role": "user",
-                "content": "Vous avez reçu des emails :\n\n" + json.dumps( email, indent=4 ),
-                "name": "getEmail tool"
-            }
-        )
-        print( "asking user" )
+        email_thread = ThreadWithReturnValue( target=getEmail, args=( EMAIL, EMAIL_PASSWORD ) )
+        email_thread.start()
+        
+        # print( "asking user" )
         user_input = getUserInput()
         
+        emails = email_thread.join()
+        for email in emails:
+            conversation.append(
+                {
+                    "role": "user",
+                    "content": "Email reçu :\n\n" + json.dumps( email, indent=4 ),
+                    "name": "getEmail tool"
+                }
+            )
+
         if type( user_input ) == str:
 
             # print( f"{type( conversation )=}" )
@@ -1927,7 +1998,7 @@ def chat():
             response = None
             # while True:
             print( "ask model for chatting (1)" )
-            response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, True )
+            response = Model.askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, True, Model.Verification.isJson )
 
             content = json.loads( response )
             conversation.append( 
@@ -1936,12 +2007,16 @@ def chat():
                     "content": response
                 }
             )
-            treated_text = treadTextResponse( content["message"] )
+            treating_response.join()
+            treating_response = threading.Thread( target=treatResponse, args=( content["message"], ) )
+            treating_response.start()
+            # treated_text = treadTextResponse( content["message"] )
             
-            print( f"{ASSISTANT_NAME} >", treated_text )
-            GUI.setTextToDisplay( treated_text )
-            if AUDIO:
-                treatAudioResponse( content["message"] )
+            # print( f"{ASSISTANT_NAME} >", treated_text )
+            # GUI.setTextToDisplay( treated_text )
+            # if AUDIO:
+            #     treatAudioResponse( content["message"] )
+            
             not_understand = False
             do_response = False
             last_do_response = do_response
@@ -2000,7 +2075,7 @@ def chat():
                     break
                 if do_response:
                     print( "ask model for chatting (2)" )
-                    response = askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, True )
+                    response = Model.askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, True, Model.Verification.isJson )
                     
                     conversation.append( 
                         {
@@ -2009,11 +2084,14 @@ def chat():
                         }
                     )
                     content = json.loads( response )
-                    treated_text = treadTextResponse( content["message"] )
-                    GUI.setTextToDisplay( treated_text )
-                    print( f"{ASSISTANT_NAME} >", treated_text )
-                    if AUDIO:
-                        treatAudioResponse( content["message"] )
+                    treating_response.join()
+                    treating_response = threading.Thread( target=treatResponse, args=( content["message"], ) )
+                    treating_response.start()
+                    # treated_text = treadTextResponse( content["message"] )
+                    # GUI.setTextToDisplay( treated_text )
+                    # print( f"{ASSISTANT_NAME} >", treated_text )
+                    # if AUDIO:
+                    #     treatAudioResponse( content["message"] )
                 else:
                     break
 
@@ -2039,7 +2117,7 @@ try:
             # print( "..." )
             # question = Sound.listen()
             # print( question )
-            print( f"{called=}" )
+            # print( f"{called=}" )
             if called:
                 try:
                     GUI.displayRika( True )

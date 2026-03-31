@@ -130,7 +130,26 @@ base_settings = {
         "color": [ 3, 232, 252 ],
         "font": "./assets/gui/Nasalization Rg.otf"
     },
-    "reset-protocol-name": "Mémoire Saturée"
+    "reset-protocol-name": "Mémoire Saturée",
+    "apps-path": {
+        "get-env":[
+            {
+                "key": "ProgramFiles",
+                "default": "C:/Program Files"
+            },
+            {
+                "key": "ProgramFiles(x86)",
+                "default": "C:/Program Files (x86)"
+            }
+        ],
+        "expand-user": [
+            "~/AppData/Local",
+            "~/AppData/Roaming",
+            "~/Desktop",
+            "~/Documents"
+        ],
+        "normal": []
+    }
 }
 
 Json.write( base_settings, "./settings.json" )

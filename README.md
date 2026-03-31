@@ -9,7 +9,7 @@
 - Ouvrir une application installé sur l'ordinateur
 - Envoyer un courriel
 - Éxécuter des actions custom via des protocols
-- Sauvegarder un fichier et l'ouvrir
+- Sauvegarder un fichier
 - Lire des courriels
 - Reconnaitre une musique
 - Recherche sur le web

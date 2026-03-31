@@ -34,15 +34,16 @@ def listen( language: str = "fr-FR" ):
 settings = Json.read( "./settings.json" )
 
 while True:
-    print( "Quel paramètre voulez vous changer ?" )
-    print( "1. Nom de l'agent" )
-    print( "2. Email de l'agent" )
-    print( "3. Clés API" )
-    print( "4. Changer la voix" )
-    print( "5. Changer le raccourcis clavier" )
-    print( "6. Nom du protocol pour effacer la mémoire" )
-    print( "7. Changer les paramètres de l'interface graphique" )
-    print( "8. Quitter" )
+    print( """Quel paramètre voulez vous changer ?
+1. Nom de l'agent
+2. Email de l'agent
+3. Clés API
+4. Changer la voix
+5. Changer le raccourcis clavier
+6. Nom du protocol pour effacer la mémoire
+7. Changer les paramètres de l'interface graphique
+8. Quitter""")
+    
     choice = input( "> " )
 
     if choice == '1':

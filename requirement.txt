@@ -3,6 +3,7 @@ opencv-python
 pyaudiowpatch
 sounddevice
 pyautogui
+threading
 soundfile
 pygrabber
 edge-tts
