@@ -185,7 +185,7 @@ class Sound:
     def playVoice():
         return asyncio.run( Sound._playVoice() )
     
-    def awaitForVoiceToFinish():
+    def waitForVoiceToFinish():
         while pygame.mixer.music.get_busy():
             pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
@@ -331,7 +331,7 @@ settings = Json.read( "settings.json" )
 
 loadPrint()#c
 
-API_KEYS = settings["api-keys"]
+API_KEYS = settings["api"]["api-keys"]
 clients = [
     Groq( api_key=n )
     for n in API_KEYS
@@ -349,7 +349,7 @@ MAIN_MODEL = settings["models"]["main"]
 VISION_MODEL = settings["models"]["vision"]
 ASK_MODEL = settings["models"]["data"]
 WEB_MODEL = settings["models"]["web"]
-MAX_RETRIES = settings["max-api-retries"]
+MAX_RETRIES = settings["api"]["max-api-retries"]
 ASSISTANT_NAME = settings["assistant-name"]
 
 loadPrint()#c
@@ -406,18 +406,18 @@ IMAP_SERVERS = {
 loadPrint()#c
 
 SEARCH_DIRS = []
-for element in settings["apps-path"]["get-env"]:
+for element in settings["directories"]["apps-path"]["get-env"]:
     SEARCH_DIRS.append(
         os.environ.get(
             element["key"],
             element["default"]
         )
     )
-for element in settings["apps-path"]["expand-user"]:
+for element in settings["directories"]["apps-path"]["expand-user"]:
     SEARCH_DIRS.append(
         os.path.expanduser( element )
     )
-for element in settings["apps-path"]["normal"]:
+for element in settings["directories"]["apps-path"]["normal"]:
     SEARCH_DIRS.append( element )
 
 loadPrint()#c
@@ -445,6 +445,7 @@ loadPrint()#c
 def getAllAppsThread():
     global APPLICATIONS
     APPLICATIONS = getAllApps()
+    sendNotification( "Applications chargées.", "Scan des applications installés terminées" )
 
 get_all_apps_thread = threading.Thread( target=getAllAppsThread )
 get_all_apps_thread.start()
@@ -1704,7 +1705,7 @@ def analyseImage( type, prompt, renew ):
         return "Type invalide", True
 
     print( "ask model for vision" )
-    response = Model.askModel( VISION_MODEL, messages, "high", MAX_RETRIES, False, Model.Verification.rawResponse )
+    response = Model.askModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
 
     return f"voici l'image. Fait ce que {USERNAME} te demande de faire avec : " + response, True
 
@@ -1800,7 +1801,6 @@ Garde le plus d'informations importantes possible en respectant la limite de mot
         ],
         "none",
         MAX_RETRIES,
-        True,
         Model.Verification.isJson
     )
 
@@ -1998,7 +1998,7 @@ def chat():
             response = None
             # while True:
             print( "ask model for chatting (1)" )
-            response = Model.askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, True, Model.Verification.isJson )
+            response = Model.askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
 
             content = json.loads( response )
             conversation.append( 
@@ -2075,7 +2075,7 @@ def chat():
                     break
                 if do_response:
                     print( "ask model for chatting (2)" )
-                    response = Model.askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, True, Model.Verification.isJson )
+                    response = Model.askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
                     
                     conversation.append( 
                         {
