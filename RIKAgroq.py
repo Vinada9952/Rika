@@ -760,7 +760,7 @@ class Model:
                         messages=message
                     ).choices[0].message.content
                 if not verification( ans ):
-                    raise NotValidResponse( "The ai's response doesn't match or respect the output specifications" )
+                    raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.name()}, response is {ans}" )
                 return ans
             except APIStatusError as e:
                 print( str( e ) )
@@ -768,9 +768,14 @@ class Model:
                     can_think = False
                 if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
                     autoEraseConversation()
+            except NotValidResponse as e:
+                print( str( e ) )
+                log( f"Invalid response from AI: {ans}", str( e ), "error" )
     
     class Verification:
         def isJson( object ):
+            def name():
+                return "isJson"
             try:
                 json.loads( object )
                 return True
@@ -778,15 +783,21 @@ class Model:
                 return False
         
         def isPath( path ):
+            def name():
+                return "isPath"
             return os.path.exists( path )
 
         def isLink( link ):
+            def name():
+                return "isLink"
             if link.find( "http" ) == 0:
                 return True
             if link.find( "www" ) != -1:
                 return True
         
         def rawResponse( a ):
+            def name():
+                return "rawResponse"
             return True
 
 
@@ -1971,6 +1982,7 @@ def chat():
         email_thread.start()
         
         # print( "asking user" )
+        treating_response.join()
         user_input = getUserInput()
         
         emails = email_thread.join()
@@ -2007,7 +2019,6 @@ def chat():
                     "content": response
                 }
             )
-            treating_response.join()
             treating_response = threading.Thread( target=treatResponse, args=( content["message"], ) )
             treating_response.start()
             # treated_text = treadTextResponse( content["message"] )
@@ -2019,6 +2030,7 @@ def chat():
             
             not_understand = False
             do_response = False
+            role = "assistant"
             last_do_response = do_response
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
