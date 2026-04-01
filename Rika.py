@@ -374,8 +374,8 @@ AUDIO_DURATION_LIMIT = settings["audio"]["audio-duration-threshold"]
 
 loadPrint()#c
 
-SCREENSHOT_DIR = settings["directories"]["screenshots"]
-WEBCAM_PATH = settings["directories"]["webcam"]
+SCREENSHOT_DIR = settings["directories"]["cache"]["screenshots"]
+WEBCAM_PATH = settings["directories"]["cache"]["webcam"]
 
 loadPrint()#c
 
@@ -438,7 +438,7 @@ loadPrint()#c
 
 USERNAME = settings["email"]["user-email"]["name"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
-CONTACT_LIST = Json.read( settings["directories"]["contacts"] )
+CONTACT_LIST = Json.read( settings["directories"]["assets"]["contacts"] )
 
 loadPrint()#c
 
@@ -448,7 +448,7 @@ GET_CONVERSATION = settings["server"]["get-conversation"]
 
 loadPrint()#c
 
-PROTOCOLS = [ { "name": settings["reset-protocol-name"], "command": "/delete-memory" } ] + Json.read( settings["directories"]["protocols"] )
+PROTOCOLS = [ { "name": settings["reset-protocol-name"], "command": "/delete-memory" } ] + Json.read( settings["directories"]["assets"]["protocols"] )
 
 protocol_list = ''
 for protocol in PROTOCOLS:
@@ -1204,15 +1204,9 @@ def doProtocol( name ):
         if name == PROTOCOLS[i]["name"]:
             if PROTOCOLS[i]["command"] == "/delete-memory":
                 conversation = [ conversation[0] ]
-                sleepSystem( False )
-                Sound.waitForVoiceToFinish()
-                Sound.generateVoice( "Vous aurez besoin de relançer mon programme", VOICE )
-                Sound.playVoice()
-                Sound.waitForVoiceToFinish()
-                sys.exit( 0 )
-                print( "Veuillez relancer le programme..." )
-                Sound.generateVoice( "Veuillez relancer le programme...", VOICE )
-                Sound.playVoice()
+                if SERVER_URL:
+                    requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
+                Json.write( conversation, "./conversation.json" )
             subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
             break
     return f"protocol {name} execution success", False
