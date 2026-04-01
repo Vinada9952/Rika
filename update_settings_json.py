@@ -179,14 +179,13 @@ for data in settings_list:
     value = getValuePath( current_settings, path )
     settings_list[data] = value
 
-new_settings = new_template.copy()
 Json.write( new_template, "./current_setting.template" )
+new_settings = new_template
 
 for key in settings_list.keys():
     data = settings_list[key]
     path = findKeysFromValue( new_template, key )
     new_settings = setValueFromPath( new_settings, path, data )
-    os.system( "cls" )
     pass
 
 Json.write( new_settings, "./settings.json" )
