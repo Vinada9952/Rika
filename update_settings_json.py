@@ -180,6 +180,7 @@ for data in settings_list:
     settings_list[data] = value
 
 new_settings = new_template.copy()
+Json.write( new_template, "./current_setting.template" )
 
 for key in settings_list.keys():
     data = settings_list[key]
@@ -189,4 +190,3 @@ for key in settings_list.keys():
     pass
 
 Json.write( new_settings, "./settings.json" )
-Json.write( new_template, "./current_setting.template" )

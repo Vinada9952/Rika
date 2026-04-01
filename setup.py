@@ -95,11 +95,34 @@ base_settings = {
         "voice": "fr-CA-SylvieNeural"
     },
     "directories": {
-        "screenshots": "/cache/screenshots/",
-        "cache": "cache/",
-        "webcam": "./cache/captured.jpg",
-        "protocols": "./assets/protocols/protocols.json",
-        "contacts": "./assets/contacts.json"
+        "cache": {
+            "screenshots": "./cache/screenshots/",
+            "cache": "./cache/",
+            "webcam": "./cache/captured.jpg",
+        },
+        "assets": {
+            "protocols": "./assets/protocols/protocols.json",
+            "contacts": "./assets/contacts.json"
+        },
+        "apps-path": {
+            "get-env":[
+                {
+                    "key": "ProgramFiles",
+                    "default": "C:/Program Files"
+                },
+                {
+                    "key": "ProgramFiles(x86)",
+                    "default": "C:/Program Files (x86)"
+                }
+            ],
+            "expand-user": [
+                "~/AppData/Local",
+                "~/AppData/Roaming",
+                "~/Desktop",
+                "~/Documents"
+            ],
+            "normal": []
+        }
     },
     "models": {
         "main": "openai/gpt-oss-120b",
@@ -124,31 +147,11 @@ base_settings = {
         "set-conversation": "setConversation",
         "get-conversation": "getConversation"
     },
-    "color": [ 3, 232, 252 ],
     "gui":{
         "color": [ 3, 232, 252 ],
         "font": "./assets/gui/Nasalization Rg.otf"
     },
-    "reset-protocol-name": "Mémoire Saturée",
-    "apps-path": {
-        "get-env":[
-            {
-                "key": "ProgramFiles",
-                "default": "C:/Program Files"
-            },
-            {
-                "key": "ProgramFiles(x86)",
-                "default": "C:/Program Files (x86)"
-            }
-        ],
-        "expand-user": [
-            "~/AppData/Local",
-            "~/AppData/Roaming",
-            "~/Desktop",
-            "~/Documents"
-        ],
-        "normal": []
-    }
+    "reset-protocol-name": "Mémoire Saturée"
 }
 
 Json.write( base_settings, "./settings.json" )
@@ -174,11 +177,15 @@ Json.write(
             "voice": "\"voice\""
         },
         "directories": {
-            "screenshots": "\"screenshot-path\"",
-            "cache": "\"cache-path\"",
-            "webcam": "\"webcam-path\"",
-            "protocols": "\"protocols-path\"",
-            "contacts": "\"contacts-path\"",
+            "cache": {
+                "screenshots": "\"screenshot-path\"",
+                "cache": "\"cache-path\"",
+                "webcam": "\"webcam-path\""
+            },
+            "assets": {
+                "protocols": "\"protocols-path\"",
+                "contacts": "\"contacts-path\""
+            },
             "apps-path": {
                 "get-env": "[apps-path-getenv]",
                 "expand-user": "[apps-path-expand-user]",
@@ -208,7 +215,7 @@ Json.write(
             "set-conversation": "\"server-setconversation\"",
             "get-conversation": "\"server-getconversation\""
         },
-        "gui":{
+        "gui": {
             "color": "[gui-color]",
             "font": "\"font-path\""
         }
