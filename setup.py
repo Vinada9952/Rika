@@ -1,5 +1,4 @@
 import os
-os.system( "pip install -r requirement.txt" )
 import json
 import speech_recognition as sr
 
