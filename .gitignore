@@ -19,3 +19,4 @@ ai_test.py
 **/test/
 **/web/
 current_setting.template
+my_settings.py

@@ -158,12 +158,21 @@ def getValuePath( data, path, default=None ):
             return default
     return value
 
-def setValueFromPath( data: dict, path: list, value ):
-    if type( data ) == dict:
-        index = path.pop( 0 )
-        data[index] = setValueFromPath( data[index], path, value )
+def setValueFromPath(data: dict, path: list, value):
+    if not path:
+        return value
+
+    key = path[0]
+
+    if len(path) == 1:
+        data[key] = value
         return data
-    return value
+
+    if key not in data or not isinstance(data[key], dict):
+        data[key] = {}
+
+    data[key] = setValueFromPath(data[key], path[1:], value)
+    return data
 
 for data in settings_list:
     path = findKeysFromValue( current_template, data )
