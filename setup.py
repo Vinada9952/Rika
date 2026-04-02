@@ -33,6 +33,9 @@ class Json:
 os.makedirs( "./cache", True )
 os.makedirs( "./cache/screenshots", True )
 os.makedirs( "./assets/protocols/", True )
+Json.write( [], "./assets/protocols/protocols.json" )
+Json.write( [], "./assets/contacts.json" )
+Json.write( [0], "./assets/conversation.json" )
 
 api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
 name = input( "Votre nom : " )
@@ -154,10 +157,6 @@ base_settings = {
 }
 
 Json.write( base_settings, "./settings.json" )
-Json.write( [], "./assets/protocols/protocols.json" )
-Json.write( [], "./assets/protocols/protocols.json" )
-Json.write( [], "./assets/contacts.json" )
-Json.write( [], "./assets/conversation.json" )
 Json.write(
     {
         "assistant-name": "\"assistant-name\"",
