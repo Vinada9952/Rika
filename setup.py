@@ -30,9 +30,9 @@ class Json:
             informations = json.load( infile )
         return informations
 
-os.makedirs( "./cache", True )
-os.makedirs( "./cache/screenshots", True )
-os.makedirs( "./assets/protocols/", True )
+os.makedirs( "./cache", exist_ok=True )
+os.makedirs( "./cache/screenshots", exist_ok=True )
+os.makedirs( "./assets/protocols/", exist_ok=True )
 Json.write( [], "./assets/protocols/protocols.json" )
 Json.write( [], "./assets/contacts.json" )
 Json.write( [0], "./assets/conversation.json" )
