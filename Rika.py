@@ -1,5 +1,6 @@
 from pygrabber.dshow_graph import FilterGraph
 from email.utils import parsedate_to_datetime
+from spotipy.oauth2 import SpotifyOAuth
 from email.header import decode_header
 from email.mime.text import MIMEText
 from json import JSONDecodeError
@@ -24,6 +25,7 @@ import datetime
 import asyncio
 import smtplib
 import logging
+import spotipy
 import imaplib
 import base64
 import pygame
@@ -442,6 +444,18 @@ CONTACT_LIST = Json.read( settings["directories"]["assets"]["contacts"] )
 
 loadPrint()#c
 
+SPOTIFY_CLIENT_ID = settings["spotify-player"]["client-id"]
+SPOTIFY_CLIENT_SECRET = settings["spotify-player"]["client-secret"]
+
+loadPrint()#c
+
+PLAYLISTS = Json.read( settings["directories"]["assets"]["playlists"] )
+playlists_formatted = ''
+for playlist in PLAYLISTS:
+    playlists_formatted += f"\n    -> {playlist["name"]} ({playlist["type"]}): {playlist["description"]}"
+
+loadPrint()#c
+
 SERVER_URL = settings["server"]["url"]
 SET_CONVERSATION = settings["server"]["set-conversation"]
 GET_CONVERSATION = settings["server"]["get-conversation"]
@@ -644,6 +658,18 @@ OUTILS DISPONIBLES :
     -> query (string): Ce que tu veux savoir
   - Tu peux l'utiliser à n'importe quel moment, sans avoir besoin d'autorisation
 
+- playMusic
+  - Faire jouer quelque chose sur spotify
+  - params:
+    -> search (string): Ce que tu cherches sur spotify. Le plus précis possible.
+    -> type (string): Le type du contenu recherché.
+  - types possibles:
+    -> track
+    -> album
+    -> artist
+    -> playlist
+  - Différentes playlist de l'utilisateur:{playlists_formatted}
+
 - recognizeMusic
   - Reconaitre la musique qui joue
 
@@ -781,6 +807,7 @@ class Model:
                     raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__()}, response is {ans}" )
                 return ans
             except APIStatusError as e:
+                log( f"Invalid response from API", f"{str( e )}, {ans=}, {message=}", "error" )
                 print( str( e ) )
                 if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
                     can_think = False
@@ -1076,6 +1103,189 @@ async def _recognize_music_async() -> dict:
 
 loadPrint()#c
 
+class SpotifyPlayer:
+    SCOPE = (
+        "user-read-playback-state "
+        "user-modify-playback-state "
+        "user-read-currently-playing"
+    )
+
+    def __init__(self, client_id: str, client_secret: str, redirect_uri: str = "https://127.0.0.1:9952/callback"):
+        self.sp = spotipy.Spotify(
+            auth_manager=SpotifyOAuth(
+                client_id=client_id,
+                client_secret=client_secret,
+                redirect_uri=redirect_uri,
+                scope=self.SCOPE,
+            )
+        )
+
+    def openSpotify(self):
+        """Lance Spotify sur l'ordinateur."""
+        subprocess.Popen( ["spotify.exe"], creationflags=subprocess.DETACHED_PROCESS, shell=True)
+        time.sleep( 2 )
+        
+
+    # ------------------------------------------------------------------ #
+    #  Vérification des appareils                                          #
+    # ------------------------------------------------------------------ #
+
+    def _get_active_device(self) -> str | None:
+        """Retourne l'ID du premier appareil actif, ou None si aucun."""
+        devices = self.sp.devices().get("devices", [])
+        for d in devices:
+            if d["is_active"]:
+                return d["id"]
+        return None
+
+    def _ensure_device(self) -> str | None:
+        """
+        Vérifie qu'un appareil Spotify est disponible.
+        Si aucun n'est trouvé, appelle openSpotify() et réessaie.
+        Retourne l'ID de l'appareil, ou None si toujours indisponible.
+        """
+        devices = self.sp.devices().get("devices", [])
+
+        if not devices:
+            # print("⚠️  Aucun appareil Spotify détecté. Lancement de Spotify...")
+            self.openSpotify()
+
+            # Réessaie jusqu'à 5 fois avec 1 seconde d'intervalle
+            for attempt in range(5):
+                time.sleep(1)
+                devices = self.sp.devices().get("devices", [])
+                if devices:
+                    # print("✅  Spotify détecté !")
+                    break
+            else:
+                # print("❌  Spotify n'a pas pu être lancé.")
+                return None
+
+        # Retourne l'appareil actif, sinon le premier disponible
+        for d in devices:
+            if d["is_active"]:
+                return d["id"]
+        return devices[0]["id"]
+
+    # ------------------------------------------------------------------ #
+    #  Lecture / Pause / Stop                                              #
+    # ------------------------------------------------------------------ #
+
+    def play(self, uri: str | None = None, device_id: str | None = None):
+        if device_id is None:
+            device_id = self._ensure_device()
+            if device_id is None:
+                return  # Abandon si Spotify n'est pas disponible
+
+        kwargs = {"device_id": device_id}
+        if uri:
+            if uri.startswith("spotify:track:"):
+                kwargs["uris"] = [uri]
+            else:
+                kwargs["context_uri"] = uri
+        self.sp.start_playback(**kwargs)
+        # print(f"▶  Lecture lancée{' : ' + uri if uri else ''}")
+
+    def pause(self):
+        self.sp.pause_playback()
+        # print("⏸  Pause")
+
+    def resume(self):
+        self.sp.start_playback()
+        # print("▶  Reprise")
+
+    def next_track(self):
+        self.sp.next_track()
+        # print("⏭  Titre suivant")
+
+    def previous_track(self):
+        self.sp.previous_track()
+        # print("⏮  Titre précédent")
+
+    def shuffle(self, state: bool = True):
+        self.sp.shuffle(state)
+        # print(f"🔀  Shuffle : {'activé' if state else 'désactivé'}")
+
+    def now_playing(self) -> dict | None:
+        current = self.sp.current_playback()
+        if not current or not current.get("item"):
+            return None
+        track = current["item"]
+        info = {
+            "title":   track["name"],
+            "artists": ", ".join(a["name"] for a in track["artists"]),
+            "album":   track["album"]["name"],
+            "uri":     track["uri"],
+            "playing": current["is_playing"],
+        }
+        return info
+
+    def list_devices(self) -> list[dict]:
+        devices = self.sp.devices().get("devices", [])
+        return devices
+
+    def search(self, query: str, search_type: str = "track", limit: int = 5) -> list[dict]:
+        results = self.sp.search(q=query, type=search_type, limit=limit)
+        
+        types = search_type.split(",")
+        items = []
+        
+        for t in types:
+            key = f"{t.strip()}s"  # "track" -> "tracks", "playlist" -> "playlists"
+            if key in results:
+                for item in results[key]["items"]:
+                    if item is not None:  # ← filtre les None
+                        item["_search_type"] = t.strip()  # on tag chaque item avec son type
+                        items.append(item)
+        
+        return items, search_type
+
+    class SearchTypes:
+        def mix( *types ):
+            return ','.join( types )
+
+        TRACK = "track"
+        ALBUM = "album"
+        ARTIST = "artist"
+        PLAYLIST = "playlist"
+
+        def isInTypes( types ):
+            if type( types ) == str:
+                if types.find( ',' ) != -1:
+                    types = types.split( ',' )
+                else:
+                    if types not in ["track", "album", "artist", "playlist"]:
+                        return False
+            if type( types ) == list:
+                for item in types:
+                    if item not in ["track", "album", "artist", "playlist"]:
+                        return False
+            return True
+
+loadPrint()#c
+
+try:
+    spotify = SpotifyPlayer( SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET )
+except Exception as e:
+    log( "Error creating spotify instance", str( e ), "warning" )
+
+
+loadPrint()#c
+
+def playMusic( search, types ):
+    # if spotify.SearchTypes.isInTypes( types ):
+    try:
+        results, _ = spotify.search( search, types )
+        spotify.play( results[0]["uri"] )
+        return f"{search} joue maintenant en tant que {types}", False
+    except Exception as e:
+        log( "Spotify error", str( e ), "error" )
+        return "Erreur pour faire jouer le contenu", True
+    # else:
+    #     return "Type(s) non valide", True
+
+loadPrint()#c
+
 def recognizeMusic() -> dict:
     """Point d'entrée public. Retourne un dict avec les infos de la musique détectée."""
     return str( asyncio.run(_recognize_music_async()) ), True
@@ -1117,7 +1327,7 @@ loadPrint()#c
 # TOOL: openApp
 # =====================
 def launchApp( app ):
-    subprocess.Popen( [app["path"]], creationflags=subprocess.DETACHED_PROCESS, shell=True)
+    subprocess.Popen( [app["path"]], creationflags=subprocess.DETACHED_PROCESS, shell=False)
     return "Application lancé avec succès"
 
 loadPrint()#c
@@ -2055,6 +2265,8 @@ def chat():
                         result, do_response = openApp( tool["params"]["app"] )
                     elif tool["name"] == "doProtocol":
                         result, do_response = doProtocol( tool["params"]["protocol"] )
+                    elif tool["name"] == "playMusic":
+                        result, do_response = playMusic( tool["params"]["search"], tool["params"]["type"] )
                     elif tool["name"] == "recognizeMusic":
                         result, do_response = recognizeMusic()
                     elif tool["name"] == "saveFile":

@@ -35,6 +35,7 @@ os.makedirs( "./cache/screenshots", exist_ok=True )
 os.makedirs( "./assets/protocols/", exist_ok=True )
 Json.write( [], "./assets/protocols/protocols.json" )
 Json.write( [], "./assets/contacts.json" )
+Json.write( [], "./assets/playlists.json" )
 Json.write( [0], "./assets/conversation.json" )
 
 api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
@@ -104,7 +105,8 @@ base_settings = {
         },
         "assets": {
             "protocols": "./assets/protocols/protocols.json",
-            "contacts": "./assets/contacts.json"
+            "contacts": "./assets/contacts.json",
+            "playlists": "./assets/assets/playlists.json"
         },
         "apps-path": {
             "get-env":[
@@ -153,12 +155,16 @@ base_settings = {
         "color": [ 3, 232, 252 ],
         "font": "./assets/gui/Nasalization Rg.otf"
     },
-    "reset-protocol-name": "Mémoire Saturée"
+    "reset-protocol-name": "Mémoire Saturée",
+    "spotify-player": {
+        "client-id": None,
+        "client-secret": None
+    }
 }
 
 Json.write( base_settings, "./settings.json" )
 Json.write(
-    {
+        {
         "assistant-name": "\"assistant-name\"",
         "api": {
             "api-keys": "[api-keys]",
@@ -182,7 +188,8 @@ Json.write(
             },
             "assets": {
                 "protocols": "\"protocols-path\"",
-                "contacts": "\"contacts-path\""
+                "contacts": "\"contacts-path\"",
+                "playlists": "\"playlists-path\""
             },
             "apps-path": {
                 "get-env": "[apps-path-getenv]",
@@ -216,7 +223,10 @@ Json.write(
         "gui": {
             "color": "[gui-color]",
             "font": "\"font-path\""
+        },
+        "spotify-player": {
+            "client-id": "\"spotify-client-id\"",
+            "client-secret": "\"spotify-client-secret\""
         }
-    },
-    "./current_setting.template"
+    }
 )

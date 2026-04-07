@@ -147,6 +147,18 @@ OUTILS DISPONIBLES :
     -> query (string): Ce que tu veux savoir
   - Tu peux l'utiliser à n'importe quel moment, sans avoir besoin d'autorisation
 
+- playMusic
+  - Faire jouer quelque chose sur spotify
+  - params:
+    -> search (string): Ce que tu cherches sur spotify. Le plus précis possible.
+    -> type (string): Le type du contenu recherché.
+  - types possibles:
+    -> track
+    -> album
+    -> artist
+    -> playlist
+  - Différentes playlist de l'utilisateur:{playlists_formatted}
+
 - recognizeMusic
   - Reconaitre la musique qui joue
 

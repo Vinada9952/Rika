@@ -73,6 +73,9 @@ settings_list = {
         "~/Documents"
     ],
     "[apps-path-normal]": [],
+    "\"spotify-client-id\"": None,
+    "\"spotify-client-secret\"": None,
+    "\"playlists-path\"": "./assets/assets/playlists.json"
 }
 
 new_template = {
@@ -99,7 +102,8 @@ new_template = {
         },
         "assets": {
             "protocols": "\"protocols-path\"",
-            "contacts": "\"contacts-path\""
+            "contacts": "\"contacts-path\"",
+            "playlists": "\"playlists-path\""
         },
         "apps-path": {
             "get-env": "[apps-path-getenv]",
@@ -133,6 +137,10 @@ new_template = {
     "gui":{
         "color": "[gui-color]",
         "font": "\"font-path\""
+    },
+    "spotify-player": {
+        "client-id": "\"spotify-client-id\"",
+        "client-secret": "\"spotify-client-secret\""
     }
 }
 
