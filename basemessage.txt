@@ -152,12 +152,15 @@ OUTILS DISPONIBLES :
   - params:
     -> search (string): Ce que tu cherches sur spotify. Le plus précis possible.
     -> type (string): Le type du contenu recherché.
+    -> device (string) : L'appareil sur lequel jouer la musique
   - types possibles:
     -> track
     -> album
     -> artist
     -> playlist
   - Différentes playlist de l'utilisateur:{playlists_formatted}
+  - Liste d'appareils disponibles:{formatted_devices}
+  - l'appareil par défaut est "{DEFAULT_DEVICE}". Si l'utilisateur ne demande pas d'appareils précis, utilise celui-ci
 
 - recognizeMusic
   - Reconaitre la musique qui joue

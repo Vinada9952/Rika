@@ -37,6 +37,7 @@ Json.write( [], "./assets/protocols/protocols.json" )
 Json.write( [], "./assets/contacts.json" )
 Json.write( [], "./assets/playlists.json" )
 Json.write( [0], "./assets/conversation.json" )
+Json.write( [], "./assets/playlists.json" )
 
 api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
 name = input( "Votre nom : " )
@@ -123,7 +124,7 @@ base_settings = {
         "assets": {
             "protocols": "./assets/protocols/protocols.json",
             "contacts": "./assets/contacts.json",
-            "playlists": "./assets/assets/playlists.json"
+            "playlists": "./assets/playlists.json"
         },
         "apps-path": {
             "get-env":[
@@ -175,75 +176,29 @@ base_settings = {
     "reset-protocol-name": "Mémoire Saturée",
     "spotify-player": {
         "client-id": spotify_id,
-        "client-secret": spotify_secret
+        "client-secret": spotify_secret,
+        "default-device": "Computer",
+        "available-devices": [
+            "Computer",
+            "Smartphone",
+            "Speaker",
+            "Tablet"
+        ]
     }
 }
 
+# ALL DEVICES TYPES:
+# COMPUTER     = "Computer"    (Ordinateur)
+# SMARTPHONE   = "Smartphone"  (Téléphone)
+# TABLET       = "Tablet"      (Tablette)
+# SPEAKER      = "Speaker"     (Enceinte connectée)
+# TV           = "TV"          (Télévision )
+# AVR          = "AVR"         (Ampli home cinéma)
+# STB          = "STB"         (Décodeur / Set-top box)
+# AUDIO_DONGLE = "AudioDongle" Clé audio Spotify
+# GAME_CONSOLE = "GameConsole" (Console de jeu vidéo)
+# CAST_AUDIO   = "CastAudio"   (Google Cast audio)
+# CAST_VIDEO   = "CastVideo"   (Google Cast vidéo)
+# AUTOMOBILE   = "Automobile"  (Voiture)
+
 Json.write( base_settings, "./settings.json" )
-Json.write(
-        {
-        "assistant-name": "\"assistant-name\"",
-        "api": {
-            "api-keys": "[api-keys]",
-            "max-api-retries": "max-api-retry"
-        },
-        "call": {
-            "names": "[call-names]",
-            "hotkey": "\"hotkey\""
-        },
-        "reset-protocol-name": "\"reset-protocol-name\"",
-        "audio": {
-            "audio": "audio",
-            "audio-duration-threshold": "audio-duration-threshold",
-            "voice": "\"voice\""
-        },
-        "directories": {
-            "cache": {
-                "screenshots": "\"screenshot-path\"",
-                "cache": "\"cache-path\"",
-                "webcam": "\"webcam-path\""
-            },
-            "assets": {
-                "protocols": "\"protocols-path\"",
-                "contacts": "\"contacts-path\"",
-                "playlists": "\"playlists-path\""
-            },
-            "apps-path": {
-                "get-env": "[apps-path-getenv]",
-                "expand-user": "[apps-path-expand-user]",
-                "normal": "[apps-path-normal]"
-            }
-        },
-        "models": {
-            "data": "\"data-model\"",
-            "main": "\"main-model\"",
-            "vision": "\"vision-model\"",
-            "web": "\"web-model\""
-        },
-        "email": {
-            "email": "\"agent-email-adress\"",
-            "pwd": "\"agent-email-pwd\"",
-            "smtp": {
-                "server": "\"smtp-server\"",
-                "port": "smtp-port"
-            },
-            "user-email": {
-                "name": "\"username\"",
-                "email": "\"user-email\""
-            }
-        },
-        "server": {
-            "url": "\"server-url\"",
-            "set-conversation": "\"server-setconversation\"",
-            "get-conversation": "\"server-getconversation\""
-        },
-        "gui": {
-            "color": "[gui-color]",
-            "font": "\"font-path\""
-        },
-        "spotify-player": {
-            "client-id": "\"spotify-client-id\"",
-            "client-secret": "\"spotify-client-secret\""
-        }
-    }
-)

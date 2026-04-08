@@ -20,5 +20,4 @@ fix analyseImage when just ask to analyse image
 add sonor effects when assistant activates and deactivate
 make Rika API with flask for tools
 make web version
-make Rika play music on iphone
 make recognizeMusic also use spotify
