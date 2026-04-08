@@ -14,6 +14,8 @@
 - Reconnaitre une musique
 - Recherche sur le web
 - Ouvrir un lien web
+- Reconnaitre une musique
+- Jouer de la musique sur spotify
 
 **OPTIONS**
 
