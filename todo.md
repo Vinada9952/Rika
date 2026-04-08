@@ -22,4 +22,3 @@ make Rika API with flask for tools
 make web version
 make Rika play music on iphone
 make recognizeMusic also use spotify
-make user choose if add spotify in setup.py
