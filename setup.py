@@ -42,7 +42,16 @@ api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
 name = input( "Votre nom : " )
 user = input( "Votre email : " )
 
-ask = input( "Voulez vous modifier le nom de l'agent ? (o/n) : " )
+def getYesNoInput( prompt, not_valid_msg, choices ):
+    while True:
+        ask = input( prompt )
+        if ask.lower() in choices:
+            return ask
+        else:
+            print( not_valid_msg )
+
+ask = getYesNoInput( "Voulez vous modifier le nom de l'agent ? (o/n) : ", "choix invalide", ['o', 'n'] )
+
 if ask == 'o':
     assistant_name = input( "Nom de l'agent : " )
     call_names = []
@@ -74,13 +83,21 @@ else:
         "ricard"
     ]
 
-ask = input( "Voulez vous mettre un email pour l'agent ? (o/n) : " )
+ask = getYesNoInput( "Voulez vous mettre un email pour l'agent ? (o/n) : ", "choix invalide", ['o', 'n'] )
 if ask.lower() == 'o':
     email = input( "Email de L'agent : " )
     pwd = input( "Mot de passe de l'agent pour l'email (https://myaccount.google.com/apppasswords)" )
 else:
     email = "No Email Available"
     pwd = "No Email Available"
+
+ask = getYesNoInput( "Voulez vous autoriser l'accès à spotify ? (o/n) : ", "choix invalide", ['o', 'n'] )
+if ask == 'o':
+    spotify_id = input( "client ID (https://developer.spotify.com/dashboard) : " )
+    spotify_secret = input( "client secret (https://developer.spotify.com/dashboard) : " )
+else:
+    spotify_id = None
+    spotify_secret = None
 
 base_settings = {
     "assistant-name": "Rika",
@@ -157,8 +174,8 @@ base_settings = {
     },
     "reset-protocol-name": "Mémoire Saturée",
     "spotify-player": {
-        "client-id": None,
-        "client-secret": None
+        "client-id": spotify_id,
+        "client-secret": spotify_secret
     }
 }
 
