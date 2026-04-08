@@ -316,14 +316,16 @@ class SpotifyPlayer:
         if not current or not current.get("item"):
             return None
         track = current["item"]
-        info = {
-            "title":   track["name"],
-            "artists": ", ".join(a["name"] for a in track["artists"]),
-            "album":   track["album"]["name"],
-            "uri":     track["uri"],
-            "playing": current["is_playing"],
-        }
-        return info
+        Json.write( track, "a.json" )
+        if current["is_playing"]:
+            info = {
+                "name": track["name"],
+                "artists": ", ".join(a["name"] for a in track["artists"]),
+                "album": track["album"]["name"],
+                "publication": ""
+            }
+            return info
+        return None
 
     def listDevices(self) -> list[dict]:
         devices = self.sp.devices().get("devices", [])
@@ -620,9 +622,6 @@ except Exception as e:
 
 loadPrint()#c
 
-if IS_THERE_SPOTIFY:
-    connected_device = spotify.listDevices()
-
 formatted_devices = ""
 DEVICES = settings["spotify-player"]["available-devices"]
 DEFAULT_DEVICE = settings["spotify-player"]["default-device"]
@@ -841,7 +840,7 @@ OUTILS DISPONIBLES :
   - Tu peux l'utiliser à n'importe quel moment, sans avoir besoin d'autorisation
 
 - playMusic
-  - Faire jouer quelque chose sur spotify
+  - Faire jouer quelque chose sur spotify. Quand l'utilisateur te demande de faire jouer de la musique, l'ajouter sur spotify ou de chanter, utilise cet outil.
   - params:
     -> search (string): Ce que tu cherches sur spotify. Le plus précis possible.
     -> type (string): Le type du contenu recherché.
@@ -971,6 +970,7 @@ loadPrint()#c
 
 class Model:
     def askModel( model: str, message: dict, thinking: str, max_retries: int, verification ):
+        log( f"Asking model", f"{model=}, {message=}, {thinking=}, {max_retries=}, {verification.__name__}", "info" )
         global clients
         can_think = True
         ans = ""
@@ -989,7 +989,7 @@ class Model:
                     ).choices[0].message.content
                 log( "Verifying if response is correct", f"Response: {ans}, Verification: {verification.__name__}", 'info' )
                 if not verification( ans ):
-                    raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__()}, response is {ans}" )
+                    raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__}, response is {ans}" )
                 return ans
             except APIStatusError as e:
                 log( f"Invalid response from API", f"{str( e )}, {ans=}, {message=}", "error" )
@@ -1065,24 +1065,36 @@ loadPrint()#c
 def get_default_wasapi_loopback_device(p: pyaudiowpatch.PyAudio) -> dict | None:
     try:
         return p.get_default_wasapi_loopback()
-    except Exception as e:
+    except Exception:
         pass
-
     for i in range(p.get_device_count()):
         dev = p.get_device_info_by_index(i)
         if dev.get("isLoopbackDevice", False):
             return dev
-
     return None
 
 loadPrint()#c
 
-def _record_worker(device_index: int, sample_rate: int, channels: int,
-                   duration: int, result_holder: list, error_holder: list) -> None:
-    """Enregistrement dans un thread séparé avec sa propre instance PyAudio."""
-    p = pyaudiowpatch.PyAudio()
+def _record_stream_callback(frames_holder: list, num_chunks_target: int, done_event: threading.Event):
+    """Retourne un callback PyAudio qui accumule les frames."""
+    def callback(in_data, frame_count, time_info, status):
+        frames_holder.append(in_data)
+        if len(frames_holder) >= num_chunks_target:
+            done_event.set()
+            return (None, pyaudiowpatch.paComplete)
+        return (None, pyaudiowpatch.paContinue)
+    return callback
+
+loadPrint()#c
+
+def _record_single(p: pyaudiowpatch.PyAudio, device_index: int, sample_rate: int,
+                   channels: int, duration: int) -> np.ndarray | None:
+    """Enregistre depuis un device via callback (non-bloquant)."""
+    frames         = []
+    num_chunks     = int(sample_rate / 1024 * duration)
+    done_event     = threading.Event()
+
     try:
-        frames = []
         stream = p.open(
             format=pyaudiowpatch.paInt16,
             channels=channels,
@@ -1090,98 +1102,168 @@ def _record_worker(device_index: int, sample_rate: int, channels: int,
             input=True,
             input_device_index=device_index,
             frames_per_buffer=1024,
+            stream_callback=_record_stream_callback(frames, num_chunks, done_event),
         )
-
-        num_chunks = int(sample_rate / 1024 * duration)
-        for _ in range(num_chunks):
-            data = stream.read(1024, exception_on_overflow=False)
-            frames.append(data)
-
+        stream.start_stream()
+        done_event.wait(timeout=TIMEOUT)
         stream.stop_stream()
         stream.close()
-
-        raw   = b"".join(frames)
-        audio = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
-
-        if channels == 2:
-            audio = audio.reshape(-1, 2).mean(axis=1)
-
-        if sample_rate != SAMPLE_RATE:
-            try:
-                from scipy.signal import resample_poly
-                from math import gcd
-                g = gcd(SAMPLE_RATE, sample_rate)
-                audio = resample_poly(audio, SAMPLE_RATE // g, sample_rate // g)
-            except ImportError:
-                new_len = int(len(audio) * SAMPLE_RATE / sample_rate)
-                audio = np.interp(
-                    np.linspace(0, len(audio) - 1, new_len),
-                    np.arange(len(audio)),
-                    audio
-                )
-
-        result_holder.append(audio)
-
-    except Exception as e:
-        error_holder.append(str(e))
-    finally:
-        p.terminate()
-
-loadPrint()#c
-
-def record_with_timeout(device_index: int, sample_rate: int, channels: int,
-                        duration: int, label: str) -> np.ndarray | None:
-    """Lance l'enregistrement dans un thread avec un timeout strict."""
-    result_holder = []
-    error_holder  = []
-
-    t = threading.Thread(
-        target=_record_worker,
-        args=(device_index, sample_rate, channels, duration, result_holder, error_holder),
-        daemon=True,
-    )
-    t.start()
-    t.join(timeout=TIMEOUT)
-
-    if t.is_alive():
-        return None
-
-    if error_holder:
-        return None
-
-    return result_holder[0] if result_holder else None
-
-loadPrint()#c
-
-def record_loopback(device_info: dict, duration: int = DURATION) -> np.ndarray | None:
-    sample_rate = int(device_info["defaultSampleRate"])
-    channels    = min(int(device_info["maxInputChannels"]), 2)
-    dev_index   = int(device_info["index"])
-
-    return record_with_timeout(dev_index, sample_rate, channels, duration, "speaker")
-
-loadPrint()#c
-
-def record_default_mic(duration: int = DURATION) -> np.ndarray | None:
-    p = pyaudiowpatch.PyAudio()
-    try:
-        dev_info    = p.get_default_input_device_info()
-        sample_rate = int(dev_info["defaultSampleRate"])
-        dev_index   = int(dev_info["index"])
     except Exception as e:
         return None
-    finally:
-        p.terminate()
 
-    audio = record_with_timeout(dev_index, sample_rate, 1, duration, "micro")
-    if audio is not None:
-        audio = np.clip(audio * MIC_GAIN, -1.0, 1.0)
+    if not frames:
+        return None
+
+    raw   = b"".join(frames)
+    audio = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+
+    if channels == 2:
+        audio = audio.reshape(-1, 2).mean(axis=1)
+
+    if sample_rate != SAMPLE_RATE:
+        try:
+            from scipy.signal import resample_poly
+            from math import gcd
+            g     = gcd(SAMPLE_RATE, sample_rate)
+            audio = resample_poly(audio, SAMPLE_RATE // g, sample_rate // g)
+        except ImportError:
+            new_len = int(len(audio) * SAMPLE_RATE / sample_rate)
+            audio   = np.interp(
+                np.linspace(0, len(audio) - 1, new_len),
+                np.arange(len(audio)),
+                audio,
+            )
+
     return audio
 
 loadPrint()#c
 
+def _record_both_parallel(loopback_device: dict | None) -> tuple[np.ndarray | None, np.ndarray | None]:
+    """
+    Enregistre speaker et micro en parallèle via callbacks dans une seule
+    instance PyAudio — évite le crash natif lié à 2 instances simultanées.
+    """
+    # ── Paramètres speaker ────────────────────────────────────────────────────
+    speaker_params = None
+    if loopback_device:
+        speaker_params = (
+            int(loopback_device["index"]),
+            int(loopback_device["defaultSampleRate"]),
+            min(int(loopback_device["maxInputChannels"]), 2),
+        )
+
+    # ── Paramètres micro ──────────────────────────────────────────────────────
+    mic_params = None
+    p_tmp = pyaudiowpatch.PyAudio()
+    try:
+        dev_info   = p_tmp.get_default_input_device_info()
+        mic_params = (
+            int(dev_info["index"]),
+            int(dev_info["defaultSampleRate"]),
+            1,
+        )
+    except Exception:
+        pass
+    finally:
+        p_tmp.terminate()
+
+    # ── Une seule instance PyAudio pour les deux streams ──────────────────────
+    p = pyaudiowpatch.PyAudio()
+
+    speaker_frames     = []
+    mic_frames         = []
+    speaker_done       = threading.Event()
+    mic_done           = threading.Event()
+    speaker_stream     = None
+    mic_stream         = None
+
+    try:
+        if speaker_params:
+            s_idx, s_rate, s_ch = speaker_params
+            s_chunks = int(s_rate / 1024 * DURATION)
+            speaker_stream = p.open(
+                format=pyaudiowpatch.paInt16,
+                channels=s_ch,
+                rate=s_rate,
+                input=True,
+                input_device_index=s_idx,
+                frames_per_buffer=1024,
+                stream_callback=_record_stream_callback(speaker_frames, s_chunks, speaker_done),
+            )
+            speaker_stream.start_stream()
+
+        if mic_params:
+            m_idx, m_rate, m_ch = mic_params
+            m_chunks = int(m_rate / 1024 * DURATION)
+            mic_stream = p.open(
+                format=pyaudiowpatch.paInt16,
+                channels=m_ch,
+                rate=m_rate,
+                input=True,
+                input_device_index=m_idx,
+                frames_per_buffer=1024,
+                stream_callback=_record_stream_callback(mic_frames, m_chunks, mic_done),
+            )
+            mic_stream.start_stream()
+
+        # Attend que les deux aient fini (ou timeout)
+        if speaker_params:
+            speaker_done.wait(timeout=TIMEOUT)
+        if mic_params:
+            mic_done.wait(timeout=TIMEOUT)
+
+    finally:
+        for stream in (speaker_stream, mic_stream):
+            if stream is not None:
+                try:
+                    stream.stop_stream()
+                    stream.close()
+                except Exception:
+                    pass
+        p.terminate()
+
+    # ── Post-traitement ───────────────────────────────────────────────────────
+    def process(frames: list, sample_rate: int, channels: int) -> np.ndarray | None:
+        if not frames:
+            return None
+        raw   = b"".join(frames)
+        audio = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+        if channels == 2:
+            audio = audio.reshape(-1, 2).mean(axis=1)
+        if sample_rate != SAMPLE_RATE:
+            try:
+                from scipy.signal import resample_poly
+                from math import gcd
+                g     = gcd(SAMPLE_RATE, sample_rate)
+                audio = resample_poly(audio, SAMPLE_RATE // g, sample_rate // g)
+            except ImportError:
+                new_len = int(len(audio) * SAMPLE_RATE / sample_rate)
+                audio   = np.interp(
+                    np.linspace(0, len(audio) - 1, new_len),
+                    np.arange(len(audio)),
+                    audio,
+                )
+        return audio
+
+    speaker_audio = process(speaker_frames, *speaker_params[1:]) if speaker_params else None
+    mic_audio     = process(mic_frames,     *mic_params[1:])     if mic_params     else None
+
+    if mic_audio is not None:
+        mic_audio = np.clip(mic_audio * MIC_GAIN, -1.0, 1.0)
+
+    if speaker_audio is not None:
+        sf.write("recording_speaker.wav", speaker_audio, SAMPLE_RATE)
+
+    if mic_audio is not None:
+        sf.write("recording_mic.wav", mic_audio, SAMPLE_RATE)
+
+    return speaker_audio, mic_audio
+
+loadPrint()#c
+
 async def identify(audio: np.ndarray, label: str = "") -> dict | None:
-    shazam = Shazam()
+    shazam    = Shazam()
+    sf.write(f"debug_{label}.wav", audio, SAMPLE_RATE)
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp_path = tmp.name
@@ -1198,39 +1280,23 @@ async def identify(audio: np.ndarray, label: str = "") -> dict | None:
 loadPrint()#c
 
 def extract_track_info(result: dict) -> dict:
-    track = result.get("track", {})
-
-    name   = track.get("title", "Inconnu")
-    artist = track.get("subtitle", "Inconnu")
-
-    # Album
+    track    = result.get("track", {})
+    name     = track.get("title",    "Inconnu")
+    artist   = track.get("subtitle", "Inconnu")
     sections = track.get("sections", [])
+
     album = "Inconnu"
     for section in sections:
         for meta in section.get("metadata", []):
             if meta.get("title", "").lower() == "album":
                 album = meta.get("text", "Inconnu")
 
-    # Genre
-    genres_obj = track.get("genres", {})
-    genre = genres_obj.get("primary", "Inconnu")
-
-    # Année de publication
+    genre       = track.get("genres", {}).get("primary", "Inconnu")
     publication = "Inconnu"
     for section in sections:
         for meta in section.get("metadata", []):
             if meta.get("title", "").lower() in ("released", "year", "année", "date de sortie"):
                 publication = meta.get("text", "Inconnu")
-
-    # Spotify URI — dans hub.providers
-    spotify = "Inconnu"
-    for provider in track.get("hub", {}).get("providers", []):
-        if provider.get("type") == "SPOTIFY":
-            for action in provider.get("actions", []):
-                uri = action.get("uri", "")
-                if uri.startswith("spotify:"):
-                    spotify = uri
-                    break
 
     return {
         "name":        name,
@@ -1238,62 +1304,74 @@ def extract_track_info(result: dict) -> dict:
         "album":       album,
         "genre":       genre,
         "publication": publication,
-        "spotify":     spotify,
     }
 
 loadPrint()#c
 
 async def _recognize_music_async() -> dict:
-    speaker_audio = None
-    mic_audio     = None
-    output        = {"note": "aucune musique détectée"}
-
-    # ── Étape 1 : Speaker par défaut Windows (loopback WASAPI) ────────────────
-    p = pyaudiowpatch.PyAudio()
+    p               = pyaudiowpatch.PyAudio()
     loopback_device = get_default_wasapi_loopback_device(p)
     p.terminate()
 
-    if loopback_device:
+    speaker_audio, mic_audio = _record_both_parallel(loopback_device)
 
-        speaker_audio = record_loopback(loopback_device)
+    async def identify_speaker() -> dict | None:
+        if speaker_audio is not None and rms(speaker_audio) > SPEAKER_SILENCE_THRESH:
+            result = await identify(speaker_audio, "speaker")
+            if result:
+                return extract_track_info(result)
+        return None
 
-        if speaker_audio is not None:
-            level = rms(speaker_audio)
-
-            if level > SPEAKER_SILENCE_THRESH:
-                result = await identify(speaker_audio, "speaker")
-                if result:
-                    info = extract_track_info(result)
-                    output = {**info, "note": "musique détectée par speaker"}
-                    # Reconnu : sauvegarde et fin, micro ignoré
-                    mic_audio = record_default_mic()
-                    return output
-
-    # ── Étape 2 : Microphone par défaut ───────────────────────────────────────
-    mic_audio = record_default_mic()
-
-    if mic_audio is not None:
-        level = rms(mic_audio)
-
-        if level > MIC_SILENCE_THRESH:
+    async def identify_mic() -> dict | None:
+        if mic_audio is not None and rms(mic_audio) > MIC_SILENCE_THRESH:
             result = await identify(mic_audio, "micro")
             if result:
-                info = extract_track_info(result)
-                output = {**info, "note": "musique détectée par micro"}
-            else:
-                output = {"note": "musique non reconnue"}
+                return extract_track_info(result)
+        return None
 
+    speaker_info, mic_info = await asyncio.gather(
+        identify_speaker(),
+        identify_mic(),
+    )
 
-    return output
+    return {
+        "speaker":    speaker_info,
+        "microphone": mic_info,
+    }
+
+loadPrint()#c
+
+def recognizeMusic() -> dict:
+    """Point d'entrée public. Retourne un dict avec les infos de la musique détectée."""
+    data = asyncio.run(_recognize_music_async())
+    spotify_data = spotify.nowPlaying()
+    speaker_data = data["speaker"]
+    microphone_data = data["microphone"]
+    to_return =  "Aucune chanson trouvé"
+    if microphone_data != None:
+        to_return = "Chanson trouvé sur le microphone :\n" + str( microphone_data )
+    if speaker_data != None:
+        to_return = "Chanson trouvé sur le microphone :\n" + str( speaker_data )
+    if spotify_data != None:
+        to_return = "Chanson trouvé sur le microphone :\n" + str( spotify_data )
+    print( to_return )
+    return to_return, True
 
 loadPrint()#c
 
 def playMusic( search, types, choosed_device ):
+    devices = spotify.listDevices()
     # if spotify.SearchTypes.isInTypes( types ):
     if not IS_THERE_SPOTIFY:
         return "Impossible de faire jouer de la musique", True
     try:
-        devices = spotify.listDevices()
+        while True:
+            devices = spotify.listDevices()
+            # print( f"{devices=}" )
+            if devices == []:
+                spotify.openSpotify()
+            else:
+                break
         found = False
         for device in devices:
             if device["type"] == choosed_device:
@@ -1312,16 +1390,15 @@ def playMusic( search, types, choosed_device ):
 
 loadPrint()#c
 
-def recognizeMusic() -> dict:
-    """Point d'entrée public. Retourne un dict avec les infos de la musique détectée."""
-    return str( asyncio.run(_recognize_music_async()) ), True
-
-loadPrint()#c
-
 # =====================
 # TOOL: openLink
 # =====================
-def openLink( query: str ):
+def openLink( query: str, is_direct_link ):
+    if is_direct_link:
+        success = webbrowser.open( query )
+        if success:
+            return f"ouverture de {query} réussie", False
+        return f"ouverture de {query} raté", True
     link = Model.askModel(
         WEB_MODEL,
         [
@@ -1353,8 +1430,13 @@ loadPrint()#c
 # TOOL: openApp
 # =====================
 def launchApp( app ):
-    subprocess.Popen( [app["path"]], creationflags=subprocess.DETACHED_PROCESS, shell=False)
-    return "Application lancé avec succès"
+    log( "Launching app", f"app {json.dumps( app, indent=4 )}", "info" )
+    try:
+        subprocess.Popen( [app["path"]], creationflags=subprocess.DETACHED_PROCESS, shell=False)
+    except PermissionError:
+        log( "Lauching app", f"not enough authorization for app {json.dumps( app, indent=4 )}", "error" )
+        return "Permission insuffisante pour lancer cette application", True
+    return "Application lancé avec succès", False
 
 loadPrint()#c
 
@@ -2193,10 +2275,10 @@ loadPrint()#c
 
 def treatResponse( response ):
     treated_text = treadTextResponse( response )
-    print( f"{ASSISTANT_NAME} >", treated_text )
     GUI.setTextToDisplay( treated_text )
     if AUDIO:
         treatAudioResponse( response )
+    print( f"{ASSISTANT_NAME} >", treated_text )
 
 loadPrint()#c
 
@@ -2276,7 +2358,7 @@ def chat():
             last_do_response = do_response
             while len( content["tools"] ) != 0:
                 for tool in content["tools"]:
-                    print( f"{tool["name"]} tool" )
+                    print( f"Using {tool["name"]} tool" )
                     if tool["name"] == "analyseOldImage":
                         result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
                     elif tool["name"] == "analyseNewImage":
@@ -2284,7 +2366,12 @@ def chat():
                     elif tool["name"] == "sendEmail":
                         result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
                     elif tool["name"] == "openLink":
-                        result, do_response = openLink( tool["params"]["query"] )
+                        try:
+                            query = tool["params"]["query"]
+                            result, do_response = openLink( query, False )
+                        except KeyError:
+                            query = tool["params"]["link"]
+                            result, do_response = openLink( query, True )
                     elif tool["name"] == "getLocalisation":
                         result, do_response = getLocalisation()
                     elif tool["name"] == "openApp":

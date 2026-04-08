@@ -20,3 +20,4 @@ ai_test.py
 **/web/
 current_setting.template
 *.cache
+*.wav

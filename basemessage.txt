@@ -148,7 +148,7 @@ OUTILS DISPONIBLES :
   - Tu peux l'utiliser à n'importe quel moment, sans avoir besoin d'autorisation
 
 - playMusic
-  - Faire jouer quelque chose sur spotify
+  - Faire jouer quelque chose sur spotify. Quand l'utilisateur te demande de faire jouer de la musique, l'ajouter sur spotify ou de chanter, utilise cet outil.
   - params:
     -> search (string): Ce que tu cherches sur spotify. Le plus précis possible.
     -> type (string): Le type du contenu recherché.
