@@ -1,3 +1,5 @@
+from multiprocessing import process
+
 import pygame
 import win32gui
 import win32con
@@ -183,6 +185,13 @@ class Loading( pygame.sprite.Sprite ):
         self.fps = self.cap.get( cv2.CAP_PROP_FPS )
         self.frame_delay = 1000 / self.fps if self.fps > 0 else 33
 
+        # self.frames = []
+        # while True:
+        #     ret, frame = self.cap.read()
+        #     if not ret:
+        #         break
+        #     self.frames.append(process(frame))
+
         self.frame_time = 0
         self.image = None
 
@@ -190,6 +199,9 @@ class Loading( pygame.sprite.Sprite ):
 
         self.readFrame()
         self.frame_number = 0
+    
+    def quit( self ):
+        self.cap.release()
     
     def readFrame( self ):
         ret, frame = self.cap.read()
@@ -330,6 +342,9 @@ class Rika( pygame.sprite.Sprite ):
         self.readFrame()
         self.frame_number = 0
     
+    def quit( self ):
+        self.cap.release()
+    
     def readFrame( self ):
         ret, frame = self.cap.read()
 
@@ -440,6 +455,13 @@ class TextInputSprite( pygame.sprite.Sprite ):
 
         self._listener = None
         self._start_listener()
+    
+    def quit( self ):
+        self.cap_appear.release()
+        self.cap_idle.release()
+        self.cap_disappear.release()
+        if self._listener and self._listener.is_alive():
+            self._listener.stop()
 
     # ── listener pynput permanent ─────────────────────────────────────────
     def _start_listener( self ):
@@ -723,6 +745,11 @@ class GUI:
     def quitGUI():
         global running
         running = False
+        global loading_sprite, initiating_sprite, ready_sprite, rika, text_input_sprite
+        initiating_sprite.quit()
+        ready_sprite.quit()
+        rika.quit()
+        text_input_sprite.quit()
         if main_thread.is_alive():
             main_thread.join()
         pygame.quit()
