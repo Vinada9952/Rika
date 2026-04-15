@@ -858,6 +858,7 @@ OUTILS DISPONIBLES :
   - Reconaitre la musique qui joue
 
 RÈGLES IMPORTANTES :
+- Soit consis, exact, juste, précis
 - Ne JAMAIS écrire autre chose que du JSON.
 - Répond uniquement et uniquement en français.
 - L'ordre d'apparition des outils dans "tools": [] est l'ordre d'exécution des outils
