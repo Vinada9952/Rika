@@ -4,6 +4,7 @@ from spotipy.oauth2 import SpotifyOAuth
 from email.header import decode_header
 from email.mime.text import MIMEText
 from json import JSONDecodeError
+from groq import BadRequestError
 from groq import APIStatusError
 import speech_recognition as sr
 from plyer import notification
@@ -974,31 +975,52 @@ class Model:
         log( f"Asking model", f"{model=}, {message=}, {thinking=}, {max_retries=}, {verification.__name__}", "info" )
         global clients
         can_think = True
+        can_web_search = True if model == WEB_MODEL else False
         ans = ""
         for i in range( max_retries ):
             try:
-                if can_think:
-                    ans = random.choice( clients ).chat.completions.create(
-                        model=model,
-                        messages=message,
-                        reasoning_effort=thinking
-                    ).choices[0].message.content
+                if can_web_search:
+                    if can_think:
+                        ans = random.choice( clients ).chat.completions.create(
+                            model=model,
+                            messages=message,
+                            reasoning_effort=thinking,
+                            tools=[{"type": "browser_search"}]
+                        ).choices[0].message.content
+                    else:
+                        ans = random.choice( clients ).chat.completions.create(
+                            model=model,
+                            messages=message,
+                            tools=[{"type": "browser_search"}]
+                        ).choices[0].message.content
                 else:
-                    ans = random.choice( clients ).chat.completions.create(
-                        model=model,
-                        messages=message
-                    ).choices[0].message.content
+                    if can_think:
+                        ans = random.choice( clients ).chat.completions.create(
+                            model=model,
+                            messages=message,
+                            reasoning_effort=thinking
+                        ).choices[0].message.content
+                    else:
+                        ans = random.choice( clients ).chat.completions.create(
+                            model=model,
+                            messages=message
+                        ).choices[0].message.content
                 log( "Verifying if response is correct", f"Response: {ans}, Verification: {verification.__name__}", 'info' )
                 if not verification( ans ):
                     raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__}, response is {ans}" )
                 return ans
+            except BadRequestError as e:
+                log( f"Invalid response from API", f"{str( e )}, {ans=}, {message=}", "error" )
+                print( str( e ) )
+                can_web_search = False
             except APIStatusError as e:
                 log( f"Invalid response from API", f"{str( e )}, {ans=}, {message=}", "error" )
                 print( str( e ) )
                 if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
                     can_think = False
-                if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
-                    autoEraseConversation()
+                if model == MAIN_MODEL:
+                    if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
+                        autoEraseConversation()
             except NotValidResponse as e:
                 print( str( e ) )
                 log( f"Invalid response from AI", f"{str( e )}, {ans=}, {message=}", "error" )
@@ -1528,7 +1550,9 @@ def doProtocol( name ):
                 if SERVER_URL:
                     requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
                 Json.write( conversation, "./conversation.json" )
-            subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
+                sendNotification( "Mémoire effacée", "Votre historique a été effacé pour alléger la conversation" )
+            else:
+                subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
             break
     return f"protocol {name} execution success", False
 

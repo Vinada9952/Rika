@@ -22,3 +22,4 @@ make Rika API with flask for tools
 make web version
 add stopwatch
 maybe use ollama
+add reminders

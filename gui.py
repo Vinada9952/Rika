@@ -29,8 +29,8 @@ HEIGHT = pyautogui.size().height
 print( f"{WIDTH=}, {HEIGHT=}" )
 
 FILL_COLOR = ( 0, 0, 0 )
-LIGHT_BLUE = tuple( Json.read( "./settings.json" )["gui"]["color"] )
-FONT = Json.read( "./settings.json" )["gui"]["font"]
+LIGHT_BLUE = tuple( Json.read( "settings.json" )["gui"]["color"] )
+FONT = Json.read( "settings.json" )["gui"]["font"]
 
 pygame.init()
 screen = pygame.display.set_mode( ( WIDTH, HEIGHT ) )
