@@ -2641,32 +2641,56 @@ def chat():
                 for tool in content["tools"]:
                     print( f"Using {tool["name"]} tool" )
                     if tool["name"] == "analyseOldImage":
-                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                        if WIFI:
+                            result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                        else:
+                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                     elif tool["name"] == "analyseNewImage":
-                        result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
+                        if WIFI:
+                            result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
+                        else:
+                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                     elif tool["name"] == "sendEmail":
-                        result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
+                        if WIFI:
+                            result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
+                        else:
+                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                     elif tool["name"] == "openLink":
-                        try:
-                            query = tool["params"]["query"]
-                            result, do_response = openLink( query, False )
-                        except KeyError:
-                            query = tool["params"]["link"]
-                            result, do_response = openLink( query, True )
+                        if WIFI:
+                            try:
+                                query = tool["params"]["query"]
+                                result, do_response = openLink( query, False )
+                            except KeyError:
+                                query = tool["params"]["link"]
+                                result, do_response = openLink( query, True )
+                        else:
+                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                     elif tool["name"] == "getLocalisation":
-                        result, do_response = getLocalisation()
+                        if WIFI:
+                            result, do_response = getLocalisation()
+                        else:
+                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                     elif tool["name"] == "openApp":
                         result, do_response = openApp( tool["params"]["app"] )
                     elif tool["name"] == "doProtocol":
                         result, do_response = doProtocol( tool["params"]["protocol"] )
                     elif tool["name"] == "playMusic":
-                        result, do_response = playMusic( tool["params"]["search"], tool["params"]["type"], tool["params"]["device"] )
+                        if WIFI:
+                            result, do_response = playMusic( tool["params"]["search"], tool["params"]["type"], tool["params"]["device"] )
+                        else:
+                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                     elif tool["name"] == "recognizeMusic":
-                        result, do_response = recognizeMusic()
+                        if WIFI:
+                            result, do_response = recognizeMusic()
+                        else:
+                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                     elif tool["name"] == "saveFile":
                         result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] )
                     elif tool["name"] == "webSearch":
-                        result, do_response = webSearch( tool["params"]["query"] )
+                        if WIFI:
+                            result, do_response = webSearch( tool["params"]["query"] )
+                        else:
+                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                     elif tool["name"] == "notUnderstand":
                         not_understand = True
                         break

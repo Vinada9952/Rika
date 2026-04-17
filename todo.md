@@ -23,3 +23,4 @@ add stopwatch
 maybe use ollama
 add reminders
 add choice to change the port in settings for ui-backend socket communication
+make analyseImage tool without wifi
