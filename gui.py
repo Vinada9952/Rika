@@ -212,8 +212,8 @@ class Loading( pygame.sprite.Sprite ):
         self.readFrame()
         self.frame_number = 0
     
-    # def quit( self ):
-    #     self.cap.release()
+    def quit( self ):
+        self.cap.release()
     
     def readFrame( self ):
         ret, frame = self.cap.read()
@@ -354,8 +354,8 @@ class Rika( pygame.sprite.Sprite ):
         self.readFrame()
         self.frame_number = 0
     
-    # def quit( self ):
-    #     self.cap.release()
+    def quit( self ):
+        self.cap.release()
     
     def readFrame( self ):
         ret, frame = self.cap.read()
@@ -470,12 +470,12 @@ class TextInputSprite( pygame.sprite.Sprite ):
         self._listener = None
         self._start_listener()
     
-    # def quit( self ):
-    #     self.cap_appear.release()
-    #     self.cap_idle.release()
-    #     self.cap_disappear.release()
-    #     if self._listener and self._listener.is_alive():
-    #         self._listener.stop()
+    def quit( self ):
+        self.cap_appear.release()
+        self.cap_idle.release()
+        self.cap_disappear.release()
+        if self._listener and self._listener.is_alive():
+            self._listener.stop()
 
     # ── listener pynput permanent ─────────────────────────────────────────
     def _start_listener( self ):
@@ -772,26 +772,40 @@ def send():
     while socket_running:
         if queue_send:
             input_string = str( queue_send.pop( 0 ) )
-            if not input_string.endswith( "\n" ):
-                input_string += "\n"
+
+            if not input_string.endswith( '\n' ):
+                input_string += '\n'
 
             # Envoi des données
             client_socket.sendall( input_string.encode( 'utf-8' ) )
-
-        time.sleep( 0.1 )
+        else:
+            time.sleep( 0.1 )
 
 
 def onReceiveSocket():
     global socket_running
     while socket_running:
         try:
-            message_serveur = client_socket.recv( 1024 ).decode( 'utf-8' )
-            data = json.loads( message_serveur )
-            print( "data received :", json.dumps( data, indent=4 ) )
-            if data["args"] != None:
-                callFunctionWithArgs( data["function"], data["args"] )
+            received = client_socket.recv( 1024 ).decode( 'utf-8' )
+            if received.find( '\n' ) != -1:
+                informations = received.split( '\n' )
             else:
-                callFunction( data["function"] )
+                informations = [received]
+            for i, information in enumerate( informations ):
+                if len( information ) == 0:
+                    informations.pop( i )
+            for information in informations:
+                try:
+                    print( information )
+                    data = json.loads( information )
+                    print( "data received :", json.dumps( data, indent=4 ) )
+
+                    if data["args"] != None:
+                        callFunctionWithArgs( data["function"], data["args"] )
+                    else:
+                        callFunction( data["function"] )
+                except json.JSONDecodeError as e:
+                    print( e )
         except ConnectionResetError:
             print( "Connection closed by server" )
             socket_running = False
@@ -832,10 +846,10 @@ class GUI:
         global running, socket_receive_thread, socket_send_thread
         running = False
         global loading_sprite, initiating_sprite, ready_sprite, rika, text_input_sprite
-        # initiating_sprite.quit()
-        # ready_sprite.quit()
-        # rika.quit()
-        # text_input_sprite.quit()
+        initiating_sprite.quit()
+        ready_sprite.quit()
+        rika.quit()
+        text_input_sprite.quit()
         quitSocket()
         while socket_receive_thread.is_alive():
             socket_receive_thread.join()
@@ -936,36 +950,16 @@ all_sprite.add( system_on_sprite )
 
 clock = pygame.time.Clock()
 
-def sendInput():
-    global running
-    while running:
-        sendDataSocket(
-            json.dumps(
-                {
-                    "variable": "text_input_text",
-                    "value": GUI.getInput()
-                }
-            )
-        )
-        sendDataSocket(
-            json.dumps(
-                {
-                    "variable": "text_input_state",
-                    "value": GUI.getTextInputState()
-                }
-            )
-        )
-        # print( "input sent" )
-        time.sleep( 0.5 )
-
-send_input_thread = threading.Thread( target=sendInput )
 
 charge()
 
-
+current_text = ""
+last_text = ""
+current_state = ""
+last_state = ""
 
 def main():
-    global running, initiating, loaded, ready, display_rika, last_movement, text, system_display
+    global running, initiating, loaded, ready, display_rika, last_movement, text, system_display, current_text, last_text, current_state, last_state
     global rika, loading_sprite, initiating_sprite, ready_sprite, text_input_sprite, system_on_sprite
 
     while running:
@@ -1013,6 +1007,33 @@ def main():
         ready_sprite       .update( dt )
         text_input_sprite  .update( dt )
         system_on_sprite   .update( dt )
+
+        current_text = GUI.getInput()
+        current_state = GUI.getTextInputState()
+
+        if current_text != last_text and current_text is not None:
+            print( "sending current text" )
+            sendDataSocket(
+                json.dumps(
+                    {
+                        "variable": "text_input_text",
+                        "value": current_text
+                    }
+                )
+            )
+        if current_state != last_state:
+            print( "sending current state" )
+            sendDataSocket(
+                json.dumps(
+                    {
+                        "variable": "text_input_state",
+                        "value": current_state
+                    }
+                )
+            )
+
+        last_text = current_text
+        last_state = current_state
 
         # print( "GUI updated" )
 
@@ -1062,6 +1083,4 @@ sendDataSocket(
     )
 )
 print( "sent!" )
-send_input_thread.start()
 main()
-send_input_thread.join()

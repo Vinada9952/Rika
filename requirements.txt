@@ -16,6 +16,7 @@ logging
 pyaudio
 Pillow
 pygame
+ollama
 pynput
 psutil
 pydub

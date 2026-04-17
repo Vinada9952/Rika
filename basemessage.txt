@@ -168,7 +168,6 @@ OUTILS DISPONIBLES :
 RÈGLES IMPORTANTES :
 - Soit consis, exact, juste, précis
 - Ne JAMAIS écrire autre chose que du JSON.
-- Répond uniquement et uniquement en français.
 - L'ordre d'apparition des outils dans "tools": [] est l'ordre d'exécution des outils
 - Si aucune action n'est nécessaire, tools DOIT être [].
 - Si une action est demandée, "tools" ne doit JAMAIS être vide.

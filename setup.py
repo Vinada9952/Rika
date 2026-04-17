@@ -150,7 +150,8 @@ base_settings = {
         "main": "openai/gpt-oss-120b",
         "data": "llama-3.1-8b-instant",
         "vision": "meta-llama/llama-4-scout-17b-16e-instruct",
-        "web": "openai/gpt-oss-20b"
+        "web": "openai/gpt-oss-20b",
+        "ollama": "gemma4"
     },
     "email": {
         "email": email,

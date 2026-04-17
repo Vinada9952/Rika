@@ -22,3 +22,4 @@ make web version
 add stopwatch
 maybe use ollama
 add reminders
+add choice to change the port in settings for ui-backend socket communication

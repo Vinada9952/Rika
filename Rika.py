@@ -1,3 +1,4 @@
+from requests.exceptions import ConnectionError, Timeout, RequestException
 from pygrabber.dshow_graph import FilterGraph
 from email.utils import parsedate_to_datetime
 from spotipy.oauth2 import SpotifyOAuth
@@ -8,6 +9,7 @@ from groq import BadRequestError
 from groq import APIStatusError
 import speech_recognition as sr
 from plyer import notification
+from typing import List, Dict
 from shazamio import Shazam
 import soundfile as sf
 from PIL import Image
@@ -27,6 +29,7 @@ import smtplib
 import logging
 import spotipy
 import imaplib
+import ollama
 import base64
 import pygame
 import random
@@ -50,38 +53,54 @@ socket_running = True
 to_send = ""
 queue_send = []
 
+mutex = threading.Lock()
+
 def onReceiveSocket():
     global socket_running
     # Réception des données
     while socket_running:
-        data = client_socket.recv( 1024 ).decode( 'utf-8' )
-        data = json.loads( data )
-        if data["variable"] == "text_input_text":
-            global text_input_text
-            text_input_text = data["value"]
-        elif data["variable"] == "text_input_state":
-            global text_input_state
-            text_input_state = data["value"]
-        elif data["variable"] == "gui_ready":
-            global gui_ready
-            gui_ready = data["value"]
-        # print( "new data receive in socket :", json.dumps( data, indent=4 ) )
+        received = client_socket.recv( 1024 ).decode( 'utf-8' )
+        if received.find( '\n' ) != -1:
+            informations = received.split( '\n' )
+        else:
+            informations = [received]
+        for i, information in enumerate( informations ):
+            if len( information ) == 0:
+                informations.pop( i )
+
+        for information in informations:
+            data = json.loads( information )
+            if data["variable"] == "text_input_text":
+                global text_input_text
+                text_input_text = data["value"]
+            elif data["variable"] == "text_input_state":
+                global text_input_state
+                text_input_state = data["value"]
+            elif data["variable"] == "gui_ready":
+                global gui_ready
+                gui_ready = data["value"]
+            # print( "new data receive in socket :", json.dumps( data, indent=4 ) )
 
 def send():
-    global to_send, queue_send, socket_running, client_socket
+    global to_send, queue_send, socket_running, client_socket, mutex
     while socket_running:
         if queue_send:
             # Envoi d'un message au client
-            message = str( queue_send.pop( 0 ) )
+            message = None
+            with mutex:
+                message = queue_send.pop( 0 )
+            message = str( message )
+            # message = message.replace( '\n', '' )
             if not message.endswith( "\n" ):
                 message += "\n"
             client_socket.sendall( message.encode('utf-8') )
-        
-        time.sleep( 0.1 )
+        else:
+            time.sleep( 0.1 )
 
-def sendDataSocket( value ):
-    global queue_send, to_send
-    queue_send.append( value )
+def sendDataSocket( value: str ):
+    global queue_send, to_send, mutex
+    with mutex:
+        queue_send.append( value )
 
 def quitSocket():
     global socket_running
@@ -125,8 +144,7 @@ class GUI:
                 {
                     "function": "quitGUI",
                     "args": None
-                },
-                indent=4
+                }
             )
         )
         quitSocket()
@@ -138,8 +156,7 @@ class GUI:
                 {
                     "function": "setInit",
                     "args": (state)
-                },
-                indent=4
+                }
             )
         )
 
@@ -148,9 +165,8 @@ class GUI:
             json.dumps(
                 {
                     "function": "setLoading",
-                    "args": (load)
-                },
-                indent=4
+                    "args": (int( load ))
+                }
             )
         )
 
@@ -160,8 +176,7 @@ class GUI:
                 {
                     "function": "displayRika",
                     "args": (value)
-                },
-                indent=4
+                }
             )
         )
     
@@ -171,8 +186,7 @@ class GUI:
                 {
                     "function": "setTextToDisplay",
                     "args": (value)
-                },
-                indent=4
+                }
             )
         )
     
@@ -182,14 +196,15 @@ class GUI:
                 {
                     "function": "textInput",
                     "args": (value)
-                },
-                indent=4
+                }
             )
         )
 
     def getInput():
         global text_input_text
-        return text_input_text
+        tmp = text_input_text
+        text_input_text = None
+        return tmp
     
     def getTextInputState():
         global text_input_state
@@ -249,6 +264,7 @@ def loadPrint():
     if load_print == count:
         print( "\n" )
         GUI.setInit( False )
+
 
 loadPrint()#c
 
@@ -345,6 +361,48 @@ class Sound:
         while pygame.mixer.music.get_busy():
             pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
+
+loadPrint()#c
+
+def hasWifiAccess( url = "http://www.google.com", timeout = 3 ) -> bool:
+    """
+    Tente d'établir une connexion avec un serveur externe fiable (Google)
+    pour déterminer si un accès Internet est disponible.
+    
+    Retourne True si la connexion réussit, False sinon.
+    """
+    # URL de test : On utilise une URL très stable.
+    # HEAD est utilisé car il ne télécharge que l'en-tête (plus rapide que GET).
+
+    try:
+        # On fait une requête HEAD au lieu de GET pour optimiser la bande passante
+        response = requests.head(url, timeout=timeout, allow_redirects=True)
+        
+        # Si la requête réussit (code de statut 200-399), l'Internet est fonctionnel.
+        # On vérifie même si le code de statut est dans la plage "succès"
+        if response.status_code < 400:
+            # print("✅ Connexion réussie.")
+            return True
+        else:
+            # print(f"❌ Échec de la connexion (Code {response.status_code}).")
+            return False
+             
+    except ConnectionError:
+        # Cette exception est levée si aucun réseau n'est détecté ou si le DNS échoue.
+        # print("❌ Échec de la connexion réseau (Problème de câble, Wi-Fi, etc.).")
+        return False
+    except Timeout:
+        # Cette exception est levée si le délai d'attente est dépassé.
+        # print("⏳ Timeout de connexion (Le serveur ne répond pas à temps).")
+        return False
+    except RequestException as e:
+        # Capture toutes les autres erreurs de la bibliothèque requests.
+        # print(f"❌ Erreur réseau imprévue : {e}")
+        return False
+    
+loadPrint()#c
+
+WIFI = hasWifiAccess()
 
 loadPrint()#c
 
@@ -672,6 +730,8 @@ clients = [
 ]
 del API_KEYS
 
+ollama_client = ollama.Client()
+
 loadPrint()#c
 
 call_names = settings["call"]["names"]
@@ -683,6 +743,7 @@ MAIN_MODEL = settings["models"]["main"]
 VISION_MODEL = settings["models"]["vision"]
 ASK_MODEL = settings["models"]["data"]
 WEB_MODEL = settings["models"]["web"]
+OLLAMA_MODEL = settings["models"]["ollama"]
 MAX_RETRIES = settings["api"]["max-api-retries"]
 ASSISTANT_NAME = settings["assistant-name"]
 
@@ -1014,7 +1075,6 @@ OUTILS DISPONIBLES :
 RÈGLES IMPORTANTES :
 - Soit consis, exact, juste, précis
 - Ne JAMAIS écrire autre chose que du JSON.
-- Répond uniquement et uniquement en français.
 - L'ordre d'apparition des outils dans "tools": [] est l'ordre d'exécution des outils
 - Si aucune action n'est nécessaire, tools DOIT être [].
 - Si une action est demandée, "tools" ne doit JAMAIS être vide.
@@ -1124,40 +1184,83 @@ def sendNotification(title, message):
 loadPrint()#c
 
 class Model:
-    def askModel( model: str, message: dict, thinking: str, max_retries: int, verification ):
+    def askOllamaModel(model: str, conversation: List[Dict[str, str]]) -> str:
+        global ollama_client
+        """
+        Envoie une requête de chat à un modèle Ollama local en utilisant l'historique de la conversation.
+
+        Args:
+            model (str): Le nom du modèle à utiliser (ex: "llama2", "mistral").
+            conversation (List[Dict[str, str]]): La liste des messages de conversation.
+                Chaque élément doit être un dictionnaire avec 'role' et 'content'.
+                Exemple: [{"role": "user", "content": "Bonjour"}, {"role": "assistant", "content": "Salut !"}]
+
+        Returns:
+            str: La réponse générée par le modèle, ou un message d'erreur.
+        """
+        if ollama_client is None:
+            return "ERREUR: Impossible de se connecter au client Ollama. Veuillez vérifier que le serveur est lancé."
+        
+        if model is None:
+            return "ERREUR: Veuillez spécifier un modèle."
+
+        # print(f"\n🤖 Envoi de la requête au modèle '{model}'...")
+
+        try:
+            # Utilisation de client.chat() pour envoyer l'historique complet
+            response = ollama_client.chat(
+                model=model,
+                messages=conversation
+            )
+            
+            # Extraction du contenu de la réponse
+            return response['message']['content']
+
+        except Exception as e:
+            if "model not found" in str(e):
+                return f"ERREUR: Le modèle '{model}' n'est pas trouvé ou n'est pas téléchargé. Veuillez exécuter 'ollama pull {model}'."
+            elif "connection error" in str(e) or "connection refused" in str(e):
+                return "ERREUR DE CONNEXION: Le serveur Ollama semble être arrêté. Veuillez le relancer."
+            else:
+                return f"Une erreur inattendue est survenue: {e}"
+
+    def askGroqModel( model: str, message: dict, thinking: str, max_retries: int, verification ):
         log( f"Asking model", f"{model=}, {message=}, {thinking=}, {max_retries=}, {verification.__name__}", "info" )
-        global clients
+        global clients, WIFI
         can_think = True
         can_web_search = True if model == WEB_MODEL else False
         ans = ""
         for i in range( max_retries ):
             try:
-                if can_web_search:
-                    if can_think:
-                        ans = random.choice( clients ).chat.completions.create(
-                            model=model,
-                            messages=message,
-                            reasoning_effort=thinking,
-                            tools=[{"type": "browser_search"}]
-                        ).choices[0].message.content
+                if WIFI:
+                    if can_web_search:
+                        if can_think:
+                            ans = random.choice( clients ).chat.completions.create(
+                                model=model,
+                                messages=message,
+                                reasoning_effort=thinking,
+                                tools=[{"type": "browser_search"}]
+                            ).choices[0].message.content
+                        else:
+                            ans = random.choice( clients ).chat.completions.create(
+                                model=model,
+                                messages=message,
+                                tools=[{"type": "browser_search"}]
+                            ).choices[0].message.content
                     else:
-                        ans = random.choice( clients ).chat.completions.create(
-                            model=model,
-                            messages=message,
-                            tools=[{"type": "browser_search"}]
-                        ).choices[0].message.content
+                        if can_think:
+                            ans = random.choice( clients ).chat.completions.create(
+                                model=model,
+                                messages=message,
+                                reasoning_effort=thinking
+                            ).choices[0].message.content
+                        else:
+                            ans = random.choice( clients ).chat.completions.create(
+                                model=model,
+                                messages=message
+                            ).choices[0].message.content
                 else:
-                    if can_think:
-                        ans = random.choice( clients ).chat.completions.create(
-                            model=model,
-                            messages=message,
-                            reasoning_effort=thinking
-                        ).choices[0].message.content
-                    else:
-                        ans = random.choice( clients ).chat.completions.create(
-                            model=model,
-                            messages=message
-                        ).choices[0].message.content
+                    ans = Model.askOllamaModel( OLLAMA_MODEL, conversation )
                 log( "Verifying if response is correct", f"Response: {ans}, Verification: {verification.__name__}", 'info' )
                 if not verification( ans ):
                     raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__}, response is {ans}" )
@@ -1211,7 +1314,7 @@ def image_to_base64( path ):
 loadPrint()#c
 
 def webSearch( query: str ):
-    result = Model.askModel(
+    result = Model.askGroqModel(
         WEB_MODEL,
         [
             {
@@ -1575,7 +1678,7 @@ def openLink( query: str, is_direct_link ):
         if success:
             return f"ouverture de {query} réussie", False
         return f"ouverture de {query} raté", True
-    link = Model.askModel(
+    link = Model.askGroqModel(
         WEB_MODEL,
         [
             {
@@ -1630,7 +1733,7 @@ loadPrint()#c
 def appPath( apps, app: str ):
     print( f"{apps=}" )
     for i in range( MAX_RETRIES ):
-        path = Model.askModel(
+        path = Model.askGroqModel(
             "llama-3.1-8b-instant",
             [
                 {
@@ -2216,7 +2319,7 @@ def analyseImage( type, prompt, renew ):
         return "Type invalide", True
 
     print( "ask model for vision" )
-    response = Model.askModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
+    response = Model.askGroqModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
 
     return f"voici l'image. Fait ce que {USERNAME} te demande de faire avec : " + response, True
 
@@ -2286,7 +2389,7 @@ def summarized( response: str ):
     if len( response.split( ' ' ) ) < 50:
         return response
     print( "ask model for summary" )
-    summary = Model.askModel(
+    summary = Model.askGroqModel(
         ASK_MODEL,
         [
             {
@@ -2512,7 +2615,7 @@ def chat():
             response = None
             # while True:
             print( "ask model for chatting (1)" )
-            response = Model.askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+            response = Model.askGroqModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
 
             content = json.loads( response )
             conversation.append( 
@@ -2596,7 +2699,7 @@ def chat():
                     break
                 if do_response:
                     print( "ask model for chatting (2)" )
-                    response = Model.askModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+                    response = Model.askGroqModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
                     
                     conversation.append( 
                         {
