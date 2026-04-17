@@ -1,4 +1,3 @@
-gui crashes when all windows are minimized
 upload files
 spotify API
 mode incognito

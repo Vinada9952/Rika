@@ -13,7 +13,6 @@ import soundfile as sf
 from PIL import Image
 from groq import Groq
 import pyaudiowpatch
-from gui import GUI
 import numpy as np
 import webbrowser
 import subprocess
@@ -31,6 +30,7 @@ import imaplib
 import base64
 import pygame
 import random
+import socket
 import email
 import glob
 import json
@@ -39,8 +39,161 @@ import time
 import cv2
 import sys
 import mss
-import os
 import re
+import os
+
+serveur_socket = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
+serveur_socket.bind( ( '0.0.0.0', 5789 ) )
+client_socket = None
+
+socket_running = True
+to_send = ""
+queue_send = []
+
+def onReceiveSocket():
+    global socket_running
+    # Réception des données
+    while socket_running:
+        data = client_socket.recv( 1024 ).decode( 'utf-8' )
+        data = json.loads( data )
+        if data["variable"] == "text_input_text":
+            global text_input_text
+            text_input_text = data["value"]
+        elif data["variable"] == "text_input_state":
+            global text_input_state
+            text_input_state = data["value"]
+        elif data["variable"] == "gui_ready":
+            global gui_ready
+            gui_ready = data["value"]
+        # print( "new data receive in socket :", json.dumps( data, indent=4 ) )
+
+def send():
+    global to_send, queue_send, socket_running, client_socket
+    while socket_running:
+        if queue_send:
+            # Envoi d'un message au client
+            message = str( queue_send.pop( 0 ) )
+            if not message.endswith( "\n" ):
+                message += "\n"
+            client_socket.sendall( message.encode('utf-8') )
+        
+        time.sleep( 0.1 )
+
+def sendDataSocket( value ):
+    global queue_send, to_send
+    queue_send.append( value )
+
+def quitSocket():
+    global socket_running
+    socket_running = False
+
+socket_receive_thread = threading.Thread( target=onReceiveSocket )
+socket_send_thread = threading.Thread( target=send )
+
+socket_receive_thread.daemon = True
+socket_send_thread.daemon = True
+
+text_input_text = None
+text_input_state = "hidden"
+
+# def gui():
+#     subprocess.run( ["python3", "./gui.py"] )
+#     # os.system( "python3 ./gui.py" )
+
+gui_ready = False
+
+class GUI:
+    def startGUI():
+        global serveur_socket, client_socket, socket_send_thread, socket_receive_thread
+        # thread_gui = threading.Thread( target=gui )
+        # thread_gui.start()
+        subprocess.Popen( ["python3", "./gui.py"], creationflags=subprocess.DETACHED_PROCESS, shell=False)
+        serveur_socket.listen()
+        client_socket, _ = serveur_socket.accept()
+        socket_send_thread.start()
+        socket_receive_thread.start()
+        global gui_ready
+        while not gui_ready:
+            print( f"{gui_ready=}" )
+            time.sleep( 1 )
+
+
+    def quitGUI():
+        global socket_send_thread, socket_receive_thread
+        sendDataSocket(
+            json.dumps(
+                {
+                    "function": "quitGUI",
+                    "args": None
+                },
+                indent=4
+            )
+        )
+        quitSocket()
+
+
+    def setInit( state: bool ):
+        sendDataSocket(
+            json.dumps(
+                {
+                    "function": "setInit",
+                    "args": (state)
+                },
+                indent=4
+            )
+        )
+
+    def setLoading( load ):
+        sendDataSocket(
+            json.dumps(
+                {
+                    "function": "setLoading",
+                    "args": (load)
+                },
+                indent=4
+            )
+        )
+
+    def displayRika( value ):
+        sendDataSocket(
+            json.dumps(
+                {
+                    "function": "displayRika",
+                    "args": (value)
+                },
+                indent=4
+            )
+        )
+    
+    def setTextToDisplay( value ):
+        sendDataSocket(
+            json.dumps(
+                {
+                    "function": "setTextToDisplay",
+                    "args": (value)
+                },
+                indent=4
+            )
+        )
+    
+    def textInput( value: bool ):
+        sendDataSocket(
+            json.dumps(
+                {
+                    "function": "textInput",
+                    "args": (value)
+                },
+                indent=4
+            )
+        )
+
+    def getInput():
+        global text_input_text
+        return text_input_text
+    
+    def getTextInputState():
+        global text_input_state
+        return text_input_state
 
 GUI.startGUI()
 

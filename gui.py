@@ -1,16 +1,23 @@
 from multiprocessing import process
-
-import pygame
+from pynput import mouse, keyboard
+import pygetwindow as gw
+import threading
+import pyautogui
 import win32gui
 import win32con
 import win32api
-import pyautogui
-import pygetwindow as gw
-import time
-import threading
-import cv2
-from pynput import mouse, keyboard
+import pygame
+import socket
 import json
+import time
+import sys
+import cv2
+
+charged = 0
+def charge():
+    global charged
+    charged += 1
+    print( f"Charged {charged}" )
 
 class Json:
     def write( informations: dict, json_name: str ):
@@ -22,6 +29,7 @@ class Json:
             informations = json.load( infile )
         return informations
 
+charge()
 
 WIDTH = pyautogui.size().width
 HEIGHT = pyautogui.size().height
@@ -36,6 +44,7 @@ pygame.init()
 screen = pygame.display.set_mode( ( WIDTH, HEIGHT ) )
 pygame.display.set_caption( 'Rika' )
 
+charge()
 
 hwnd = pygame.display.get_wm_info()["window"]
 win32gui.SetWindowLong( 
@@ -60,6 +69,7 @@ win32gui.SetWindowPos(
     win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
 )
 
+charge()
 
 # def hasUserActivity( 
 #     detect_mouse_move: bool = True,
@@ -132,41 +142,43 @@ def forceTopmost():
         win32con.HWND_TOPMOST,
         0, 0, 0, 0,
         win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOACTIVATE
- )
+)
 
-def onFocusGained( hwnd, callback ):
-    global running
-    def _watch():
-        global running
-        was_focused = False
-        while running:
-            focused_hwnd = win32gui.GetForegroundWindow()
-            is_focused = ( focused_hwnd == hwnd )
+# def onFocusGained( hwnd, callback ):
+#     global running
+#     def _watch():
+#         global running
+#         was_focused = False
+#         while running:
+#             focused_hwnd = win32gui.GetForegroundWindow()
+#             is_focused = ( focused_hwnd == hwnd )
             
-            if is_focused and not was_focused:
-                if callback is not None:
-                    callback()
+#             if is_focused and not was_focused:
+#                 if callback is not None:
+#                     callback()
 
-            was_focused = is_focused
-            time.sleep( 0.5 )  # 0.1 → 0.5 pour éviter le spam si aucune fenêtre dispo
+#             was_focused = is_focused
+#             time.sleep( 0.5 )  # 0.1 → 0.5 pour éviter le spam si aucune fenêtre dispo
     
-    t = threading.Thread( target=_watch, daemon=True )
-    t.start()
-    return t
+#     t = threading.Thread( target=_watch, daemon=True )
+#     t.start()
+#     return t
 
-def looseFocus():
-    other_windows = []
-    def enum_handler( h, _ ):
-        if h != hwnd and win32gui.IsWindowVisible( h ) and win32gui.GetWindowText( h ):
-            other_windows.append( h )
-    win32gui.EnumWindows( enum_handler, None )
+# def looseFocus():
+#     # return
+#     other_windows = []
+#     def enum_handler( h, _ ):
+#         if h != hwnd and win32gui.IsWindowVisible( h ) and win32gui.GetWindowText( h ):
+#             other_windows.append( h )
+#     win32gui.EnumWindows( enum_handler, None )
     
-    if other_windows:
-        pyautogui.hotkey( 'alt', 'tab' )
-    else:
-        # Minimise plutôt que de crasher
-        win32gui.ShowWindow( hwnd, win32con.SW_MINIMIZE )
+#     if other_windows:
+#         pyautogui.hotkey( 'alt', 'tab' )
+#     else:
+#         # Minimise plutôt que de crasher
+#         win32gui.ShowWindow( hwnd, win32con.SW_MINIMIZE )
 
+charge()
 
 class Loading( pygame.sprite.Sprite ):
     last_image = None
@@ -200,8 +212,8 @@ class Loading( pygame.sprite.Sprite ):
         self.readFrame()
         self.frame_number = 0
     
-    def quit( self ):
-        self.cap.release()
+    # def quit( self ):
+    #     self.cap.release()
     
     def readFrame( self ):
         ret, frame = self.cap.read()
@@ -342,8 +354,8 @@ class Rika( pygame.sprite.Sprite ):
         self.readFrame()
         self.frame_number = 0
     
-    def quit( self ):
-        self.cap.release()
+    # def quit( self ):
+    #     self.cap.release()
     
     def readFrame( self ):
         ret, frame = self.cap.read()
@@ -426,6 +438,8 @@ class Rika( pygame.sprite.Sprite ):
         if not self.frame_updated:
             self.image = self.last_image
 
+charge()
+
 class TextInputSprite( pygame.sprite.Sprite ):
     last_image = None
     frame_updated = False
@@ -456,12 +470,12 @@ class TextInputSprite( pygame.sprite.Sprite ):
         self._listener = None
         self._start_listener()
     
-    def quit( self ):
-        self.cap_appear.release()
-        self.cap_idle.release()
-        self.cap_disappear.release()
-        if self._listener and self._listener.is_alive():
-            self._listener.stop()
+    # def quit( self ):
+    #     self.cap_appear.release()
+    #     self.cap_idle.release()
+    #     self.cap_disappear.release()
+    #     if self._listener and self._listener.is_alive():
+    #         self._listener.stop()
 
     # ── listener pynput permanent ─────────────────────────────────────────
     def _start_listener( self ):
@@ -733,37 +747,118 @@ def focusWindow():
         win.restore()   # si minimisée
         win.activate()  # focus
 
+charge()
+
 mouse.Listener( on_move=_trigger, on_click=_trigger, on_scroll=_trigger ).start()
 keyboard.Listener( on_press=_trigger ).start()
 
+client_socket = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
+client_socket.connect( ( 'localhost', 5789 ) )
+
+socket_running = True
+queue_send = []
+to_send = ""
+
+def callFunctionWithArgs( func_name, *args ):
+    if func_name in functions:
+        functions[func_name]( *args )
+
+def callFunction( func_name ):
+    if func_name in functions:
+        functions[func_name]()
+
+def send():
+    global queue_send, to_send, socket_running
+    while socket_running:
+        if queue_send:
+            input_string = str( queue_send.pop( 0 ) )
+            if not input_string.endswith( "\n" ):
+                input_string += "\n"
+
+            # Envoi des données
+            client_socket.sendall( input_string.encode( 'utf-8' ) )
+
+        time.sleep( 0.1 )
+
+
+def onReceiveSocket():
+    global socket_running
+    while socket_running:
+        try:
+            message_serveur = client_socket.recv( 1024 ).decode( 'utf-8' )
+            data = json.loads( message_serveur )
+            print( "data received :", json.dumps( data, indent=4 ) )
+            if data["args"] != None:
+                callFunctionWithArgs( data["function"], data["args"] )
+            else:
+                callFunction( data["function"] )
+        except ConnectionResetError:
+            print( "Connection closed by server" )
+            socket_running = False
+            GUI.quitGUI()
+
+
+def sendDataSocket( value ):
+    global queue_send
+    queue_send.append( value )
+
+
+def quitSocket():
+    global socket_running
+    socket_running = False
+
+charge()
+
+socket_receive_thread = threading.Thread( target=onReceiveSocket )
+socket_send_thread = threading.Thread( target=send )
+
+socket_receive_thread.daemon = True
+socket_send_thread.daemon = True
+
+socket_receive_thread.start()
+socket_send_thread.start()
+
+charge()
+
 class GUI:
     def startGUI():
-        global main_thread
-        main_thread.start()
+        print( "Start GUI" )
+        global running
+        running = True
 
 
     def quitGUI():
-        global running
+        print( "Quit GUI" )
+        global running, socket_receive_thread, socket_send_thread
         running = False
         global loading_sprite, initiating_sprite, ready_sprite, rika, text_input_sprite
-        initiating_sprite.quit()
-        ready_sprite.quit()
-        rika.quit()
-        text_input_sprite.quit()
-        if main_thread.is_alive():
-            main_thread.join()
+        # initiating_sprite.quit()
+        # ready_sprite.quit()
+        # rika.quit()
+        # text_input_sprite.quit()
+        quitSocket()
+        while socket_receive_thread.is_alive():
+            socket_receive_thread.join()
+        while socket_send_thread.is_alive():
+            socket_send_thread.join()
         pygame.quit()
+        sys.exit()
+        exit()
+        raise Exception( "Quit GUI" )
 
 
     def setInit( state: bool ):
+        print( f"Set initiating: {state}" )
         global initiating
         initiating = state
 
     def setLoading( load ):
+        print( f"Set loading: {load}" )
         global loaded
         loaded = load
     
     def displayRika( value ):
+        print( f"Set display rika: {value}" )
         global display_rika, last_movement
         display_rika = value
         if display_rika == False:
@@ -771,10 +866,12 @@ class GUI:
         last_movement = 0
     
     def setTextToDisplay( value ):
+        print( f"Set text to display: {value}" )
         global text
         text = value
     
     def textInput( value: bool ):
+        print( f"Set text input visible: {value}" )
         global text_input_sprite
         text_input_sprite.setVisible( value )
     
@@ -788,6 +885,19 @@ class GUI:
 
     def forceTopMost():
         forceTopmost()
+
+charge()
+
+functions = {
+    "quitGUI": GUI.quitGUI,
+    "setInit": GUI.setInit,
+    "setLoading": GUI.setLoading,
+    "displayRika": GUI.displayRika,
+    "setTextToDisplay": GUI.setTextToDisplay,
+    "textInput": GUI.textInput,
+}
+
+charge()
 
 all_sprite = pygame.sprite.Group()
 
@@ -815,6 +925,8 @@ text_input_sprite = TextInputSprite(
     ( WIDTH // 2, HEIGHT // 2 ),
 )
 
+charge()
+
 all_sprite.add( initiating_sprite )
 all_sprite.add( loading_sprite )
 all_sprite.add( ready_sprite )
@@ -824,9 +936,37 @@ all_sprite.add( system_on_sprite )
 
 clock = pygame.time.Clock()
 
+def sendInput():
+    global running
+    while running:
+        sendDataSocket(
+            json.dumps(
+                {
+                    "variable": "text_input_text",
+                    "value": GUI.getInput()
+                }
+            )
+        )
+        sendDataSocket(
+            json.dumps(
+                {
+                    "variable": "text_input_state",
+                    "value": GUI.getTextInputState()
+                }
+            )
+        )
+        # print( "input sent" )
+        time.sleep( 0.5 )
+
+send_input_thread = threading.Thread( target=sendInput )
+
+charge()
+
+
 
 def main():
     global running, initiating, loaded, ready, display_rika, last_movement, text, system_display
+    global rika, loading_sprite, initiating_sprite, ready_sprite, text_input_sprite, system_on_sprite
 
     while running:
         dt = clock.get_time()
@@ -867,13 +1007,14 @@ def main():
                 rika.setPos( ( 20, HEIGHT-WIDTH/7-20 ) )
                 
 
-
         rika               .update( dt, ready, display_rika )
         loading_sprite     .update( loaded, initiating )
         initiating_sprite  .update( dt, initiating )
         ready_sprite       .update( dt )
         text_input_sprite  .update( dt )
         system_on_sprite   .update( dt )
+
+        # print( "GUI updated" )
 
         font_size = max( 12, int( 36 * rika.current_size[0] / ( WIDTH / 3 ) ) )
         font = pygame.font.Font( FONT, font_size )
@@ -902,59 +1043,25 @@ def main():
 
         clock.tick( 30 )
 
-onFocusGained( hwnd, looseFocus )
+charge()
 
-main_thread = threading.Thread( target=main )
-main_thread.daemon = True
+# onFocusGained( hwnd, looseFocus )
 
+# main_thread = threading.Thread( target=main )
+# main_thread.daemon = True
 
-def test():
-    print( "start" )
-    GUI.startGUI()
-    time.sleep( 1 )
-
-    print( "init true" )
-    GUI.setInit( True )
-    time.sleep( 1 )
-
-    print( "Loading" )
-    GUI.setLoading( 100 )
-    time.sleep( 2 )
-
-    print( "init false" )
-    GUI.setInit( False )
-    time.sleep( 5 )
-
-    print( "display Rika" )
-    GUI.displayRika( True )
-    time.sleep( 5 )
-
-    print( "text display" )
-    GUI.setTextToDisplay( "Hello World, this is a test text for Rika GUI text display" )
-    time.sleep( 5 )
-
-    GUI.textInput( True )
-    
-    while True:
-        time.sleep( 0.5 )
-        text = GUI.getInput()
-        if text:
-            print( text )
-            break
-    GUI.textInput( False )
-
-    try:
-        while True:
-            time.sleep( 100 )
-    except KeyboardInterrupt:
-        pass
-
-    print( "remove Rika" )
-    GUI.displayRika( False )
-    time.sleep( 15 )
-
-    print( "quit" )
-    GUI.quitGUI()
-
-
-# test()
+GUI.startGUI()
+print( "sending ready..." )
+time.sleep( 1 )
+sendDataSocket(
+    json.dumps(
+        {
+            "variable": "gui_ready",
+            "value": True
+        }
+    )
+)
+print( "sent!" )
+send_input_thread.start()
+main()
+send_input_thread.join()
