@@ -1,12 +1,10 @@
 upload files
-spotify API
 mode incognito
 add output diagram in Json
 connect to school portal
 time for the user to refuse a prompt or the ai tofind unintended prompts
 Log
 User can choose language of assistant
-script to update settings to newer version with settings template
 notifications
 user's note for ai
 mac adaptation (and maybe linux)
@@ -15,7 +13,6 @@ assistant can send documents in mails
 fix webcam index
 either make the shortcut every prompt in write mode or make the shortcut work in write mode
 fix notUnderstand
-fix analyseImage when just ask to analyse image
 add sonor effects when assistant activates and deactivate
 make Rika API with flask for tools
 make web version
@@ -25,4 +22,4 @@ add reminders
 add choice to change the port in settings for ui-backend socket communication
 organize how models are used
 make log output real json and not string json
-make sprites frames in array instead of videocapture
+if prompt is also in call, just make the response without anything else. otherwise, continue conversation

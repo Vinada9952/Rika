@@ -197,74 +197,73 @@ class Loading( pygame.sprite.Sprite ):
         self.fps = self.cap.get( cv2.CAP_PROP_FPS )
         self.frame_delay = 1000 / self.fps if self.fps > 0 else 33
 
-        # self.frames = []
-        # while True:
-        #     ret, frame = self.cap.read()
-        #     if not ret:
-        #         break
-        #     self.frames.append(process(frame))
+        # Charger toutes les frames dans un array
+        self.frames = []
+        while True:
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
+
+            # 🔥 créer un alpha basé sur la luminosité
+            gray = cv2.cvtColor( frame, cv2.COLOR_RGB2GRAY )
+
+            # seuil → ajuste ici ( plus haut = enlève plus de noir )
+            _, alpha = cv2.threshold( gray, 25, 255, cv2.THRESH_BINARY )
+
+            # combine RGB + Alpha → RGBA
+            frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
+            frame_rgba[:, :, 3] = alpha
+
+            # pygame
+            surface = pygame.image.frombuffer( 
+                frame_rgba.tobytes(),
+                frame_rgba.shape[1::-1],
+                "RGBA"
+            )
+
+            # scale to full width, preserve aspect ratio
+            scale_x = WIDTH / surface.get_width()
+            
+            new_width = WIDTH
+            new_height = int( surface.get_height() * scale_x )
+            surface = pygame.transform.scale( surface, ( new_width, new_height ) )
+            
+            # center vertically
+            self.frames.append( surface.convert_alpha() )
+
+        self.cap.release()
 
         self.frame_time = 0
-        self.image = None
+        self.image = self.frames[0] if self.frames else None
 
-        self.rect = pygame.Rect( 0, 0, WIDTH, HEIGHT )
+        self.rect = pygame.Rect( 0, 0, new_width if self.frames else 0, new_height if self.frames else 0 )
 
-        self.readFrame()
         self.frame_number = 0
+        self.last_image = self.image
     
     def quit( self ):
         self.cap.release()
     
     def readFrame( self ):
-        ret, frame = self.cap.read()
+        self.frame_number = (self.frame_number + 1) % len(self.frames)
+        surface = self.frames[self.frame_number]
 
-        if not ret:
-            self.cap.set( cv2.CAP_PROP_POS_FRAMES, 0 )
-            ret, frame = self.cap.read()
-        self.frame_number = int( self.cap.get( cv2.CAP_PROP_POS_FRAMES ) ) - 1
-
-        frame = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
-
-        # 🔥 créer un alpha basé sur la luminosité
-        gray = cv2.cvtColor( frame, cv2.COLOR_RGB2GRAY )
-
-        # seuil → ajuste ici ( plus haut = enlève plus de noir )
-        _, alpha = cv2.threshold( gray, 25, 255, cv2.THRESH_BINARY )
-
-        # combine RGB + Alpha → RGBA
-        frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
-        frame_rgba[:, :, 3] = alpha
-
-        # pygame
-        surface = pygame.image.frombuffer( 
-            frame_rgba.tobytes(),
-            frame_rgba.shape[1::-1],
-            "RGBA"
-        )
-
-        # scale to full width, preserve aspect ratio
-        scale_x = WIDTH / surface.get_width()
-        
-        new_width = WIDTH
-        new_height = int( surface.get_height() * scale_x )
-        surface = pygame.transform.scale( surface, ( new_width, new_height ) )
-        
         # center vertically
         self.rect.x = 0
         self.rect.y = 0
-        self.rect.width = new_width
-        self.rect.height = new_height
+        self.rect.width = surface.get_width()
+        self.rect.height = surface.get_height()
 
-        self.image = surface.convert_alpha()
+        self.image = surface
         self.last_image = self.image
         self.frame_updated = True
     
     def setToFrame( self, frame_number ):
         if frame_number < 0:
             frame_number = 0
-        elif frame_number >= self.frame_total:
-            frame_number = self.frame_total - 1
-        self.cap.set( cv2.CAP_PROP_POS_FRAMES, frame_number )
+        elif frame_number >= len(self.frames):
+            frame_number = len(self.frames) - 1
         self.frame_number = frame_number
 
     def update( self, dt, initiating: bool ):
@@ -276,13 +275,21 @@ class Loading( pygame.sprite.Sprite ):
 
         # print( f"{initiating=}, {self.frame_number=}, {self.frame_total=}" )
         if initiating:
-            if self.frame_number != 230:
-                self.readFrame()
+            if self.frame_number < 230:
+                self.frame_number += 1
+                if self.frame_number >= len(self.frames):
+                    self.frame_number = len(self.frames) - 1
+                self.image = self.frames[self.frame_number]
+                self.frame_updated = True
         if initiating == False:
             if self.frame_number != 0:
                 if self.frame_number < 230:
-                    self.setToFrame( 230 )
-                self.readFrame()
+                    self.frame_number = 230
+                self.frame_number += 1
+                if self.frame_number >= len(self.frames):
+                    self.frame_number = 0
+                self.image = self.frames[self.frame_number]
+                self.frame_updated = True
         
         if not self.frame_updated:
             self.image = self.last_image
@@ -296,8 +303,12 @@ class SystemReady( Loading ):
             self.frame_time = 0
         
         if self.frame_number != 0:
-            self.readFrame()
+            self.frame_number += 1
+            if self.frame_number >= len(self.frames):
+                self.frame_number = 0
+            self.image = self.frames[self.frame_number]
             self.rect.y = HEIGHT/3
+            self.frame_updated = True
         if self.frame_number == 50:
             self.setToFrame( 230 )
         
@@ -313,9 +324,13 @@ class SystemOn( Loading ):
             self.frame_time = 0
         
         if self.frame_number != 0:
-            self.readFrame()
+            self.frame_number += 1
+            if self.frame_number >= len(self.frames):
+                self.frame_number = 0
+            self.image = self.frames[self.frame_number]
             self.image = pygame.transform.scale( self.image, ( self.rect.width/10, self.rect.height/10 ) )
             self.rect.y = HEIGHT-HEIGHT/10
+            self.frame_updated = True
         if self.frame_number == 50:
             self.setToFrame( 230 )
         
@@ -343,47 +358,53 @@ class Rika( pygame.sprite.Sprite ):
         self.fps = self.cap.get( cv2.CAP_PROP_FPS )
         self.frame_delay = 1000 / self.fps if self.fps > 0 else 33
 
+        # Charger toutes les frames dans un array
+        self.frames = []
+        while True:
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
+
+            # 🔥 créer un alpha basé sur la luminosité
+            gray = cv2.cvtColor( frame, cv2.COLOR_RGB2GRAY )
+
+            # seuil → ajuste ici ( plus haut = enlève plus de noir )
+            _, alpha = cv2.threshold( gray, 25, 255, cv2.THRESH_BINARY )
+
+            # combine RGB + Alpha → RGBA
+            frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
+            frame_rgba[:, :, 3] = alpha
+
+            # pygame
+            surface = pygame.image.frombuffer( 
+                frame_rgba.tobytes(),
+                frame_rgba.shape[1::-1],
+                "RGBA"
+            )
+            
+            self.frames.append( surface.convert_alpha() )
+
+        self.cap.release()
+
         self.frame_time = 0
-        self.image = None
+        self.image = self.frames[0] if self.frames else None
 
         self.current_pos = ( WIDTH/3, HEIGHT/5 )
         self.current_size = ( WIDTH/3, WIDTH/3 )
 
         self.rect = pygame.Rect( 0, 0, WIDTH/3, WIDTH/3 )
 
-        self.readFrame()
         self.frame_number = 0
+        self.last_image = self.image
     
     def quit( self ):
         self.cap.release()
     
     def readFrame( self ):
-        ret, frame = self.cap.read()
+        self.frame_number = (self.frame_number + 1) % len(self.frames)
+        surface = self.frames[self.frame_number]
 
-        if not ret:
-            self.cap.set( cv2.CAP_PROP_POS_FRAMES, 0 )
-            ret, frame = self.cap.read()
-        self.frame_number = int( self.cap.get( cv2.CAP_PROP_POS_FRAMES ) ) - 1
-
-        frame = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
-
-        # 🔥 créer un alpha basé sur la luminosité
-        gray = cv2.cvtColor( frame, cv2.COLOR_RGB2GRAY )
-
-        # seuil → ajuste ici ( plus haut = enlève plus de noir )
-        _, alpha = cv2.threshold( gray, 25, 255, cv2.THRESH_BINARY )
-
-        # combine RGB + Alpha → RGBA
-        frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
-        frame_rgba[:, :, 3] = alpha
-
-        # pygame
-        surface = pygame.image.frombuffer( 
-            frame_rgba.tobytes(),
-            frame_rgba.shape[1::-1],
-            "RGBA"
-        )
-        
         surface = pygame.transform.scale( surface, ( self.current_size[0], self.current_size[1] ) )
         
         # center vertically
@@ -392,7 +413,7 @@ class Rika( pygame.sprite.Sprite ):
         self.rect.width = self.current_size[0]
         self.rect.height = self.current_size[1]
 
-        self.image = surface.convert_alpha()
+        self.image = surface
         self.last_image = self.image
         self.frame_updated = True
 
@@ -405,9 +426,8 @@ class Rika( pygame.sprite.Sprite ):
     def setToFrame( self, frame_number ):
         if frame_number < 0:
             frame_number = 0
-        elif frame_number >= self.frame_total:
-            frame_number = self.frame_total - 1
-        self.cap.set( cv2.CAP_PROP_POS_FRAMES, frame_number )
+        elif frame_number >= len(self.frames):
+            frame_number = len(self.frames) - 1
         self.frame_number = frame_number
 
     def update( self, dt, ready, display ):
@@ -428,12 +448,32 @@ class Rika( pygame.sprite.Sprite ):
                 self.frame_time = 0
 
             if display == True:
-                self.readFrame()
+                self.frame_number += 1
+                if self.frame_number >= len(self.frames):
+                    self.frame_number = 0
+                surface = self.frames[self.frame_number]
+                surface = pygame.transform.scale( surface, ( self.current_size[0], self.current_size[1] ) )
+                self.rect.x = self.current_pos[0]
+                self.rect.y = self.current_pos[1]
+                self.rect.width = self.current_size[0]
+                self.rect.height = self.current_size[1]
+                self.image = surface
+                self.frame_updated = True
                 if self.frame_number == 230:
                     self.setToFrame( 20 )
             if display == False:
                 if self.frame_number != 0:
-                    self.readFrame()
+                    self.frame_number += 1
+                    if self.frame_number >= len(self.frames):
+                        self.frame_number = 0
+                    surface = self.frames[self.frame_number]
+                    surface = pygame.transform.scale( surface, ( self.current_size[0], self.current_size[1] ) )
+                    self.rect.x = self.current_pos[0]
+                    self.rect.y = self.current_pos[1]
+                    self.rect.width = self.current_size[0]
+                    self.rect.height = self.current_size[1]
+                    self.image = surface
+                    self.frame_updated = True
             
         if not self.frame_updated:
             self.image = self.last_image
@@ -462,6 +502,54 @@ class TextInputSprite( pygame.sprite.Sprite ):
         self.frame_delay = 1000 / self.fps
         self.frame_time  = 0
 
+        # Charger les frames pour appear
+        self.frames_appear = []
+        while True:
+            ret, frame = self.cap_appear.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
+            gray = cv2.cvtColor( frame, cv2.COLOR_RGB2GRAY )
+            _, alpha = cv2.threshold( gray, 25, 255, cv2.THRESH_BINARY )
+            frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
+            frame_rgba[:, :, 3] = alpha
+            surface = pygame.image.frombuffer( frame_rgba.tobytes(), frame_rgba.shape[1::-1], "RGBA" )
+            surface = pygame.transform.scale( surface, ( int( self.size[0] ), int( self.size[1] ) ) )
+            self.frames_appear.append( surface.convert_alpha() )
+        self.cap_appear.release()
+
+        # Charger les frames pour idle
+        self.frames_idle = []
+        while True:
+            ret, frame = self.cap_idle.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
+            gray = cv2.cvtColor( frame, cv2.COLOR_RGB2GRAY )
+            _, alpha = cv2.threshold( gray, 25, 255, cv2.THRESH_BINARY )
+            frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
+            frame_rgba[:, :, 3] = alpha
+            surface = pygame.image.frombuffer( frame_rgba.tobytes(), frame_rgba.shape[1::-1], "RGBA" )
+            surface = pygame.transform.scale( surface, ( int( self.size[0] ), int( self.size[1] ) ) )
+            self.frames_idle.append( surface.convert_alpha() )
+        self.cap_idle.release()
+
+        # Charger les frames pour disappear
+        self.frames_disappear = []
+        while True:
+            ret, frame = self.cap_disappear.read()
+            if not ret:
+                break
+            frame = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
+            gray = cv2.cvtColor( frame, cv2.COLOR_RGB2GRAY )
+            _, alpha = cv2.threshold( gray, 25, 255, cv2.THRESH_BINARY )
+            frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
+            frame_rgba[:, :, 3] = alpha
+            surface = pygame.image.frombuffer( frame_rgba.tobytes(), frame_rgba.shape[1::-1], "RGBA" )
+            surface = pygame.transform.scale( surface, ( int( self.size[0] ), int( self.size[1] ) ) )
+            self.frames_disappear.append( surface.convert_alpha() )
+        self.cap_disappear.release()
+
         self.image = pygame.Surface( ( 0, 0 ), pygame.SRCALPHA )
         self.rect  = pygame.Rect( pos[0], pos[1], size[0], size[1] )
 
@@ -469,11 +557,9 @@ class TextInputSprite( pygame.sprite.Sprite ):
 
         self._listener = None
         self._start_listener()
+        self.last_image = self.image
     
     def quit( self ):
-        self.cap_appear.release()
-        self.cap_idle.release()
-        self.cap_disappear.release()
         if self._listener and self._listener.is_alive():
             self._listener.stop()
 
@@ -618,28 +704,14 @@ class TextInputSprite( pygame.sprite.Sprite ):
             self._restart_listener( suppress=False )  # laisse passer les touches
 
     # ── lecture frame ─────────────────────────────────────────────────────
-    def _read_frame( self, cap, loop=False ):
-        ret, frame = cap.read()
-        if not ret:
-            if loop:
-                cap.set( cv2.CAP_PROP_POS_FRAMES, 0 )
-                ret, frame = cap.read()
-            else:
-                return None
-
-        frame      = cv2.cvtColor( frame, cv2.COLOR_BGR2RGB )
-        gray       = cv2.cvtColor( frame, cv2.COLOR_RGB2GRAY )
-        _, alpha   = cv2.threshold( gray, 25, 255, cv2.THRESH_BINARY )
-        frame_rgba = cv2.cvtColor( frame, cv2.COLOR_RGB2RGBA )
-        frame_rgba[:, :, 3] = alpha
-
-        surface = pygame.image.frombuffer( 
-            frame_rgba.tobytes(),
-            frame_rgba.shape[1::-1],
-            "RGBA"
-        )
-        surface = pygame.transform.scale( surface, ( int( self.size[0] ), int( self.size[1] ) ) )
-        return surface.convert_alpha()
+    def _read_frame( self, frames, loop=False ):
+        if not hasattr(self, 'frame_number'):
+            self.frame_number = 0
+        self.frame_number = (self.frame_number + 1) % len(frames) if loop else min(self.frame_number + 1, len(frames) - 1)
+        if self.frame_number < len(frames):
+            surface = frames[self.frame_number].copy()
+            return surface
+        return None
 
     # ── update ────────────────────────────────────────────────────────────
     def update( self, dt ):
@@ -654,17 +726,17 @@ class TextInputSprite( pygame.sprite.Sprite ):
         self.frame_time = 0
 
         if self.state == "appearing":
-            frame = self._read_frame( self.cap_appear, loop=False )
+            frame = self._read_frame( self.frames_appear, loop=False )
             if frame is None:
-                self.cap_idle.set( cv2.CAP_PROP_POS_FRAMES, 0 )
+                self.frame_number = 0
                 self.state = "idle"
-                frame = self._read_frame( self.cap_idle, loop=True )
+                frame = self._read_frame( self.frames_idle, loop=True )
 
         elif self.state == "idle":
-            frame = self._read_frame( self.cap_idle, loop=True )
+            frame = self._read_frame( self.frames_idle, loop=True )
 
         elif self.state == "disappearing":
-            frame = self._read_frame( self.cap_disappear, loop=False )
+            frame = self._read_frame( self.frames_disappear, loop=False )
             if frame is None:
                 self.state      = "hidden"
                 self.visible    = False
@@ -708,6 +780,7 @@ class LoadingSprite( pygame.sprite.Sprite ):
         self.rect.x = pos[0]
         self.rect.y = pos[1]
         self.full_size = full_size
+        self.current_percent = 0
 
     def update( self, percentage_load: float, initiating ):
         speed = ( percentage_load-self.current_percent )/5

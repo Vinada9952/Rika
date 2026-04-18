@@ -358,10 +358,17 @@ class Sound:
         pygame.mixer.music.load( "./cache/output.mp3" )
         pygame.mixer.music.play()
     
+    async def _playFile( file_path ):
+        pygame.mixer.music.load( file_path )
+        pygame.mixer.music.play()
+    
     def playVoice():
         return asyncio.run( Sound._playVoice() )
     
-    def waitForVoiceToFinish():
+    def playFile( file_path ):
+        return asyncio.run( Sound._playFile( file_path ) )
+    
+    def waitForSoundTofinish():
         while pygame.mixer.music.get_busy():
             pygame.time.Clock().tick( 10 )
         pygame.mixer.music.unload()
@@ -824,6 +831,10 @@ loadPrint()#c
 USERNAME = settings["email"]["user-email"]["name"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
 CONTACT_LIST = Json.read( settings["directories"]["assets"]["contacts"] )
+
+loadPrint()#c
+
+CONFIRMATION_SOUND = settings["audio"]["confirmation-sound"]
 
 loadPrint()#c
 
@@ -1830,7 +1841,7 @@ def autoEraseConversation():
     with open( f"{os.path.expanduser("~")}/Downloads/{file_name}", 'w', encoding="utf-8" ) as f:
         json.dump( conversation, f, indent=4, ensure_ascii=False )
     if AUDIO:
-        Sound.waitForVoiceToFinish()
+        Sound.waitForSoundTofinish()
         Sound.generateVoice( text, VOICE )
         Sound.playVoice()
     doProtocol( settings["reset-protocol-name"] )
@@ -2223,7 +2234,7 @@ def sleepSystem( exception ):
     if SERVER_URL:
         requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
     Json.write( conversation, "./conversation.json" )
-    Sound.waitForVoiceToFinish()
+    Sound.waitForSoundTofinish()
     if exception:
         raise ExitAgent()
     # exit( 0 )
@@ -2551,7 +2562,7 @@ def treatAudioResponse( response ):
     # say_response = say_response.split( '`' )
     say_response = say_response.replace( '`', '' )
 
-    Sound.waitForVoiceToFinish()
+    Sound.waitForSoundTofinish()
     Sound.generateVoice( say_response, VOICE )
     Sound.playVoice()
 
@@ -2561,7 +2572,7 @@ def getUserInput():
     # print( "getting input" )
     user_input = ''
     if AUDIO:
-        Sound.waitForVoiceToFinish()
+        Sound.waitForSoundTofinish()
         print( "YOU > ", end='' )
         user_input = Sound.listen()
         print( user_input )
@@ -2600,6 +2611,8 @@ def chat():
     global conversation, treating_response
     
     april_fools_rickroll()
+    if AUDIO:
+        Sound.playFile( CONFIRMATION_SOUND )
     # print( "called" )
 
     # conversation.append(
