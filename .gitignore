@@ -22,3 +22,5 @@ current_setting.template
 *.cache
 *.wav
 Rika.bat
+debugging_tool.py
+**/PATH/

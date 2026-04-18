@@ -23,4 +23,6 @@ add stopwatch
 maybe use ollama
 add reminders
 add choice to change the port in settings for ui-backend socket communication
-make analyseImage tool without wifi
+organize how models are used
+make log output real json and not string json
+make sprites frames in array instead of videocapture

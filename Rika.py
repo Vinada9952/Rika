@@ -1,3 +1,4 @@
+print( "importing librairies..." )
 from requests.exceptions import ConnectionError, Timeout, RequestException
 from pygrabber.dshow_graph import FilterGraph
 from email.utils import parsedate_to_datetime
@@ -44,6 +45,7 @@ import sys
 import mss
 import re
 import os
+print( "Starting GUI..." )
 
 serveur_socket = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
 serveur_socket.bind( ( '0.0.0.0', 5789 ) )
@@ -209,6 +211,8 @@ class GUI:
     def getTextInputState():
         global text_input_state
         return text_input_state
+
+print( "Starting Rika..." )
 
 GUI.startGUI()
 
@@ -1260,7 +1264,10 @@ class Model:
                                 messages=message
                             ).choices[0].message.content
                 else:
-                    ans = Model.askOllamaModel( OLLAMA_MODEL, conversation )
+                    print( "asking ollama..." )
+                    ans = Model.askOllamaModel( OLLAMA_MODEL, message )
+                if verification.__name__ == "isJson":
+                    ans = ans.replace( "```json", '' ).replace( "```", '' )
                 log( "Verifying if response is correct", f"Response: {ans}, Verification: {verification.__name__}", 'info' )
                 if not verification( ans ):
                     raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__}, response is {ans}" )
@@ -1308,6 +1315,7 @@ loadPrint()#c
 # IMAGE TO BASE64
 # =====================
 def image_to_base64( path ):
+    path = path.replace( '"', '' )
     with open( path, "rb" ) as f:
         return base64.b64encode( f.read() ).decode()
 
@@ -2265,55 +2273,77 @@ def analyseImage( type, prompt, renew ):
 
         if not files:
             return "Aucun screenshot disponible", True
-
-        content = [
-            {
-                "type": "text",
-                "text": prompt
-            }
-        ]
-
-        for file in files:
-            path = os.path.join( SCREENSHOT_DIR, file )
-            image_b64 = image_to_base64( path )
-            content.append(
+        if WIFI:
+            content = [
                 {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{image_b64}"
-                    }
+                    "type": "text",
+                    "text": prompt
                 }
-            )
+            ]
 
-        messages.append(
-            {
-                "role": "user",
-                "content": content
-            }
-        )
-
-    elif type == "webcam":
-        if not os.path.exists( WEBCAM_PATH ):
-            return "Aucune image webcam disponible", True
-
-        image_b64 = image_to_base64( WEBCAM_PATH )
-        messages.append(
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": prompt
-                    },
+            for file in files:
+                path = os.path.join( SCREENSHOT_DIR, file )
+                image_b64 = image_to_base64( path )
+                content.append(
                     {
                         "type": "image_url",
                         "image_url": {
                             "url": f"data:image/jpeg;base64,{image_b64}"
                         }
                     }
-                ]
-            }
-        )
+                )
+
+            messages.append(
+                {
+                    "role": "user",
+                    "content": content
+                }
+            )
+        else:
+            images = []
+            for file in files:
+                path = os.path.join( SCREENSHOT_DIR, file )
+                image_b64 = image_to_base64( path )
+                images.append( image_b64 )
+            messages = [
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "images": images
+                }
+            ]
+
+    elif type == "webcam":
+        if not os.path.exists( WEBCAM_PATH ):
+            return "Aucune image webcam disponible", True
+
+        image_b64 = image_to_base64( WEBCAM_PATH )
+        if WIFI:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_b64}"
+                            }
+                        }
+                    ]
+                }
+            )
+        else:
+            messages = [
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "images": [image_b64]
+                }
+            ]
 
     else:
         return "Type invalide", True
@@ -2321,7 +2351,7 @@ def analyseImage( type, prompt, renew ):
     print( "ask model for vision" )
     response = Model.askGroqModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
 
-    return f"voici l'image. Fait ce que {USERNAME} te demande de faire avec : " + response, True
+    return f"voici le contenu de image. Fait ce que {USERNAME} te demande de faire avec : " + response, True
 
 loadPrint()#c
 
@@ -2583,22 +2613,23 @@ def chat():
         
         # print( "getting emails" )
 
-        email_thread = ThreadWithReturnValue( target=getEmail, args=( EMAIL, EMAIL_PASSWORD ) )
-        email_thread.start()
+        if WIFI:
+            email_thread = ThreadWithReturnValue( target=getEmail, args=( EMAIL, EMAIL_PASSWORD ) )
+            email_thread.start()
         
         # print( "asking user" )
         treating_response.join()
         user_input = getUserInput()
-        
-        emails = email_thread.join()
-        for email in emails:
-            conversation.append(
-                {
-                    "role": "user",
-                    "content": "Email reçu :\n\n" + json.dumps( email, indent=4 ),
-                    "name": "getEmail tool"
-                }
-            )
+        if WIFI:
+            emails = email_thread.join()
+            for email in emails:
+                conversation.append(
+                    {
+                        "role": "user",
+                        "content": "Email reçu :\n\n" + json.dumps( email, indent=4 ),
+                        "name": "getEmail tool"
+                    }
+                )
 
         if type( user_input ) == str:
 
@@ -2618,6 +2649,11 @@ def chat():
             response = Model.askGroqModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
 
             content = json.loads( response )
+            
+            try:
+                _ = content["tools"]
+            except KeyError:
+                content["tools"] = []
             conversation.append( 
                 {
                     "role": "assistant",
@@ -2637,111 +2673,108 @@ def chat():
             do_response = False
             role = "assistant"
             last_do_response = do_response
-            while len( content["tools"] ) != 0:
-                for tool in content["tools"]:
-                    print( f"Using {tool["name"]} tool" )
-                    if tool["name"] == "analyseOldImage":
-                        if WIFI:
+            try:
+                while len( content["tools"] ) != 0:
+                    for tool in content["tools"]:
+                        print( f"Using {tool["name"]} tool\n\n" )
+                        if tool["name"] == "analyseOldImage":
                             result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
-                        else:
-                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
-                    elif tool["name"] == "analyseNewImage":
-                        if WIFI:
+                        elif tool["name"] == "analyseNewImage":
                             result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
+                        elif tool["name"] == "sendEmail":
+                            if WIFI:
+                                result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
+                            else:
+                                result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "openLink":
+                            if WIFI:
+                                try:
+                                    query = tool["params"]["query"]
+                                    result, do_response = openLink( query, False )
+                                except KeyError:
+                                    query = tool["params"]["link"]
+                                    result, do_response = openLink( query, True )
+                            else:
+                                result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "getLocalisation":
+                            if WIFI:
+                                result, do_response = getLocalisation()
+                            else:
+                                result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "openApp":
+                            result, do_response = openApp( tool["params"]["app"] )
+                        elif tool["name"] == "doProtocol":
+                            result, do_response = doProtocol( tool["params"]["protocol"] )
+                        elif tool["name"] == "playMusic":
+                            if WIFI:
+                                result, do_response = playMusic( tool["params"]["search"], tool["params"]["type"], tool["params"]["device"] )
+                            else:
+                                result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "recognizeMusic":
+                            if WIFI:
+                                result, do_response = recognizeMusic()
+                            else:
+                                result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "saveFile":
+                            result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] )
+                        elif tool["name"] == "webSearch":
+                            if WIFI:
+                                result, do_response = webSearch( tool["params"]["query"] )
+                            else:
+                                result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "notUnderstand":
+                            not_understand = True
+                            break
+                        elif tool["name"] == "sleepSystem":
+                            sleepSystem( True )
                         else:
-                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
-                    elif tool["name"] == "sendEmail":
-                        if WIFI:
-                            result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
-                        else:
-                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
-                    elif tool["name"] == "openLink":
-                        if WIFI:
-                            try:
-                                query = tool["params"]["query"]
-                                result, do_response = openLink( query, False )
-                            except KeyError:
-                                query = tool["params"]["link"]
-                                result, do_response = openLink( query, True )
-                        else:
-                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
-                    elif tool["name"] == "getLocalisation":
-                        if WIFI:
-                            result, do_response = getLocalisation()
-                        else:
-                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
-                    elif tool["name"] == "openApp":
-                        result, do_response = openApp( tool["params"]["app"] )
-                    elif tool["name"] == "doProtocol":
-                        result, do_response = doProtocol( tool["params"]["protocol"] )
-                    elif tool["name"] == "playMusic":
-                        if WIFI:
-                            result, do_response = playMusic( tool["params"]["search"], tool["params"]["type"], tool["params"]["device"] )
-                        else:
-                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
-                    elif tool["name"] == "recognizeMusic":
-                        if WIFI:
-                            result, do_response = recognizeMusic()
-                        else:
-                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
-                    elif tool["name"] == "saveFile":
-                        result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] )
-                    elif tool["name"] == "webSearch":
-                        if WIFI:
-                            result, do_response = webSearch( tool["params"]["query"] )
-                        else:
-                            result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
-                    elif tool["name"] == "notUnderstand":
-                        not_understand = True
-                        break
-                    elif tool["name"] == "sleepSystem":
-                        sleepSystem( True )
-                    else:
-                        result = f"No tool found for {tool["name"]}"
-                    
-                    if not not_understand:
+                            result = f"No tool found for {tool["name"]}"
+                        
+                        if not not_understand:
 
-                        if type( result ) == str:
-                            conversation.append( 
-                                {
-                                    "role": "user",
-                                    "content": result,
-                                    "name": f"{tool["name"]} tool"
-                                }
-                            )
-                        else:
-                            conversation.append( 
-                                {
-                                    "role": role,
-                                    "content": result,
-                                }
-                            )
-                    do_response = do_response or last_do_response
-                    last_do_response = do_response
-                if not_understand:
-                    content["tools"] = []
-                    break
-                if do_response:
-                    print( "ask model for chatting (2)" )
-                    response = Model.askGroqModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
-                    
-                    conversation.append( 
-                        {
-                            "role": "assistant",
-                            "content": response
-                        }
-                    )
-                    content = json.loads( response )
-                    treating_response.join()
-                    treating_response = threading.Thread( target=treatResponse, args=( content["message"], ) )
-                    treating_response.start()
-                    # treated_text = treadTextResponse( content["message"] )
-                    # GUI.setTextToDisplay( treated_text )
-                    # print( f"{ASSISTANT_NAME} >", treated_text )
-                    # if AUDIO:
-                    #     treatAudioResponse( content["message"] )
-                else:
-                    break
+                            if type( result ) == str:
+                                conversation.append( 
+                                    {
+                                        "role": "user",
+                                        "content": result,
+                                        "name": f"{tool["name"]} tool"
+                                    }
+                                )
+                            else:
+                                conversation.append( 
+                                    {
+                                        "role": role,
+                                        "content": result,
+                                    }
+                                )
+                        do_response = do_response or last_do_response
+                        last_do_response = do_response
+                    if not_understand:
+                        content["tools"] = []
+                        break
+                    if do_response:
+                        print( "ask model for chatting (2)" )
+                        response = Model.askGroqModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+                        
+                        conversation.append( 
+                            {
+                                "role": "assistant",
+                                "content": response
+                            }
+                        )
+                        content = json.loads( response )
+                        treating_response.join()
+                        treating_response = threading.Thread( target=treatResponse, args=( content["message"], ) )
+                        treating_response.start()
+                        # treated_text = treadTextResponse( content["message"] )
+                        # GUI.setTextToDisplay( treated_text )
+                        # print( f"{ASSISTANT_NAME} >", treated_text )
+                        # if AUDIO:
+                        #     treatAudioResponse( content["message"] )
+                    else:
+                        break
+            except KeyError:
+                pass 
 
 loadPrint()#c
 time.sleep( 0.5 )
