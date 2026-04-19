@@ -33,11 +33,48 @@ class Json:
 os.makedirs( "./cache", exist_ok=True )
 os.makedirs( "./cache/screenshots", exist_ok=True )
 os.makedirs( "./assets/protocols/", exist_ok=True )
-Json.write( [], "./assets/protocols/protocols.json" )
-Json.write( [], "./assets/contacts.json" )
-Json.write( [], "./assets/playlists.json" )
-Json.write( [0], "./assets/conversation.json" )
-Json.write( [], "./assets/playlists.json" )
+Json.write(
+    [
+        {
+            "name": "Rick",
+            "command": "curl ASCII.live/rick"
+        }
+    ],
+    "./assets/protocols/protocols.json"
+)
+Json.write(
+    [
+        {
+            "name": "Exemple 1",
+            "email": "exemple1@gmail.com",
+            "phone": [123, 456, 7890],
+            "relation": "cousin",
+            "language": "Français"
+        },
+        {
+            "name": "Exemple 2",
+            "email": "exemple2@gmail.com",
+            "phone": None,
+            "relation": "ami",
+            "language": "English"
+        }
+    ],
+    "./assets/contacts.json"
+)
+Json.write( [0, 0], "./assets/conversation.json" )
+Json.write(
+    [
+        {
+            "name": "my mcdonalds order",
+            "type": "playlist",
+            "description": "Some funny playlist"
+        }
+    ],
+    "./assets/playlists.json"
+)
+
+with open( "./assets/usernote.txt", 'w' ) as f:
+    f.write( "" )
 
 api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
 name = input( "Votre nom : " )
@@ -126,7 +163,8 @@ base_settings = {
         "assets": {
             "protocols": "./assets/protocols/protocols.json",
             "contacts": "./assets/contacts.json",
-            "playlists": "./assets/playlists.json"
+            "playlists": "./assets/playlists.json",
+            "usernote": "./assets/usernote.txt"
         },
         "apps-path": {
             "get-env":[

@@ -6,7 +6,6 @@ time for the user to refuse a prompt or the ai tofind unintended prompts
 Log
 User can choose language of assistant
 notifications
-user's note for ai
 mac adaptation (and maybe linux)
 make assistant resum video screenshot or webcam
 assistant can send documents in mails

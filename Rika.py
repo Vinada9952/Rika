@@ -55,7 +55,7 @@ socket_running = True
 to_send = ""
 queue_send = []
 
-mutex = threading.Lock()
+gui_mutex = threading.Lock()
 
 def onReceiveSocket():
     global socket_running
@@ -84,12 +84,12 @@ def onReceiveSocket():
             # print( "new data receive in socket :", json.dumps( data, indent=4 ) )
 
 def send():
-    global to_send, queue_send, socket_running, client_socket, mutex
+    global to_send, queue_send, socket_running, client_socket, gui_mutex
     while socket_running:
         if queue_send:
             # Envoi d'un message au client
             message = None
-            with mutex:
+            with gui_mutex:
                 message = queue_send.pop( 0 )
             message = str( message )
             # message = message.replace( '\n', '' )
@@ -100,8 +100,8 @@ def send():
             time.sleep( 0.1 )
 
 def sendDataSocket( value: str ):
-    global queue_send, to_send, mutex
-    with mutex:
+    global queue_send, to_send, gui_mutex
+    with gui_mutex:
         queue_send.append( value )
 
 def quitSocket():
@@ -318,6 +318,7 @@ class Substitute:
 loadPrint()#c
 
 pygame.mixer.init()
+sound_mutex = threading.Lock()
 class Sound:
 
     def listen( language: str = "fr-FR" ):
@@ -343,19 +344,24 @@ class Sound:
 
 
     async def _generateVoice( text, voice ):
+        global sound_mutex
         text = "   " + text.replace( '*', '' ).replace( '\n', ".     " )
         if type( voice ) == str:
             communicate = edge_tts.Communicate( text, voice )
-            await communicate.save( "./cache/output.mp3" )
+            with sound_mutex:
+                await communicate.save( "./cache/output.mp3" )
         else:
             communicate = edge_tts.Communicate( text, voice["ShortName"] )
-            await communicate.save( "./cache/output.mp3" )
+            with sound_mutex:
+                await communicate.save( "./cache/output.mp3" )
     
     def generateVoice( text, voice ):
         return asyncio.run( Sound._generateVoice( text, voice ) )
     
     async def _playVoice():
-        pygame.mixer.music.load( "./cache/output.mp3" )
+        global sound_mutex
+        with sound_mutex:
+            pygame.mixer.music.load( "./cache/output.mp3" )
         pygame.mixer.music.play()
     
     async def _playFile( file_path ):
@@ -831,6 +837,7 @@ loadPrint()#c
 USERNAME = settings["email"]["user-email"]["name"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
 CONTACT_LIST = Json.read( settings["directories"]["assets"]["contacts"] )
+USERNOTE_DIRECTORY = settings["directories"]["assets"]["usernote"]
 
 loadPrint()#c
 
@@ -844,12 +851,16 @@ SPOTIFY_CLIENT_SECRET = settings["spotify-player"]["client-secret"]
 
 loadPrint()#c
 
-try:
-    spotify = SpotifyPlayer( SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET )
-    IS_THERE_SPOTIFY = True
-except Exception as e:
+if WIFI:
+    try:
+        spotify = SpotifyPlayer( SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET )
+        IS_THERE_SPOTIFY = True
+    except Exception as e:
+        IS_THERE_SPOTIFY = False
+        log( "Error creating spotify instance", str( e ), "warning" )
+else:
     IS_THERE_SPOTIFY = False
-    log( "Error creating spotify instance", str( e ), "warning" )
+    log( "No wifi access", "Spotify features will be unavailable", "warning" )
 
 loadPrint()#c
 
@@ -1122,6 +1133,15 @@ conversation[0] = {
     "content": base_message
 }
 
+with open( USERNOTE_DIRECTORY, "r", encoding="utf-8" ) as f:
+    user_note = f.read()
+
+conversation[1] = {
+    "role": "system",
+    "name": "instructions",
+    "content": f"Voici une note de l'utilisateur que tu dois absolument prendre en compte dans tes réponses :\n\n{user_note}\n\nFin de la note."
+}
+
 loadPrint()#c
 
 # =====================
@@ -1199,6 +1219,9 @@ def sendNotification(title, message):
 
 loadPrint()#c
 
+client_index = 0
+client_max = len( clients )
+
 class Model:
     def askOllamaModel(model: str, conversation: List[Dict[str, str]]) -> str:
         global ollama_client
@@ -1241,37 +1264,59 @@ class Model:
                 return f"Une erreur inattendue est survenue: {e}"
 
     def askGroqModel( model: str, message: dict, thinking: str, max_retries: int, verification ):
-        log( f"Asking model", f"{model=}, {message=}, {thinking=}, {max_retries=}, {verification.__name__}", "info" )
+        log(
+            f"asking model",
+            {
+                "model": model,
+                "message": message,
+                "thinking": thinking,
+                "max_retries": max_retries,
+                "verification": verification.__name__
+            },
+            "info"
+        )
+        # log( f"Asking model", f"{model=}, {message=}, {thinking=}, {max_retries=}, {verification.__name__}", "info" )
         global clients, WIFI
         can_think = True
-        can_web_search = True if model == WEB_MODEL else False
+        can_web_search = True if model == MAIN_MODEL else False
+        if not WIFI:
+            log( "No internet connection", "Asking ollama model instead of groq", "warning" )
+            can_web_search = False
         ans = ""
         for i in range( max_retries ):
             try:
                 if WIFI:
                     if can_web_search:
                         if can_think:
-                            ans = random.choice( clients ).chat.completions.create(
+                            client = Model.getNextClient()
+                            log( "Asking client groq", {"api-key": client.api_key}, "info" )
+                            ans = client.chat.completions.create(
                                 model=model,
                                 messages=message,
                                 reasoning_effort=thinking,
                                 tools=[{"type": "browser_search"}]
                             ).choices[0].message.content
                         else:
-                            ans = random.choice( clients ).chat.completions.create(
+                            client = Model.getNextClient()
+                            log( "Asking client groq", {"api-key": client.api_key}, "info" )
+                            ans = client.chat.completions.create(
                                 model=model,
                                 messages=message,
                                 tools=[{"type": "browser_search"}]
                             ).choices[0].message.content
                     else:
                         if can_think:
-                            ans = random.choice( clients ).chat.completions.create(
+                            client = Model.getNextClient()
+                            log( "Asking client groq", {"api-key": client.api_key}, "info" )
+                            ans = client.chat.completions.create(
                                 model=model,
                                 messages=message,
                                 reasoning_effort=thinking
                             ).choices[0].message.content
                         else:
-                            ans = random.choice( clients ).chat.completions.create(
+                            client = Model.getNextClient()
+                            log( "Asking client groq", {"api-key": client.api_key}, "info" )
+                            ans = client.chat.completions.create(
                                 model=model,
                                 messages=message
                             ).choices[0].message.content
@@ -1280,16 +1325,39 @@ class Model:
                     ans = Model.askOllamaModel( OLLAMA_MODEL, message )
                 if verification.__name__ == "isJson":
                     ans = ans.replace( "```json", '' ).replace( "```", '' )
-                log( "Verifying if response is correct", f"Response: {ans}, Verification: {verification.__name__}", 'info' )
+                log(
+                    "Verifying if response is correct",
+                    {
+                        "response": ans,
+                        "verification": verification.__name__
+                    },
+                    "info"
+                )
                 if not verification( ans ):
                     raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__}, response is {ans}" )
                 return ans
             except BadRequestError as e:
-                log( f"Invalid response from API", f"{str( e )}, {ans=}, {message=}", "error" )
+                log(
+                    f"Invalid response from API",
+                    {
+                        "error": str( e ),
+                        "response": ans,
+                        "message": message
+                    },
+                    "error"
+                )
                 print( str( e ) )
                 can_web_search = False
             except APIStatusError as e:
-                log( f"Invalid response from API", f"{str( e )}, {ans=}, {message=}", "error" )
+                log(
+                    f"Invalid response from API",
+                    {
+                        "error": str( e ),
+                        "response": ans,
+                        "message": message
+                    },
+                    "error"
+                )
                 print( str( e ) )
                 if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
                     can_think = False
@@ -1298,8 +1366,24 @@ class Model:
                         autoEraseConversation()
             except NotValidResponse as e:
                 print( str( e ) )
-                log( f"Invalid response from AI", f"{str( e )}, {ans=}, {message=}", "error" )
+                log(
+                    f"Invalid response from API",
+                    {
+                        "error": str( e ),
+                        "response": ans,
+                        "message": message
+                    },
+                    "error"
+                )
     
+    def getNextClient():
+        global client_max, client_index, clients
+        client = clients[client_index]
+        client_index += 1
+        if client_index == client_max:
+            client_index = 0
+        return client
+
     class Verification:
         def isJson( object ):
             try:
@@ -1318,7 +1402,9 @@ class Model:
                 return True
         
         def rawResponse( a ):
-            return True
+            if len( a ) != 0:
+                return True
+            return False
 
 
 loadPrint()#c
@@ -1898,7 +1984,7 @@ def getLocalisation() -> dict:
             return str(
                 {
                     "method": "ip",
-                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
                     "ip_address": data.get("query"),
                     "isp": data.get("isp"),
                     "organisation": data.get("org"),
@@ -2001,7 +2087,7 @@ def getLocalisation() -> dict:
 
     return str(
         {
-            "generated_at":     datetime.datetime.utcnow().isoformat() + "Z",
+            "generated_at":     datetime.datetime.now(datetime.UTC).isoformat(),
             "ip_location":      ip_data,
             "windows_location": win_data,
             "comparison":       _compare(ip_data, win_data),
@@ -2633,7 +2719,7 @@ def chat():
         
         # print( "asking user" )
         treating_response.join()
-        sendNotification( "Attente de votre message", "Rika attend votre message, vous pouvez maintenant parler" )
+        # sendNotification( "Attente de votre message", "Rika attend votre message, vous pouvez maintenant parler" )
         user_input = getUserInput()
         if WIFI:
             emails = email_thread.join()
