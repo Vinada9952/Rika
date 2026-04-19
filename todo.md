@@ -17,7 +17,6 @@ add sonor effects when assistant activates and deactivate
 make Rika API with flask for tools
 make web version
 add stopwatch
-maybe use ollama
 add reminders
 add choice to change the port in settings for ui-backend socket communication
 organize how models are used

@@ -2632,6 +2632,7 @@ def chat():
         
         # print( "asking user" )
         treating_response.join()
+        sendNotification( "Attente de votre message", "Rika attend votre message, vous pouvez maintenant parler" )
         user_input = getUserInput()
         if WIFI:
             emails = email_thread.join()
@@ -2823,7 +2824,6 @@ try:
 
 
 except KeyboardInterrupt:
-
     GUI.quitGUI()
     Json.write( conversation, "./conversation.json" )
     # Sauvegarde brute pour debug
