@@ -139,10 +139,12 @@ else:
 
 base_settings = {
     "assistant-name": "Rika",
-    "api-keys": [
-        api_key
-    ],
-    "max-api-retries": 10,
+    "api": {
+        "api-keys": [
+            api_key
+        ],
+        "max-api-retries": 10
+    },
     "call": {
         "names": call_names,
         "hotkey": "ctrl+alt+r"
