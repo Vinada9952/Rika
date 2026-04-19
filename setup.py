@@ -113,7 +113,9 @@ base_settings = {
     "audio": {
         "audio": True,
         "audio-duration-threshold": 15,
-        "voice": "fr-CA-SylvieNeural"
+        "voice": "fr-CA-SylvieNeural",
+        "listen-time-limit": 20,
+        "confirmation-sound": "./assets/default/rescopicsound-ui-alert-menu-modern-interface-confirm-small-230482.mp3"
     },
     "directories": {
         "cache": {

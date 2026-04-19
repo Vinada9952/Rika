@@ -328,7 +328,7 @@ class Sound:
             except AssertionError:
                 pass
             # r.adjust_for_ambient_noise( 1 )
-            audio_data = r.listen( source=source, phrase_time_limit=10 )
+            audio_data = r.listen( source=source, phrase_time_limit=LISTEN_TIME_LIMIT )
         try:
             text = r.recognize_google( audio_data, language=language )
             text = str( text )
@@ -835,6 +835,7 @@ CONTACT_LIST = Json.read( settings["directories"]["assets"]["contacts"] )
 loadPrint()#c
 
 CONFIRMATION_SOUND = settings["audio"]["confirmation-sound"]
+LISTEN_TIME_LIMIT = settings["audio"]["listen-time-limit"]
 
 loadPrint()#c
 
