@@ -111,14 +111,21 @@ else:
         "reka",
         "rica",
         "richard",
+        "chrétien",
+        "fréquence",
         "rika",
         "requin",
+        "rita",
+        "gta",
         "ricardo",
         "rik",
+        "recap",
+        "regarde",
         "riga",
         "richelieu",
         "robert",
-        "ricard"
+        "ricard",
+        "lucas"
     ]
 
 ask = getYesNoInput( "Voulez vous mettre un email pour l'agent ? (o/n) : ", "choix invalide", ['o', 'n'] )

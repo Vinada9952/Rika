@@ -339,40 +339,74 @@ class Sound:
         except sr.RequestError:
             return -2
     
-    async def getVoices():
-        return await edge_tts.list_voices()
+    def getVoices():
+        return edge_tts.list_voices()
 
 
-    async def _generateVoice( text, voice ):
+    def _generateVoice( text, voice ):
         global sound_mutex
-        text = "   " + text.replace( '*', '' ).replace( '\n', ".     " )
-        if type( voice ) == str:
-            communicate = edge_tts.Communicate( text, voice )
-            with sound_mutex:
-                await communicate.save( "./cache/output.mp3" )
-        else:
-            communicate = edge_tts.Communicate( text, voice["ShortName"] )
-            with sound_mutex:
-                await communicate.save( "./cache/output.mp3" )
+        is_correctly_generated = False
+        while not is_correctly_generated:
+            text = "   " + text.replace( '*', '' ).replace( '\n', ".     " )
+            if type( voice ) == str:
+                communicate = edge_tts.Communicate( text, voice )
+                with sound_mutex:
+                    communicate.save_sync( "./cache/output.mp3" )
+            else:
+                communicate = edge_tts.Communicate( text, voice["ShortName"] )
+                with sound_mutex:
+                    communicate.save( "./cache/output.mp3" )
+            
+            # Vérifier que le fichier a été créé et n'est pas vide
+            if not os.path.exists( "./cache/output.mp3" ) or os.path.getsize( "./cache/output.mp3" ) == 0:
+                pass
+            else:
+                is_correctly_generated = True
     
     def generateVoice( text, voice ):
-        return asyncio.run( Sound._generateVoice( text, voice ) )
+        return Sound._generateVoice( text, voice )
     
-    async def _playVoice():
+    def _playVoice():
         global sound_mutex
-        with sound_mutex:
-            pygame.mixer.music.load( "./cache/output.mp3" )
-        pygame.mixer.music.play()
+        try:
+            with sound_mutex:
+                pygame.mixer.music.load( "./cache/output.mp3" )
+            pygame.mixer.music.play()
+        except pygame.error as e:
+            log(
+                "Failed to load MP3 file",
+                {
+                    "error": str( e ),
+                    "file": "./cache/output.mp3",
+                    "file_exists": os.path.exists( "./cache/output.mp3" ),
+                    "file_size": os.path.getsize( "./cache/output.mp3" ) if os.path.exists( "./cache/output.mp3" ) else 0
+                },
+                "warning"
+            )
+            print( f"Erreur: Impossible de charger le fichier MP3: {e}" )
     
-    async def _playFile( file_path ):
-        pygame.mixer.music.load( file_path )
-        pygame.mixer.music.play()
+    def _playFile( file_path ):
+        try:
+            pygame.mixer.music.load( file_path )
+            pygame.mixer.music.play()
+        except pygame.error as e:
+            log(
+                "Failed to load audio file",
+                {
+                    "error": str( e ),
+                    "file": file_path,
+                    "file_exists": os.path.exists( file_path ),
+                    "file_size": os.path.getsize( file_path ) if os.path.exists( file_path ) else 0
+                },
+                "warning"
+            )
+            print( f"Erreur: Impossible de charger le fichier audio {file_path}: {e}" )
     
     def playVoice():
-        return asyncio.run( Sound._playVoice() )
+        return Sound._playVoice()
     
     def playFile( file_path ):
-        return asyncio.run( Sound._playFile( file_path ) )
+        return Sound._playFile( file_path )
     
     def waitForSoundTofinish():
         while pygame.mixer.music.get_busy():
@@ -1127,6 +1161,9 @@ RÈGLES IMPORTANTES :
 - Ta réponse est fait pour être dite à l'oral. Garde des caractères normaux pouvant être dit par un module TTS. C'est à dire, ne met pas de parenthèses et autres trucs du genre
 """
 
+while len( conversation ) < 2:
+    conversation.append( 0 )
+
 conversation[0] = {
     "role": "system",
     "name": "instructions",
@@ -1137,9 +1174,9 @@ with open( USERNOTE_DIRECTORY, "r", encoding="utf-8" ) as f:
     user_note = f.read()
 
 conversation[1] = {
-    "role": "system",
-    "name": "instructions",
-    "content": f"Voici une note de l'utilisateur que tu dois absolument prendre en compte dans tes réponses :\n\n{user_note}\n\nFin de la note."
+    "role": "user",
+    "name": USERNAME,
+    "content": user_note
 }
 
 loadPrint()#c
@@ -1153,7 +1190,8 @@ os.makedirs( SCREENSHOT_DIR, exist_ok=True )
 
 loadPrint()#c
 
-def get_camera_index( search ):
+def getCameraIndex( search ):
+    return 0 # FIXME
 
     devices = FilterGraph().get_input_devices()
 
@@ -1224,6 +1262,7 @@ client_max = len( clients )
 
 class Model:
     def askOllamaModel(model: str, conversation: List[Dict[str, str]]) -> str:
+        print( "asking groq" )
         global ollama_client
         """
         Envoie une requête de chat à un modèle Ollama local en utilisant l'historique de la conversation.
@@ -1277,7 +1316,8 @@ class Model:
         )
         # log( f"Asking model", f"{model=}, {message=}, {thinking=}, {max_retries=}, {verification.__name__}", "info" )
         global clients, WIFI
-        can_think = True
+        # openai/gpt-oss-120b ne supporte pas reasoning_effort, ne pas l'utiliser
+        can_think = False
         can_web_search = True if model == MAIN_MODEL else False
         if not WIFI:
             log( "No internet connection", "Asking ollama model instead of groq", "warning" )
@@ -1286,43 +1326,52 @@ class Model:
         for i in range( max_retries ):
             try:
                 if WIFI:
+                    client = Model.getNextClient()
+                    log( "Asking client groq", {"api-key": client.api_key}, "info" )
+                    
+                    # Préparer les paramètres de la requête
+                    request_params = {
+                        "model": model,
+                        "messages": message
+                    }
+                    
+                    # Ajouter les paramètres optionnels selon les conditions
+                    if can_think:
+                        request_params["reasoning_effort"] = thinking
                     if can_web_search:
-                        if can_think:
-                            client = Model.getNextClient()
-                            log( "Asking client groq", {"api-key": client.api_key}, "info" )
-                            ans = client.chat.completions.create(
-                                model=model,
-                                messages=message,
-                                reasoning_effort=thinking,
-                                tools=[{"type": "browser_search"}]
-                            ).choices[0].message.content
-                        else:
-                            client = Model.getNextClient()
-                            log( "Asking client groq", {"api-key": client.api_key}, "info" )
-                            ans = client.chat.completions.create(
-                                model=model,
-                                messages=message,
-                                tools=[{"type": "browser_search"}]
-                            ).choices[0].message.content
-                    else:
-                        if can_think:
-                            client = Model.getNextClient()
-                            log( "Asking client groq", {"api-key": client.api_key}, "info" )
-                            ans = client.chat.completions.create(
-                                model=model,
-                                messages=message,
-                                reasoning_effort=thinking
-                            ).choices[0].message.content
-                        else:
-                            client = Model.getNextClient()
-                            log( "Asking client groq", {"api-key": client.api_key}, "info" )
-                            ans = client.chat.completions.create(
-                                model=model,
-                                messages=message
-                            ).choices[0].message.content
+                        request_params["tools"] = [{"type": "browser_search"}]
+                    
+                    # Faire l'appel à l'API
+                    print( "asking groq" )
+                    response = client.chat.completions.create(**request_params)
+                    
+                    # Logger la réponse complète pour déboguer
+                    log(
+                        "Full API response",
+                        {
+                            "choices_count": len(response.choices) if response.choices else 0,
+                            "first_choice": str(response.choices[0]) if response.choices else None,
+                            "message": str(response.choices[0].message) if response.choices else None,
+                            "content": response.choices[0].message.content if response.choices and response.choices[0].message else None
+                        },
+                        "debug"
+                    )
+                    
+                    ans = response.choices[0].message.content
                 else:
                     print( "asking ollama..." )
                     ans = Model.askOllamaModel( OLLAMA_MODEL, message )
+                # Vérifier si la réponse est vide et logger les détails
+                if not ans or ans.strip() == "":
+                    log(
+                        "Empty response from model",
+                        {
+                            "model": model,
+                            "response": ans,
+                            "response_length": len(ans) if ans else 0
+                        },
+                        "warning"
+                    )
                 if verification.__name__ == "isJson":
                     ans = ans.replace( "```json", '' ).replace( "```", '' )
                 log(
@@ -1338,13 +1387,13 @@ class Model:
                 return ans
             except BadRequestError as e:
                 log(
-                    f"Invalid response from API",
+                    f"Wrong request for model",
                     {
                         "error": str( e ),
                         "response": ans,
                         "message": message
                     },
-                    "error"
+                    "warning"
                 )
                 print( str( e ) )
                 can_web_search = False
@@ -1367,14 +1416,18 @@ class Model:
             except NotValidResponse as e:
                 print( str( e ) )
                 log(
-                    f"Invalid response from API",
+                    f"Invalid response from model",
                     {
                         "error": str( e ),
                         "response": ans,
                         "message": message
                     },
-                    "error"
+                    "warning"
                 )
+        # Si toutes les tentatives échouent, retourner la dernière réponse ou un message d'erreur
+        if ans and ans.strip():
+            return ans
+        return "Erreur: Le modèle n'a pas pu générer une réponse valide après " + str(max_retries) + " tentatives."
     
     def getNextClient():
         global client_max, client_index, clients
@@ -1908,7 +1961,7 @@ def doProtocol( name ):
     for i in range( len( PROTOCOLS ) ):
         if name == PROTOCOLS[i]["name"]:
             if PROTOCOLS[i]["command"] == "/delete-memory":
-                conversation = [ conversation[0] ]
+                conversation = [ conversation[0], conversation[1] ]
                 if SERVER_URL:
                     requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
                 Json.write( conversation, "./conversation.json" )
@@ -2331,7 +2384,7 @@ loadPrint()#c
 # =====================
 # TOOL: getImage
 # =====================
-cap = cv2.VideoCapture( get_camera_index( "USB" ) )
+cap = cv2.VideoCapture( getCameraIndex( "USB" ) )
 # cap.release()
 def getImage( type ):
     if type == "screenshot":
