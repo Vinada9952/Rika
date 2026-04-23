@@ -2,7 +2,7 @@
 - Pour installer, éxécuter le script setup.py
 - Pour lancer, lancer RIKAgroq pour utiliser l'assistant
 
-**CAPACITÉS**
+**FONCTIONNALITÉS**
 - Obtenir la localisation
 - Avoir l'heure, date, etc.
 - Avoir la météo de votre localisation
