@@ -24,6 +24,7 @@ import tempfile
 import requests
 import edge_tts
 import keyboard
+import calendar
 import datetime
 import asyncio
 import smtplib
@@ -1009,10 +1010,17 @@ Cas avec action(s) :
 
 OUTILS DISPONIBLES :
 
+- getTime
+  - Obtenir l'heure, la date, etc.
+
 - getLocalisation
   - Obtenir la localisation de l'utilisateur
   - exemples de cas d'utilisation:
     -> Où suis-je ?
+
+- getWeather
+  - Obtenir la météo de la localisation actuelle de l'utilisateur
+
 
 - sleepSystem
   - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
@@ -1262,7 +1270,7 @@ client_max = len( clients )
 
 class Model:
     def askOllamaModel(model: str, conversation: List[Dict[str, str]]) -> str:
-        print( "asking groq" )
+        print( "asking ollama" )
         global ollama_client
         """
         Envoie une requête de chat à un modèle Ollama local en utilisant l'historique de la conversation.
@@ -1303,6 +1311,7 @@ class Model:
                 return f"Une erreur inattendue est survenue: {e}"
 
     def askGroqModel( model: str, message: dict, thinking: str, max_retries: int, verification ):
+        reset_count = 0
         log(
             f"asking model",
             {
@@ -1344,6 +1353,7 @@ class Model:
                     # Faire l'appel à l'API
                     print( "asking groq" )
                     response = client.chat.completions.create(**request_params)
+                    print( "response given" )
                     
                     # Logger la réponse complète pour déboguer
                     log(
@@ -1358,9 +1368,12 @@ class Model:
                     )
                     
                     ans = response.choices[0].message.content
+                    print( "logged" )
                 else:
                     print( "asking ollama..." )
                     ans = Model.askOllamaModel( OLLAMA_MODEL, message )
+                    print( "response given" )
+                print( "verification" )
                 # Vérifier si la réponse est vide et logger les détails
                 if not ans or ans.strip() == "":
                     log(
@@ -1382,8 +1395,11 @@ class Model:
                     },
                     "info"
                 )
+                print( "final verification" )
                 if not verification( ans ):
+                    print( "verification didn't match" )
                     raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__}, response is {ans}" )
+                print( "return..." )
                 return ans
             except BadRequestError as e:
                 log(
@@ -1412,7 +1428,10 @@ class Model:
                     can_think = False
                 if model == MAIN_MODEL:
                     if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
-                        autoEraseConversation()
+                        reset_count += 1
+                        if reset_count == client_max:
+                            reset_count = 0
+                            autoEraseConversation()
             except NotValidResponse as e:
                 print( str( e ) )
                 log(
@@ -2013,6 +2032,68 @@ loadPrint()#c
 #     except Exception as e:
 #         return "Erreur pour obtenir la localisation", True
 
+
+def moment_actuel() -> dict:
+    """
+    Retourne un dictionnaire avec toutes les informations sur le moment actuel.
+    """
+    def _moment_journee(heure: int) -> str:
+        if 5 <= heure < 12:
+            return "matin"
+        elif 12 <= heure < 14:
+            return "midi"
+        elif 14 <= heure < 18:
+            return "après-midi"
+        elif 18 <= heure < 22:
+            return "soirée"
+        else:
+            return "nuit"
+    maintenant = datetime.datetime.now()
+
+    return {
+        "date": {
+            "annee": maintenant.year,
+            "mois": maintenant.month,
+            "nom_mois": maintenant.strftime("%B"),
+            "jour": maintenant.day,
+            "nom_jour": maintenant.strftime("%A"),
+            "jour_de_annee": maintenant.timetuple().tm_yday,
+            "semaine_de_annee": maintenant.isocalendar()[1],
+            "trimestre": (maintenant.month - 1) // 3 + 1,
+        },
+        "heure": {
+            "heure": maintenant.hour,
+            "minute": maintenant.minute,
+            "seconde": maintenant.second,
+            "microseconde": maintenant.microsecond,
+            "periode": "AM" if maintenant.hour < 12 else "PM",
+            "moment_journee": _moment_journee(maintenant.hour),
+        },
+        "formats": {
+            "iso": maintenant.isoformat(),
+            "date_seule": maintenant.strftime("%Y-%m-%d"),
+            "heure_seule": maintenant.strftime("%H:%M:%S"),
+            "lisible": maintenant.strftime("%A %d %B %Y à %H:%M:%S"),
+            "timestamp_unix": maintenant.timestamp(),
+        },
+        "calendrier": {
+            "est_weekend": maintenant.weekday() >= 5,
+            "jours_dans_mois": calendar.monthrange(maintenant.year, maintenant.month)[1],
+            "est_annee_bissextile": calendar.isleap(maintenant.year),
+        },
+    }
+
+loadPrint()#c
+
+def getTime():
+    try:
+        return moment_actuel(), True
+    except Exception as e:
+        log( "Error while getting time", str( e ), "error" )
+        return "Error pour obtenir le temps présent", True
+    
+loadPrint()#c
+
 def getLocalisation() -> dict:
     """
     Retourne un dictionnaire avec :
@@ -2034,8 +2115,7 @@ def getLocalisation() -> dict:
             data = resp.json()
             if data.get("status") != "success":
                 raise ValueError(data.get("message", "Réponse inattendue"))
-            return str(
-                {
+            return {
                     "method": "ip",
                     "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
                     "ip_address": data.get("query"),
@@ -2049,16 +2129,15 @@ def getLocalisation() -> dict:
                     "longitude": data.get("lon"),
                     "accuracy_note": "Précision typique : ville (~5-50 km)",
                 }
-            ), True
         except Exception as exc:
-            return str({"method": "ip", "error": str(exc)}), True
+            return {"method": "ip", "error": str(exc)}
 
     def _get_windows() -> dict:
         try:
             import win32com.client
         except ImportError:
-            return str( {"method": "windows",
-                    "error": "pywin32 non installé (pip install pywin32)"} ), True
+            return {"method": "windows",
+                    "error": "pywin32 non installé (pip install pywin32)"}
         try:
             locator = win32com.client.Dispatch("Windows.Devices.Geolocation.Geolocator")
 
@@ -2067,7 +2146,7 @@ def getLocalisation() -> dict:
             while access.Status != 4 and time.time() < deadline:
                 time.sleep(0.1)
             if access.Status == 4 and access.GetResults() != 0:
-                return str( {"method": "windows", "error": "Accès à la localisation refusé"} ), True
+                return {"method": "windows", "error": "Accès à la localisation refusé"}
 
             locator.DesiredAccuracy = 0
             locator.DesiredAccuracyInMeters = 10
@@ -2077,7 +2156,7 @@ def getLocalisation() -> dict:
             while op.Status != 4 and time.time() < deadline:
                 time.sleep(0.2)
             if op.Status != 4:
-                return str( {"method": "windows", "error": "Délai dépassé (30 s)"} ), True
+                return {"method": "windows", "error": "Délai dépassé (30 s)"}
 
             pos   = op.GetResults()
             coord = pos.Coordinate
@@ -2092,8 +2171,7 @@ def getLocalisation() -> dict:
                         6: "Obfuscated", 7: "Other"}
             source = src_map.get(getattr(coord, "PositionSource", -1), "Unknown")
 
-            return str(
-                {
+            return {
                     "method": "windows",
                     "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
                     "latitude":            geo.Latitude,
@@ -2106,13 +2184,12 @@ def getLocalisation() -> dict:
                     "position_source":     source,
                     "accuracy_note":       "Précision typique : GPS ~5 m, Wi-Fi ~15-40 m",
                 }
-            ), True
         except Exception as exc:
             return str( {"method": "windows", "error": str(exc)} ), True
 
     def _compare(ip: dict, win: dict) -> dict:
         if "error" in ip or "error" in win:
-            return str( {"note": "Comparaison impossible (données manquantes)"} ), True
+            return {"note": "Comparaison impossible (données manquantes)"}
         try:
             R = 6371.0
             phi1, phi2 = math.radians(ip["latitude"]),  math.radians(win["latitude"])
@@ -2120,8 +2197,7 @@ def getLocalisation() -> dict:
             dlon = math.radians(win["longitude"] - ip["longitude"])
             a = math.sin(dlat/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlon/2)**2
             dist = round(R * 2 * math.asin(math.sqrt(a)), 3)
-            return str(
-                {
+            return {
                     "distance_km": dist,
                     "distance_note": (
                         "Écart faible" if dist < 5 else
@@ -2131,21 +2207,356 @@ def getLocalisation() -> dict:
                     "win_accuracy_m": win.get("accuracy_m"),
                     "win_source":     win.get("position_source"),
                 }
-            ), True
         except Exception as exc:
-            return str( {"note": f"Calcul impossible : {exc}"} ), True
+            return {"note": f"Calcul impossible : {exc}"}
 
     ip_data  = _get_ip()
     win_data = _get_windows()
 
-    return str(
-        {
-            "generated_at":     datetime.datetime.now(datetime.UTC).isoformat(),
-            "ip_location":      ip_data,
-            "windows_location": win_data,
-            "comparison":       _compare(ip_data, win_data),
+    return {
+        "generated_at":     datetime.datetime.now(datetime.UTC).isoformat(),
+        "ip_location":      ip_data,
+        "windows_location": win_data,
+        "comparison":       _compare(ip_data, win_data),
+    }, True
+
+loadPrint()#c
+
+def weather(lat: float = None, lon: float = None, city: str = None) -> dict:
+    """
+    Retourne un dictionnaire complet avec les données météo actuelles.
+
+    Si lat/lon ne sont pas fournis, la localisation est détectée
+    automatiquement via l'adresse IP publique (précision ~ville).
+
+    Paramètres:
+        lat  (float | None): Latitude  — None = détection automatique
+        lon  (float | None): Longitude — None = détection automatique
+        city (str   | None): Nom de la ville (optionnel, pour l'affichage)
+
+    Retourne:
+        dict: Données météo complètes ou dict avec clé "error" en cas d'échec.
+    """
+
+    def _get_location_auto() -> dict:
+        """
+        Détecte automatiquement la localisation via 3 méthodes en cascade :
+        1. ip-api.com       — IP géolocation (précision ~ville)
+        2. ipwho.is         — Fallback IP géolocation
+        3. ipinfo.io        — Dernier recours IP géolocation
+
+        Retourne un dict avec les clés : lat, lon, city, region, country,
+        ip, isp, timezone  — ou lève une RuntimeError si tout échoue.
+        """
+        providers = [
+            {
+                "url": "http://ip-api.com/json/",
+                "map": {
+                    "lat":      lambda d: d.get("lat"),
+                    "lon":      lambda d: d.get("lon"),
+                    "city":     lambda d: d.get("city", ""),
+                    "region":   lambda d: d.get("regionName", ""),
+                    "country":  lambda d: d.get("country", ""),
+                    "ip":       lambda d: d.get("query", ""),
+                    "isp":      lambda d: d.get("isp", ""),
+                    "timezone": lambda d: d.get("timezone", ""),
+                },
+                "ok": lambda d: d.get("status") == "success",
+            },
+            {
+                "url": "https://ipwho.is/",
+                "map": {
+                    "lat":      lambda d: d.get("latitude"),
+                    "lon":      lambda d: d.get("longitude"),
+                    "city":     lambda d: d.get("city", ""),
+                    "region":   lambda d: d.get("region", ""),
+                    "country":  lambda d: d.get("country", ""),
+                    "ip":       lambda d: d.get("ip", ""),
+                    "isp":      lambda d: d.get("connection", {}).get("isp", ""),
+                    "timezone": lambda d: d.get("timezone", {}).get("id", ""),
+                },
+                "ok": lambda d: d.get("success", False),
+            },
+            {
+                "url": "https://ipinfo.io/json",
+                "map": {
+                    "lat":      lambda d: float(d.get("loc", "0,0").split(",")[0]),
+                    "lon":      lambda d: float(d.get("loc", "0,0").split(",")[1]),
+                    "city":     lambda d: d.get("city", ""),
+                    "region":   lambda d: d.get("region", ""),
+                    "country":  lambda d: d.get("country", ""),
+                    "ip":       lambda d: d.get("ip", ""),
+                    "isp":      lambda d: d.get("org", ""),
+                    "timezone": lambda d: d.get("timezone", ""),
+                },
+                "ok": lambda d: "loc" in d,
+            },
+        ]
+
+        for provider in providers:
+            try:
+                resp = requests.get(provider["url"], timeout=5,
+                                    headers={"User-Agent": "WeatherApp/1.0"})
+                resp.raise_for_status()
+                data = resp.json()
+                if provider["ok"](data):
+                    m = provider["map"]
+                    return {key: fn(data) for key, fn in m.items()}
+            except Exception:
+                continue  # essaie le prochain fournisseur
+
+        raise RuntimeError(
+            "Impossible de détecter la localisation automatiquement "
+            "(tous les fournisseurs IP ont échoué)."
+        )
+
+    # ── Détection automatique de la localisation ──────────────────────────────
+    auto_location = {}
+    if lat is None or lon is None:
+        try:
+            auto_location = _get_location_auto()
+            lat  = auto_location["lat"]
+            lon  = auto_location["lon"]
+            city = city or auto_location.get("city", "")
+        except RuntimeError as e:
+            return {"error": str(e)}
+
+    # --- 1. Météo actuelle + prévisions horaires/journalières ---
+    weather_url = "https://api.open-meteo.com/v1/forecast"
+    weather_params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current": [
+            "temperature_2m",
+            "relative_humidity_2m",
+            "apparent_temperature",
+            "is_day",
+            "precipitation",
+            "rain",
+            "snowfall",
+            "weather_code",
+            "cloud_cover",
+            "pressure_msl",
+            "surface_pressure",
+            "wind_speed_10m",
+            "wind_direction_10m",
+            "wind_gusts_10m",
+        ],
+        "hourly": [
+            "temperature_2m",
+            "precipitation_probability",
+            "precipitation",
+            "wind_speed_10m",
+            "uv_index",
+            "visibility",
+        ],
+        "daily": [
+            "weather_code",
+            "temperature_2m_max",
+            "temperature_2m_min",
+            "apparent_temperature_max",
+            "apparent_temperature_min",
+            "sunrise",
+            "sunset",
+            "daylight_duration",
+            "uv_index_max",
+            "precipitation_sum",
+            "precipitation_probability_max",
+            "wind_speed_10m_max",
+            "wind_gusts_10m_max",
+        ],
+        "timezone": auto_location.get("timezone") or "auto",
+        "forecast_days": 7,
+    }
+
+    # --- 2. Géocodage inverse pour obtenir l'adresse complète ---
+    geo_url = "https://nominatim.openstreetmap.org/reverse"
+    geo_params = {
+        "lat": lat,
+        "lon": lon,
+        "format": "json",
+    }
+
+    # Codes météo WMO → description lisible
+    WMO_CODES = {
+        0: "Ciel dégagé", 1: "Principalement dégagé", 2: "Partiellement nuageux",
+        3: "Couvert", 45: "Brouillard", 48: "Brouillard givrant",
+        51: "Bruine légère", 53: "Bruine modérée", 55: "Bruine dense",
+        61: "Pluie légère", 63: "Pluie modérée", 65: "Pluie forte",
+        71: "Neige légère", 73: "Neige modérée", 75: "Neige forte",
+        77: "Grains de neige", 80: "Averses légères", 81: "Averses modérées",
+        82: "Averses violentes", 85: "Averses de neige légères",
+        86: "Averses de neige fortes", 95: "Orage", 96: "Orage avec grêle légère",
+        99: "Orage avec grêle forte",
+    }
+
+    try:
+        w_resp = requests.get(weather_url, params=weather_params, timeout=10)
+        w_resp.raise_for_status()
+        w_data = w_resp.json()
+    except requests.RequestException as e:
+        return {"error": f"Impossible de récupérer la météo : {e}"}
+
+    try:
+        g_resp = requests.get(geo_url, params=geo_params,
+                              headers={"User-Agent": "WeatherApp/1.0"}, timeout=5)
+        g_resp.raise_for_status()
+        g_data = g_resp.json()
+        address = g_data.get("display_name", city)
+        address_details = g_data.get("address", {})
+    except requests.RequestException:
+        address = city
+        address_details = {}
+
+    cur = w_data.get("current", {})
+    daily = w_data.get("daily", {})
+    hourly = w_data.get("hourly", {})
+    units = w_data.get("current_units", {})
+
+    # Index de l'heure actuelle dans les données horaires
+    now_iso = cur.get("time", "")
+    hourly_times = hourly.get("time", [])
+    try:
+        hour_idx = hourly_times.index(now_iso)
+    except ValueError:
+        hour_idx = 0
+
+    weather_code = cur.get("weather_code", -1)
+
+    result = {
+        # ── Localisation ──────────────────────────────────────────────
+        "location": {
+            "city": address_details.get("city") or address_details.get("town") or city,
+            "region": address_details.get("state", ""),
+            "country": address_details.get("country", ""),
+            "timezone": w_data.get("timezone", ""),
+            # "ip": auto_location.get("ip", ""),
+            # "isp": auto_location.get("isp", ""),
+            # "geolocation_method": "ip-geolocation (auto)" if auto_location else "manuel",
+        },
+
+        # ── Conditions actuelles ──────────────────────────────────────
+        "current": {
+            "timestamp": cur.get("time"),
+            "is_day": bool(cur.get("is_day", 1)),
+            "weather_code": weather_code,
+            "condition": WMO_CODES.get(weather_code, "Inconnu"),
+            "temperature_c": cur.get("temperature_2m"),
+            "feels_like_c": cur.get("apparent_temperature"),
+            "humidity_percent": cur.get("relative_humidity_2m"),
+            "precipitation_mm": cur.get("precipitation"),
+            "rain_mm": cur.get("rain"),
+            "snowfall_cm": cur.get("snowfall"),
+            "cloud_cover_percent": cur.get("cloud_cover"),
+            "pressure_hpa": cur.get("pressure_msl"),
+            "surface_pressure_hpa": cur.get("surface_pressure"),
+            "wind_speed_kmh": cur.get("wind_speed_10m"),
+            "wind_direction_deg": cur.get("wind_direction_10m"),
+            "wind_gusts_kmh": cur.get("wind_gusts_10m"),
+        },
+
+        # ── Données horaires (heure actuelle) ────────────────────────
+        "current_hour_forecast": {
+            "precipitation_probability_percent": (
+                hourly.get("precipitation_probability", [None])[hour_idx]
+            ),
+            "uv_index": hourly.get("uv_index", [None])[hour_idx],
+            "visibility_m": hourly.get("visibility", [None])[hour_idx],
+        },
+
+        # ── Prévisions 7 jours ────────────────────────────────────────
+        # "daily_forecast": [
+        #     {
+        #         "date": daily["time"][i],
+        #         "condition": WMO_CODES.get(daily["weather_code"][i], "Inconnu"),
+        #         "weather_code": daily["weather_code"][i],
+        #         "temp_max_c": daily["temperature_2m_max"][i],
+        #         "temp_min_c": daily["temperature_2m_min"][i],
+        #         "feels_like_max_c": daily["apparent_temperature_max"][i],
+        #         "feels_like_min_c": daily["apparent_temperature_min"][i],
+        #         "sunrise": daily["sunrise"][i],
+        #         "sunset": daily["sunset"][i],
+        #         "daylight_duration_sec": daily["daylight_duration"][i],
+        #         "uv_index_max": daily["uv_index_max"][i],
+        #         "precipitation_sum_mm": daily["precipitation_sum"][i],
+        #         "precipitation_probability_max_percent": daily["precipitation_probability_max"][i],
+        #         "wind_speed_max_kmh": daily["wind_speed_10m_max"][i],
+        #         "wind_gusts_max_kmh": daily["wind_gusts_10m_max"][i],
+        #     }
+        #     for i in range(len(daily.get("time", [])))
+        # ],
+
+        # ── Métadonnées ───────────────────────────────────────────────
+        "meta": {
+            # "source": "Open-Meteo (https://open-meteo.com)",
+            # "geocoding": "OpenStreetMap Nominatim",
+            # "fetched_at": datetime.now().isoformat(),
+            "units": {
+                "temperature": "°C",
+                "wind_speed": "km/h",
+                "precipitation": "mm",
+                "snowfall": "cm",
+                "pressure": "hPa",
+                "visibility": "mètres",
+            },
         }
-    ), True
+    }
+
+    return result
+
+def getWeather():
+    # try:
+    data = weather()
+    
+    # Vérifier si une erreur s'est produite
+    print( json.dumps( indent=4, obj=data ) )
+    if "error" in data:
+        log( "Exception when get weather", data["error"], "error" )
+        return "Erreur pour obtenir la météo", False
+    
+    current = data["current"]
+    print( "Getting localisation..." )
+    location, _ = getLocalisation()
+    print( json.dumps( location, indent=4 ) )
+    location = location["ip_location"]
+    print( json.dumps( location, indent=4 ) )
+    wind_direction = ""
+    print( f"{current["wind_direction_deg"]=}" )
+    wind_degrees = current["wind_direction_deg"]
+    if 360 - 22.5 < wind_degrees or wind_degrees < 22.5:
+        wind_direction = "nord"
+    elif wind_degrees < 67.5:
+        wind_direction = "nord-est"
+    elif wind_degrees < 112.5:
+        wind_direction = "est"
+    elif wind_degrees < 157.5:
+        wind_direction = "sud-est"
+    elif wind_degrees < 202.5:
+        wind_direction = "sud"
+    elif wind_degrees < 247.5:
+        wind_direction = "sud-ouest"
+    elif wind_degrees < 292.5:
+        wind_direction = "ouest"
+    elif wind_degrees < 337.5:
+        wind_direction = "nord-ouest"
+    else:
+        wind_direction = "nord"
+
+    print( f"{location=}, {current=}, {wind_direction=}" )
+
+    to_return = f"""
+En ce moment, à {location["city"]}, {location["region"]}, {location["country"]}, le {current["timestamp"]} il fait {current["temperature_c"]}.
+La température ressentie est de {current["feels_like_c"]} avec un facteur humidex à {current["humidity_percent"]} %.
+Le ciel est {current["condition"]} et sera recouvert par des nuages à {current["cloud_cover_percent"]} pourcent.
+On annonce {current["precipitation_mm"]} mm de précipitations, {current["rain_mm"]} mm de pluie et {current["snowfall_cm"]} mm de neige.
+Le vent soufflera à {current["wind_speed_kmh"]} km/h avec des rafales à {current["wind_gusts_kmh"]} km/h. Le vent viendrait du {wind_direction}.
+"""
+    print( to_return )
+    return to_return, True
+    # except Exception as e:
+    #     log( "Exception when get weather", str( e ), "error" )
+        # return "Erreur pour obtenir la météo", False
+
 
 loadPrint()#c
 
@@ -2730,17 +3141,18 @@ def getUserInput():
             if user_input:
                 GUI.textInput( False )
                 break
-        # print( f"User input: {user_input}" )
+        print( f"User input: {user_input}" )
     return user_input
 
 loadPrint()#c
 
-def treatResponse( response ):
-    treated_text = treadTextResponse( response )
-    GUI.setTextToDisplay( treated_text )
-    if AUDIO:
-        treatAudioResponse( response )
-    print( f"{ASSISTANT_NAME} >", treated_text )
+def treatResponse( response: str ):
+    if len( response ) != 0:
+        treated_text = treadTextResponse( response )
+        GUI.setTextToDisplay( treated_text )
+        if AUDIO:
+            treatAudioResponse( response )
+        print( f"{ASSISTANT_NAME} >", treated_text )
 
 loadPrint()#c
 
@@ -2774,6 +3186,7 @@ def chat():
         treating_response.join()
         # sendNotification( "Attente de votre message", "Rika attend votre message, vous pouvez maintenant parler" )
         user_input = getUserInput()
+        # WIFI = hasWifiAccess()
         if WIFI:
             emails = email_thread.join()
             for email in emails:
@@ -2831,6 +3244,7 @@ def chat():
                 while len( content["tools"] ) != 0:
                     for tool in content["tools"]:
                         print( f"Using {tool["name"]} tool\n\n" )
+                        log( "Using tool", tool["name"], "info" )
                         if tool["name"] == "analyseOldImage":
                             result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
                         elif tool["name"] == "analyseNewImage":
@@ -2855,6 +3269,13 @@ def chat():
                                 result, do_response = getLocalisation()
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "getWeather":
+                            if WIFI:
+                                result, do_response = getWeather()
+                            else:
+                                result, do_response =f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "getTime":
+                            result, do_response = getTime()
                         elif tool["name"] == "openApp":
                             result, do_response = openApp( tool["params"]["app"] )
                         elif tool["name"] == "doProtocol":
@@ -2883,9 +3304,9 @@ def chat():
                             sleepSystem( True )
                         else:
                             result = f"No tool found for {tool["name"]}"
+                        print( "tool use finished" )
                         
                         if not not_understand:
-
                             if type( result ) == str:
                                 conversation.append( 
                                     {
@@ -2894,11 +3315,11 @@ def chat():
                                         "name": f"{tool["name"]} tool"
                                     }
                                 )
-                            else:
+                            elif type( result ) == dict:
                                 conversation.append( 
                                     {
                                         "role": role,
-                                        "content": result,
+                                        "content": json.dumps( result ),
                                     }
                                 )
                         do_response = do_response or last_do_response
@@ -2907,9 +3328,12 @@ def chat():
                         content["tools"] = []
                         break
                     if do_response:
+                        # 🔧 ATTEND le thread précédent AVANT d'appeler le modèle la 2e fois
+                        treating_response.join() # FIXME
+                        
                         print( "ask model for chatting (2)" )
                         response = Model.askGroqModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
-                        
+                        print( "append to convesation" )
                         conversation.append( 
                             {
                                 "role": "assistant",
@@ -2917,7 +3341,6 @@ def chat():
                             }
                         )
                         content = json.loads( response )
-                        treating_response.join()
                         treating_response = threading.Thread( target=treatResponse, args=( content["message"], ) )
                         treating_response.start()
                         # treated_text = treadTextResponse( content["message"] )

@@ -41,10 +41,16 @@ Cas avec action(s) :
 
 OUTILS DISPONIBLES :
 
+- getTime
+  - Obtenir l'heure, la date, etc.
+
 - getLocalisation
   - Obtenir la localisation de l'utilisateur
   - exemples de cas d'utilisation:
     -> Où suis-je ?
+
+- getWeather
+  - Obtenir la météo de la localisation actuelle de l'utilisateur
 
 - sleepSystem
   - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.

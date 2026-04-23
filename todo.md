@@ -24,4 +24,3 @@ if prompt is also in call, just make the response without anything else. otherwi
 MRA API
 add imap server in settings
 auto update wifi
-retest sound
