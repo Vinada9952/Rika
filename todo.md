@@ -10,7 +10,6 @@ mac adaptation (and maybe linux)
 make assistant resum video screenshot or webcam
 assistant can send documents in mails
 fix webcam index
-either make the shortcut every prompt in write mode or make the shortcut work in write mode
 fix notUnderstand
 add sonor effects when assistant activates and deactivate
 make Rika API with flask for tools
