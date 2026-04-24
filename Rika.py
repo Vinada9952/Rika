@@ -337,8 +337,6 @@ class Sound:
             return text
         except sr.UnknownValueError:
             return -1
-        except sr.RequestError:
-            return -2
     
     def getVoices():
         return edge_tts.list_voices()
@@ -451,10 +449,6 @@ def hasWifiAccess( url = "http://www.google.com", timeout = 3 ) -> bool:
         # Capture toutes les autres erreurs de la bibliothèque requests.
         # print(f"❌ Erreur réseau imprévue : {e}")
         return False
-    
-loadPrint()#c
-
-WIFI = hasWifiAccess()
 
 loadPrint()#c
 
@@ -538,6 +532,13 @@ class SpotifyPlayer:
     # ------------------------------------------------------------------ #
     #  Lecture / Pause / Stop                                              #
     # ------------------------------------------------------------------ #
+    # def setVolume(self, volume: int):
+    #     """Définit le volume (0-100)."""
+        
+    #     # Limiter le volume entre 0 et 100
+    #     volume = max(0, min(100, volume))
+    #     self.sp.volume(volume)
+    #     # print(f"🔊  Volume : {volume}%")
 
     def play(self, uri: str | None = None, device_id: str | None = None):
         if device_id is None:
@@ -886,6 +887,12 @@ SPOTIFY_CLIENT_SECRET = settings["spotify-player"]["client-secret"]
 
 loadPrint()#c
 
+WIFI = hasWifiAccess()
+# print( f"{WIFI=}" )
+log( "Wifi connexion", WIFI, "info" )
+
+loadPrint()#c
+
 if WIFI:
     try:
         spotify = SpotifyPlayer( SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET )
@@ -896,6 +903,10 @@ if WIFI:
 else:
     IS_THERE_SPOTIFY = False
     log( "No wifi access", "Spotify features will be unavailable", "warning" )
+
+loadPrint()#c
+
+DEFAULT_VOLUME = settings["spotify-player"]["default-spotify-volume"]
 
 loadPrint()#c
 
@@ -1129,6 +1140,7 @@ OUTILS DISPONIBLES :
     -> search (string): Ce que tu cherches sur spotify. Le plus précis possible.
     -> type (string): Le type du contenu recherché.
     -> device (string) : L'appareil sur lequel jouer la musique
+    -> volume (int) : niveau de volume
   - types possibles:
     -> track
     -> album
@@ -1137,6 +1149,7 @@ OUTILS DISPONIBLES :
   - Différentes playlist de l'utilisateur:{playlists_formatted}
   - Liste d'appareils disponibles:{formatted_devices}
   - l'appareil par défaut est "{DEFAULT_DEVICE}". Si l'utilisateur ne demande pas d'appareils précis, utilise celui-ci
+  - Le volume par défaut est {DEFAULT_VOLUME}. Si l'utilisateur ne demande pas un volume précis, utilise celui-ci
 
 - recognizeMusic
   - Reconaitre la musique qui joue
@@ -1443,9 +1456,9 @@ class Model:
                     },
                     "warning"
                 )
-        # Si toutes les tentatives échouent, retourner la dernière réponse ou un message d'erreur
         if ans and ans.strip():
             return ans
+        # Si toutes les tentatives échouent, retourner la dernière réponse ou un message d'erreur
         return "Erreur: Le modèle n'a pas pu générer une réponse valide après " + str(max_retries) + " tentatives."
     
     def getNextClient():
@@ -1816,15 +1829,19 @@ def recognizeMusic() -> dict:
 
 loadPrint()#c
 
-def playMusic( search, types, choosed_device ):
+def playMusic( search, types, choosed_device, volume ):
+    # print( "ceci ne sera pas affiché" )
+    # print( f"{search=}, {types=}, {choosed_device=}, {volume=}" )
     devices = spotify.listDevices()
     # if spotify.SearchTypes.isInTypes( types ):
     if not IS_THERE_SPOTIFY:
+        log( "Playing spotify error", "No spotify, Impossible de faire jouer de la musique", "error" )
         return "Impossible de faire jouer de la musique", True
     try:
         while True:
             devices = spotify.listDevices()
             # print( f"{devices=}" )
+            log( "Spotify devices", devices, "info" )
             if devices == []:
                 spotify.openSpotify()
             else:
@@ -1837,6 +1854,7 @@ def playMusic( search, types, choosed_device ):
         if not found:
             return "Appareil impossible à trouver. Assurez vous que l'application est ouverte sur l'appareil en question", True
         results, _ = spotify.search( search, types )
+        # spotify.setVolume( volume )
         spotify.play( results[0]["uri"], device_id )
         return "Succès pour faire jouer le titre", False
     except Exception as e:
@@ -2509,19 +2527,19 @@ def getWeather():
     data = weather()
     
     # Vérifier si une erreur s'est produite
-    print( json.dumps( indent=4, obj=data ) )
+    # print( json.dumps( indent=4, obj=data ) )
     if "error" in data:
         log( "Exception when get weather", data["error"], "error" )
         return "Erreur pour obtenir la météo", False
     
     current = data["current"]
-    print( "Getting localisation..." )
+    # print( "Getting localisation..." )
     location, _ = getLocalisation()
-    print( json.dumps( location, indent=4 ) )
+    # print( json.dumps( location, indent=4 ) )
     location = location["ip_location"]
-    print( json.dumps( location, indent=4 ) )
+    # print( json.dumps( location, indent=4 ) )
     wind_direction = ""
-    print( f"{current["wind_direction_deg"]=}" )
+    # print( f"{current["wind_direction_deg"]=}" )
     wind_degrees = current["wind_direction_deg"]
     if 360 - 22.5 < wind_degrees or wind_degrees < 22.5:
         wind_direction = "nord"
@@ -2542,7 +2560,7 @@ def getWeather():
     else:
         wind_direction = "nord"
 
-    print( f"{location=}, {current=}, {wind_direction=}" )
+    # print( f"{location=}, {current=}, {wind_direction=}" )
 
     to_return = f"""
 En ce moment, à {location["city"]}, {location["region"]}, {location["country"]}, le {current["timestamp"]} il fait {current["temperature_c"]}.
@@ -3122,15 +3140,15 @@ loadPrint()#c
 def getUserInput():
     # print( "getting input" )
     user_input = ''
+    print( "YOU > ", end='' )
     if AUDIO:
         Sound.waitForSoundTofinish()
-        print( "YOU > ", end='' )
         user_input = Sound.listen()
         print( user_input )
     else:
         # user_input = input( "YOU > " )
         while True:
-            print( GUI.getTextInputState() )
+            # print( GUI.getTextInputState() )
             if GUI.getTextInputState() == "hidden":
                 break
             time.sleep( 1 )
@@ -3239,7 +3257,7 @@ def chat():
             not_understand = False
             do_response = False
             role = "assistant"
-            last_do_response = do_response
+            responses = []
             try:
                 while len( content["tools"] ) != 0:
                     for tool in content["tools"]:
@@ -3282,7 +3300,13 @@ def chat():
                             result, do_response = doProtocol( tool["params"]["protocol"] )
                         elif tool["name"] == "playMusic":
                             if WIFI:
-                                result, do_response = playMusic( tool["params"]["search"], tool["params"]["type"], tool["params"]["device"] )
+                                # print( "ceci sera affiché" )
+                                # print( tool["params"] )
+                                try:
+                                    _ = tool["params"]["volume"]
+                                except KeyError:
+                                    tool["params"]["volume"] = DEFAULT_VOLUME
+                                result, do_response = playMusic( tool["params"]["search"], tool["params"]["type"], tool["params"]["device"], tool["params"]["volume"] )
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "recognizeMusic":
@@ -3322,14 +3346,19 @@ def chat():
                                         "content": json.dumps( result ),
                                     }
                                 )
-                        do_response = do_response or last_do_response
-                        last_do_response = do_response
+
+                        print( f"{do_response=}, {responses=}" )
+                        responses.append( do_response )
+                    for response in responses:
+                        if response:
+                            do_response = True
+                            break
+                    print( f"{do_response=}" )
                     if not_understand:
                         content["tools"] = []
                         break
                     if do_response:
-                        # 🔧 ATTEND le thread précédent AVANT d'appeler le modèle la 2e fois
-                        treating_response.join() # FIXME
+                        treating_response.join()
                         
                         print( "ask model for chatting (2)" )
                         response = Model.askGroqModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )

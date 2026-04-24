@@ -233,7 +233,8 @@ base_settings = {
             "Smartphone",
             "Speaker",
             "Tablet"
-        ]
+        ],
+        "default-spotify-volume": 70
     }
 }
 
