@@ -16,10 +16,10 @@ make Rika API with flask for tools
 make web version
 add stopwatch
 add reminders
-add choice to change the port in settings for ui-backend socket communication
 organize how models are used
 make log output real json and not string json
 if prompt is also in call, just make the response without anything else. otherwise, continue conversation
 MRA API
-add imap server in settings
 auto update wifi
+audio cycle a bit slow (time between when user can talk)
+add sound when user can speak

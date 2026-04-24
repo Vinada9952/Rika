@@ -221,7 +221,8 @@ base_settings = {
     },
     "gui":{
         "color": [ 3, 232, 252 ],
-        "font": "./assets/gui/Nasalization Rg.otf"
+        "font": "./assets/gui/Nasalization Rg.otf",
+        "communication-port": 6789
     },
     "reset-protocol-name": "Mémoire Saturée",
     "spotify-player": {

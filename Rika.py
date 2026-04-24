@@ -48,8 +48,19 @@ import re
 import os
 print( "Starting GUI..." )
 
+class Json:
+    def write( informations: dict, json_name: str ):
+        json_object = json.dumps( informations, indent=4 )
+        with open( json_name, 'w', encoding="utf-8" ) as outfile:
+            outfile.write( json_object )
+    def read( json_name: str ):
+        with open( json_name, 'r', encoding="utf-8" ) as infile:
+            informations = json.load( infile )
+        return informations
+
 serveur_socket = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
-serveur_socket.bind( ( '0.0.0.0', 5789 ) )
+
+serveur_socket.bind( ( '0.0.0.0', Json.read( "./settings.json" )["gui"]["communication-port"] ) )
 client_socket = None
 
 socket_running = True
@@ -109,8 +120,8 @@ def quitSocket():
     global socket_running
     socket_running = False
 
-socket_receive_thread = threading.Thread( target=onReceiveSocket )
-socket_send_thread = threading.Thread( target=send )
+socket_receive_thread = threading.Thread( target=onReceiveSocket, name="RIKA-RX-GUI" )
+socket_send_thread = threading.Thread( target=send, name="RIKA-TX-GUI" )
 
 socket_receive_thread.daemon = True
 socket_send_thread.daemon = True
@@ -213,13 +224,15 @@ class GUI:
         global text_input_state
         return text_input_state
 
-print( "Starting Rika..." )
 
 GUI.startGUI()
+
+print( "Starting Rika..." )
 
 GUI.setInit( True )
 
 os.system( "cls" )
+
 load_print = 0
 
 load_number = -1
@@ -280,18 +293,6 @@ loadPrint()#c
 
 class NotValidResponse( Exception ):
     pass
-
-loadPrint()#c
-
-class Json:
-    def write( informations: dict, json_name: str ):
-        json_object = json.dumps( informations, indent=4 )
-        with open( json_name, 'w', encoding="utf-8" ) as outfile:
-            outfile.write( json_object )
-    def read( json_name: str ):
-        with open( json_name, 'r', encoding="utf-8" ) as infile:
-            informations = json.load( infile )
-        return informations
 
 loadPrint()#c
 
@@ -384,9 +385,25 @@ class Sound:
             )
             print( f"Erreur: Impossible de charger le fichier MP3: {e}" )
     
-    def _playFile( file_path ):
+    def _playFile( file_path, reverse: bool = False ):
         try:
-            pygame.mixer.music.load( file_path )
+            file_to_play = file_path
+            
+            if reverse:
+                from pydub import AudioSegment
+                import tempfile
+                
+                # Charger le fichier MP3
+                audio = AudioSegment.from_mp3( file_path )
+                # Inverser l'audio
+                audio_reversed = audio.reverse()
+                
+                # Sauvegarder temporairement le fichier inversé
+                with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as tmp:
+                    file_to_play = tmp.name
+                audio_reversed.export( file_to_play, format="mp3" )
+            
+            pygame.mixer.music.load( file_to_play )
             pygame.mixer.music.play()
         except pygame.error as e:
             log(
@@ -404,8 +421,8 @@ class Sound:
     def playVoice():
         return Sound._playVoice()
     
-    def playFile( file_path ):
-        return Sound._playFile( file_path )
+    def playFile( file_path, reverse: bool = False ):
+        return Sound._playFile( file_path, reverse )
     
     def waitForSoundTofinish():
         while pygame.mixer.music.get_busy():
@@ -776,6 +793,7 @@ settings = Json.read( "settings.json" )
 
 loadPrint()#c
 
+# groq API
 API_KEYS = settings["api"]["api-keys"]
 clients = [
     Groq( api_key=n )
@@ -783,15 +801,20 @@ clients = [
 ]
 del API_KEYS
 
+loadPrint()#c
+
+# ollama client
 ollama_client = ollama.Client()
 
 loadPrint()#c
 
+# call settings
 call_names = settings["call"]["names"]
 CALL_HOTKEY = settings["call"]["hotkey"]
 
 loadPrint()#c
 
+# models settings
 MAIN_MODEL = settings["models"]["main"]
 VISION_MODEL = settings["models"]["vision"]
 ASK_MODEL = settings["models"]["data"]
@@ -802,17 +825,22 @@ ASSISTANT_NAME = settings["assistant-name"]
 
 loadPrint()#c
 
+# Audio settings
 AUDIO = settings["audio"]["audio"]
 VOICE = settings["audio"]["voice"]
 AUDIO_DURATION_LIMIT = settings["audio"]["audio-duration-threshold"]
+CONFIRMATION_SOUND = settings["audio"]["confirmation-sound"]
+LISTEN_TIME_LIMIT = settings["audio"]["listen-time-limit"]
 
 loadPrint()#c
 
+# Vision settings
 SCREENSHOT_DIR = settings["directories"]["cache"]["screenshots"]
 WEBCAM_PATH = settings["directories"]["cache"]["webcam"]
 
 loadPrint()#c
 
+# code file creation settings
 file_extensions = {
     "python": "py",
     "c++": "cpp",
@@ -825,15 +853,17 @@ file_extensions = {
 
 loadPrint()#c
 
-SAMPLE_RATE            = 44100
-DURATION               = 8
-TIMEOUT                = 12
+# Music recognition settings
+SAMPLE_RATE = 44100
+DURATION = 8
+TIMEOUT = 12
 SPEAKER_SILENCE_THRESH = 0.005
-MIC_SILENCE_THRESH     = 0.0005  # beaucoup plus sensible que le speaker
-MIC_GAIN               = 5.0     # multiplie le volume du micro (augmente si encore trop faible)
+MIC_SILENCE_THRESH = 0.0005 # beaucoup plus sensible que le speaker
+MIC_GAIN = 5.0 # multiplie le volume du micro (augmente si encore trop faible)
 
 loadPrint()#c
 
+# Email settings
 SMTP_SERVER = settings["email"]["smtp"]["server"]
 SMTP_PORT = settings["email"]["smtp"]["port"]
 EMAIL = settings["email"]["email"]
@@ -853,6 +883,7 @@ IMAP_SERVERS = {
 
 loadPrint()#c
 
+# directories settings
 SEARCH_DIRS = []
 for element in settings["directories"]["apps-path"]["get-env"]:
     SEARCH_DIRS.append(
@@ -870,88 +901,11 @@ for element in settings["directories"]["apps-path"]["normal"]:
 
 loadPrint()#c
 
+# User info settings
 USERNAME = settings["email"]["user-email"]["name"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
 CONTACT_LIST = Json.read( settings["directories"]["assets"]["contacts"] )
 USERNOTE_DIRECTORY = settings["directories"]["assets"]["usernote"]
-
-loadPrint()#c
-
-CONFIRMATION_SOUND = settings["audio"]["confirmation-sound"]
-LISTEN_TIME_LIMIT = settings["audio"]["listen-time-limit"]
-
-loadPrint()#c
-
-SPOTIFY_CLIENT_ID = settings["spotify-player"]["client-id"]
-SPOTIFY_CLIENT_SECRET = settings["spotify-player"]["client-secret"]
-
-loadPrint()#c
-
-WIFI = hasWifiAccess()
-# print( f"{WIFI=}" )
-log( "Wifi connexion", WIFI, "info" )
-
-loadPrint()#c
-
-if WIFI:
-    try:
-        spotify = SpotifyPlayer( SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET )
-        IS_THERE_SPOTIFY = True
-    except Exception as e:
-        IS_THERE_SPOTIFY = False
-        log( "Error creating spotify instance", str( e ), "warning" )
-else:
-    IS_THERE_SPOTIFY = False
-    log( "No wifi access", "Spotify features will be unavailable", "warning" )
-
-loadPrint()#c
-
-DEFAULT_VOLUME = settings["spotify-player"]["default-spotify-volume"]
-
-loadPrint()#c
-
-formatted_devices = ""
-DEVICES = settings["spotify-player"]["available-devices"]
-DEFAULT_DEVICE = settings["spotify-player"]["default-device"]
-for device in DEVICES:
-    formatted_devices += f"\n    -> {device}"
-
-loadPrint()#c
-
-PLAYLISTS = Json.read( settings["directories"]["assets"]["playlists"] )
-playlists_formatted = ''
-for playlist in PLAYLISTS:
-    playlists_formatted += f"\n    -> {playlist["name"]} ({playlist["type"]}): {playlist["description"]}"
-
-loadPrint()#c
-
-SERVER_URL = settings["server"]["url"]
-SET_CONVERSATION = settings["server"]["set-conversation"]
-GET_CONVERSATION = settings["server"]["get-conversation"]
-
-loadPrint()#c
-
-PROTOCOLS = [ { "name": settings["reset-protocol-name"], "command": "/delete-memory" } ] + Json.read( settings["directories"]["assets"]["protocols"] )
-
-protocol_list = ''
-for protocol in PROTOCOLS:
-    protocol_list += f"\n    -> {protocol["name"]}"
-
-loadPrint()#c
-
-def getAllAppsThread():
-    global APPLICATIONS
-    APPLICATIONS = getAllApps()
-    sendNotification( "Applications chargées.", "Scan des applications installés terminées" )
-
-get_all_apps_thread = threading.Thread( target=getAllAppsThread )
-get_all_apps_thread.start()
-
-loadPrint()#c
-
-treating_response = Substitute()
-
-loadPrint()#c
 
 names = []
 for contact in CONTACT_LIST:
@@ -964,6 +918,76 @@ CONTACT_NAMES = '\n'.join( names )
 
 loadPrint()#c
 
+# Wifi settings
+WIFI = hasWifiAccess()
+# print( f"{WIFI=}" )
+log( "Wifi connexion", WIFI, "info" )
+
+loadPrint()#c
+
+# Spotify settings
+SPOTIFY_CLIENT_ID = settings["spotify-player"]["client-id"]
+SPOTIFY_CLIENT_SECRET = settings["spotify-player"]["client-secret"]
+
+if WIFI:
+    try:
+        spotify = SpotifyPlayer( SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET )
+        IS_THERE_SPOTIFY = True
+    except Exception as e:
+        IS_THERE_SPOTIFY = False
+        log( "Error creating spotify instance", str( e ), "warning" )
+else:
+    IS_THERE_SPOTIFY = False
+    log( "No wifi access", "Spotify features will be unavailable", "warning" )
+DEFAULT_VOLUME = settings["spotify-player"]["default-spotify-volume"]
+
+formatted_devices = ""
+DEVICES = settings["spotify-player"]["available-devices"]
+DEFAULT_DEVICE = settings["spotify-player"]["default-device"]
+for device in DEVICES:
+    formatted_devices += f"\n    -> {device}"
+
+
+PLAYLISTS = Json.read( settings["directories"]["assets"]["playlists"] )
+playlists_formatted = ''
+for playlist in PLAYLISTS:
+    playlists_formatted += f"\n    -> {playlist["name"]} ({playlist["type"]}): {playlist["description"]}"
+
+loadPrint()#c
+
+# server settings
+SERVER_URL = settings["server"]["url"]
+SET_CONVERSATION = settings["server"]["set-conversation"]
+GET_CONVERSATION = settings["server"]["get-conversation"]
+
+loadPrint()#c
+
+# Custom protocols settings
+PROTOCOLS = [ { "name": settings["reset-protocol-name"], "command": "/delete-memory" } ] + Json.read( settings["directories"]["assets"]["protocols"] )
+
+protocol_list = ''
+for protocol in PROTOCOLS:
+    protocol_list += f"\n    -> {protocol["name"]}"
+
+loadPrint()#c
+
+# apps settings
+def getAllAppsThread():
+    global APPLICATIONS
+    APPLICATIONS = getAllApps()
+    sendNotification( "Applications chargées.", "Scan des applications installés terminées" )
+
+get_all_apps_thread = threading.Thread( target=getAllAppsThread, name="scanapps" )
+get_all_apps_thread.start()
+
+loadPrint()#c
+
+# temporary variable(s)
+treating_response = Substitute()
+
+loadPrint()#c
+
+# Conversation settings
 conversation = Json.read( "./conversation.json" )
 if SERVER_URL:
     data = requests.get( f"{SERVER_URL}/{GET_CONVERSATION}" )
@@ -1075,7 +1099,7 @@ OUTILS DISPONIBLES :
     -> Regarde mieux
     -> Analyse plus en détail
     -> Que vois-tu d'autre ?
-    -> Zoome sur…
+    -> Zoom sur...
     -> Relis le code sur l'image
 
 - openApp
@@ -1264,7 +1288,7 @@ def checkAudioCall():
                 print( ASSISTANT_NAME )
         time.sleep( 1 )
 
-check_audio_call = threading.Thread( target=checkAudioCall )
+check_audio_call = threading.Thread( target=checkAudioCall, name="Check voice call" )
 
 loadPrint()#c
 
@@ -1973,6 +1997,7 @@ def openApp( app ):
     get_all_apps_thread = Substitute()
     search = searchApp( APPLICATIONS, app )
     return appPath( search, app ), False
+
 # def openApp( app: str ):
 #     app = app.lower()
 #     if app == "spotify":
@@ -2818,13 +2843,37 @@ cap = cv2.VideoCapture( getCameraIndex( "USB" ) )
 def getImage( type ):
     if type == "screenshot":
         with mss.mss() as sct:
+            # Obtenir la position du curseur
+            from ctypes import Structure, POINTER, pointer, CDLL, c_long
+            
+            class POINT(Structure):
+                _fields_ = [("x", c_long), ("y", c_long)]
+            
+            GetCursorPos = CDLL('user32').GetCursorPos
+            pt = POINT()
+            GetCursorPos(pointer(pt))
+            cursor_x, cursor_y = pt.x, pt.y
+            
+            # Trouver l'écran contenant le curseur
+            cursor_monitor = None
             for i, monitor in enumerate( sct.monitors[1:], start=1 ):
-                shot = sct.grab( monitor )
-                img = Image.frombytes( "RGB", shot.size, shot.rgb )
-                path = os.path.join( SCREENSHOT_DIR, f"screen_{i}.jpg" )
-                img.save( path )
+                if (monitor["left"] <= cursor_x <= monitor["left"] + monitor["width"] and
+                    monitor["top"] <= cursor_y <= monitor["top"] + monitor["height"]):
+                    cursor_monitor = (i, monitor)
+                    break
+            
+            # Si aucun écran n'est trouvé, utiliser le premier écran
+            if cursor_monitor is None:
+                cursor_monitor = (1, sct.monitors[1])
+            
+            # Capturer uniquement l'écran du curseur
+            i, monitor = cursor_monitor
+            shot = sct.grab( monitor )
+            img = Image.frombytes( "RGB", shot.size, shot.rgb )
+            path = os.path.join( SCREENSHOT_DIR, f"screen_{i}.jpg" )
+            img.save( path )
 
-        return f"Screenshots capturés ({len( sct.monitors ) - 1} écrans)"
+        return f"Screenshot capturé de l'écran {i}"
 
     if type == "webcam":
         ret, frame = cap.read()
@@ -2852,7 +2901,10 @@ def analyseImage( type, prompt, renew ):
         )
 
         if not files:
-            return "Aucun screenshot disponible", True
+            if renew:
+                return "Aucun screenshot disponible", True
+            else:
+                return analyseImage( type, prompt, True )
         if WIFI:
             content = [
                 {
@@ -2931,7 +2983,7 @@ def analyseImage( type, prompt, renew ):
     print( "ask model for vision" )
     response = Model.askGroqModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
 
-    return f"voici le contenu de image. Fait ce que {USERNAME} te demande de faire avec : " + response, True
+    return f"voici le contenu de image. Ne te concentre que sur l'essentiel que {USERNAME} t'a demandé. Fait ce que {USERNAME} te demande de faire avec : " + response, True
 
 loadPrint()#c
 
@@ -3035,57 +3087,6 @@ Garde le plus d'informations importantes possible en respectant la limite de mot
 
 loadPrint()#c
 
-# def moment():
-#     date = datetime.datetime.now()
-#     day_name = int( date.strftime( "%w" ) )
-#     if day_name == 0:
-#         day_name = "Dimanche"
-#     elif day_name == 1:
-#         day_name = "Lundi"
-#     elif day_name == 2:
-#         day_name = "Mardi"
-#     elif day_name == 3:
-#         day_name = "Mercredi"
-#     elif day_name == 4:
-#         day_name = "Jeudi"
-#     elif day_name == 5:
-#         day_name = "Vendredi"
-#     elif day_name == 6:
-#         day_name = "Samedi"
-#     jour = date.strftime( "%d" )
-#     mois = int( date.strftime( "%m" ) )
-#     if mois == 1:
-#         mois = "Janvier"
-#     elif mois == 2:
-#         mois = "Février"
-#     elif mois == 3:
-#         mois = "Mars"
-#     elif mois == 4:
-#         mois = "Avril"
-#     elif mois == 5:
-#         mois = "Mai"
-#     elif mois == 6:
-#         mois = "Juin"
-#     elif mois == 7:
-#         mois = "Juillet"
-#     elif mois == 8:
-#         mois = "Août"
-#     elif mois == 9:
-#         mois = "Septembre"
-#     elif mois == 10:
-#         mois = "Octobre"
-#     elif mois == 11:
-#         mois = "Novembre"
-#     elif mois == 12:
-#         mois = "Décembre"
-#     ans = date.strftime( "%Y" )
-#     heure = datetime.datetime.now().strftime( "%H" )
-#     minute = datetime.datetime.now().strftime( "%M" )
-#     return str( f"{ans=} {mois=} {jour=} {heure=} {minute=}" )
-
-
-loadPrint()#c
-
 def treadTextResponse( response: str ):
     return response.replace( "**", '' )
 
@@ -3171,6 +3172,8 @@ def treatResponse( response: str ):
         if AUDIO:
             treatAudioResponse( response )
         print( f"{ASSISTANT_NAME} >", treated_text )
+    else:
+        GUI.setTextToDisplay( response )
 
 loadPrint()#c
 
@@ -3182,7 +3185,7 @@ def chat():
     
     april_fools_rickroll()
     if AUDIO:
-        Sound.playFile( CONFIRMATION_SOUND )
+        Sound.playFile( CONFIRMATION_SOUND, False )
     # print( "called" )
 
     # conversation.append(
@@ -3197,7 +3200,7 @@ def chat():
         # print( "getting emails" )
 
         if WIFI:
-            email_thread = ThreadWithReturnValue( target=getEmail, args=( EMAIL, EMAIL_PASSWORD ) )
+            email_thread = ThreadWithReturnValue( target=getEmail, args=( EMAIL, EMAIL_PASSWORD ), name="read emails" )
             email_thread.start()
         
         # print( "asking user" )
@@ -3245,7 +3248,7 @@ def chat():
                     "content": response
                 }
             )
-            treating_response = threading.Thread( target=treatResponse, args=( content["message"], ) )
+            treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
             treating_response.start()
             # treated_text = treadTextResponse( content["message"] )
             
@@ -3325,6 +3328,8 @@ def chat():
                             not_understand = True
                             break
                         elif tool["name"] == "sleepSystem":
+                            if AUDIO:
+                                Sound.playFile( CONFIRMATION_SOUND, True )
                             sleepSystem( True )
                         else:
                             result = f"No tool found for {tool["name"]}"
@@ -3370,7 +3375,7 @@ def chat():
                             }
                         )
                         content = json.loads( response )
-                        treating_response = threading.Thread( target=treatResponse, args=( content["message"], ) )
+                        treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
                         treating_response.start()
                         # treated_text = treadTextResponse( content["message"] )
                         # GUI.setTextToDisplay( treated_text )

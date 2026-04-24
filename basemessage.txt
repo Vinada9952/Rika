@@ -94,7 +94,7 @@ OUTILS DISPONIBLES :
     -> Regarde mieux
     -> Analyse plus en détail
     -> Que vois-tu d'autre ?
-    -> Zoome sur…
+    -> Zoom sur...
     -> Relis le code sur l'image
 
 - openApp

@@ -667,7 +667,7 @@ mouse.Listener( on_move=_trigger, on_click=_trigger, on_scroll=_trigger ).start(
 keyboard.Listener( on_press=_trigger ).start()
 
 client_socket = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
-client_socket.connect( ( 'localhost', 5789 ) )
+client_socket.connect( ( 'localhost', Json.read( "./settings.json" )["gui"]["communication-port"] ) )
 
 socket_running = True
 queue_send = []
@@ -737,8 +737,8 @@ def quitSocket():
 
 charge()
 
-socket_receive_thread = threading.Thread( target=onReceiveSocket )
-socket_send_thread = threading.Thread( target=send )
+socket_receive_thread = threading.Thread( target=onReceiveSocket, name="GUI-RX-RIKA" )
+socket_send_thread = threading.Thread( target=send, name="GUI-TX-RIKA" )
 
 socket_receive_thread.daemon = True
 socket_send_thread.daemon = True
