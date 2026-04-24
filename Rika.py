@@ -1056,6 +1056,12 @@ OUTILS DISPONIBLES :
 - getWeather
   - Obtenir la météo de la localisation actuelle de l'utilisateur
 
+- startChrono
+  - partir un chronomètre.
+  - Tu peux en partir uniquement un à la fois.
+
+- stopChrono
+  - arrêter le chronomètre et retourner le temps mesuré
 
 - sleepSystem
   - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
@@ -2125,6 +2131,138 @@ def moment_actuel() -> dict:
             "est_annee_bissextile": calendar.isleap(maintenant.year),
         },
     }
+
+loadPrint()#c
+
+class StopWatch:
+    class ChronoNotStarted( Exception ):
+        """Chrono not started"""
+        pass
+
+    class ChronoNotStopped( Exception ):
+        """Chrono not stopped"""
+        pass
+
+    def timestampToDict(total_seconds: float):
+        if total_seconds < 0:
+            return {"error": "La durée ne peut pas être négative."}
+        
+        if total_seconds == 0:
+            return {
+                "jours": 0, "heures": 0, "minutes": 0, "secondes": 0,
+                "milliseconde": 0, "microseconde": 0, "duree_totale_secondes": 0.0
+            }
+
+        # 1. Détermination des unités fixes
+        
+        # Calcul des jours
+        SECONDS_POUR_UN_JOUR = 24 * 60 * 60 # 86400
+        jours = int(total_seconds // SECONDS_POUR_UN_JOUR)
+        
+        # Calcul des secondes restantes après déduction des jours
+        seconds_restantes = total_seconds % SECONDS_POUR_UN_JOUR
+        
+        # Calcul des heures
+        SECONDS_POUR_UNE_HEURE = 60 * 60 # 3600
+        heures = int(seconds_restantes // SECONDS_POUR_UNE_HEURE)
+        
+        # Calcul des secondes restantes après déduction des heures
+        seconds_restantes = seconds_restantes % SECONDS_POUR_UNE_HEURE
+        
+        # Calcul des minutes
+        minutes = int(seconds_restantes // 60)
+        
+        # Calcul des secondes et du reste de la précision
+        secondes = int(seconds_restantes % 60)
+        
+        # La précision (millisecondes/microsecondes) vient de la partie flottante
+        # On utilise la soustraction pour obtenir la partie décimale totale
+        duree_entiere_seconde = int(total_seconds)
+        partie_flottante = total_seconds - duree_entiere_seconde
+        
+        microsecondes = int(partie_flottante * 1000000)
+        milliseconde = int(round(microsecondes / 1000))
+        
+        
+        resultat = {
+            "duree_totale_secondes": round(total_seconds, 4),
+            "jours": jours,
+            "heures": heures,
+            "minutes": minutes,
+            "secondes": secondes,
+            "milliseconde": milliseconde,
+            "microseconde": microsecondes,
+        }
+        
+        return resultat
+
+
+    class chrono:
+        start_time = -1
+        stop_time = -1
+
+        def start( self ):
+            self.start_time = time.time()
+        
+        def stop( self ):
+            if self.start_time == -1:
+                raise StopWatch.ChronoNotStarted( "Chrono not started. Please start the chonometer before stopping it" )
+            self.stop_time = time.time() 
+
+        def getMesuredTime( self ):
+            if self.start_time == -1:
+                raise StopWatch.ChronoNotStarted( "Chrono not started. Please start the chonometer before mesuring its time" )
+            if self.stop_time == -1:
+                raise StopWatch.ChronoNotStopped( "Chrono not stopped. Please stop the chonometer before mesuring its time" )
+            mesured = self.stop_time - self.start_time
+            return StopWatch.timestampToDict( mesured )
+
+        def resetChrono( self ):
+            self.start_time = -1
+            self.stop_time = -1
+    
+    class timer:
+        duration = 0
+        target = None
+        args = ()
+        thread = None
+        def __init__( self, duration, finish_target, args = () ):
+            self.duration = duration
+            self.target = finish_target
+            self.args = args
+            
+        def _cooldown( self ):
+            time.sleep( self.duration )
+            self.target(*self.args)
+        
+        def start( self ):
+            self.thread = threading.Thread( target=self._cooldown )
+            self.thread.start()
+        
+        def waitTimer( self ):
+            self.thread.join()
+
+loadPrint()#c
+
+chrono = StopWatch.chrono()
+
+loadPrint()#c
+
+def startChrono():
+    global chrono
+    chrono.resetChrono()
+    chrono.start()
+    return "Chronomètre parti", False
+
+loadPrint()#c
+
+def getChrono():
+    global chrono
+    try:
+        chrono.stop()
+        return str( chrono.getMesuredTime() ) + 's', True
+    except StopWatch.ChronoNotStarted:
+        return "Le chronomètre n'est pas parti.", True
 
 loadPrint()#c
 
@@ -3297,6 +3435,10 @@ def chat():
                                 result, do_response =f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "getTime":
                             result, do_response = getTime()
+                        elif tool["name"] == "startChrono":
+                            result, do_response = startChrono()
+                        elif tool["name"] == "stopChrono":
+                            result, do_response = getChrono()
                         elif tool["name"] == "openApp":
                             result, do_response = openApp( tool["params"]["app"] )
                         elif tool["name"] == "doProtocol":

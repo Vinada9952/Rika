@@ -52,6 +52,13 @@ OUTILS DISPONIBLES :
 - getWeather
   - Obtenir la météo de la localisation actuelle de l'utilisateur
 
+- startChrono
+  - partir un chronomètre.
+  - Tu peux en partir uniquement un à la fois.
+
+- stopChrono
+  - arrêter le chronomètre et retourner le temps mesuré
+
 - sleepSystem
   - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
   - CE N'EST PAS UNE EXTINCTION DÉFNITIVE, l'utilisateur te rappellera après

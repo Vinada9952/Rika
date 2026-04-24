@@ -14,7 +14,7 @@ fix notUnderstand
 add sonor effects when assistant activates and deactivate
 make Rika API with flask for tools
 make web version
-add stopwatch
+add stopwatch (timer, already there, just tool implementation)
 add reminders
 organize how models are used
 make log output real json and not string json
