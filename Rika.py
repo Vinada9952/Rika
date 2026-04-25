@@ -554,6 +554,7 @@ class SpotifyPlayer:
         
         # Limiter le volume entre 0 et 100
         volume = max(0, min(100, volume))
+        time.sleep( 0.1 )
         self.sp.volume(volume)
         # print(f"🔊  Volume : {volume}%")
 
@@ -1382,7 +1383,8 @@ class Model:
         global clients, WIFI
         # openai/gpt-oss-120b ne supporte pas reasoning_effort, ne pas l'utiliser
         can_think = False
-        can_web_search = True if model == MAIN_MODEL else False
+        can_web_search = True if model == WEB_MODEL else False
+        # print( f"{model=}, {can_web_search=}" )
         if not WIFI:
             log( "No internet connection", "Asking ollama model instead of groq", "warning" )
             can_web_search = False
@@ -1565,6 +1567,7 @@ Va chercher sur internet la réponse à la question de l'utilisateur.
         MAX_RETRIES,
         Model.Verification.rawResponse
     )
+    print( result )
     return result, True
 
 loadPrint()#c
@@ -1896,8 +1899,8 @@ def playMusic( search, types, choosed_device, volume ):
         if not found:
             return "Appareil impossible à trouver. Assurez vous que l'application est ouverte sur l'appareil en question", True
         results, _ = spotify.search( search, types )
-        spotify.setVolume( volume )
         spotify.play( results[0]["uri"], device_id )
+        spotify.setVolume( volume )
         return "Succès pour faire jouer le titre", False
     except Exception as e:
         log( "Spotify error", str( e ), "error" )
@@ -3462,7 +3465,6 @@ def chat():
             
             not_understand = False
             do_response = False
-            role = "assistant"
             responses = []
             try:
                 while len( content["tools"] ) != 0:
@@ -3559,18 +3561,27 @@ def chat():
                                 elif type( result ) == dict:
                                     conversation.append( 
                                         {
-                                            "role": role,
+                                            "role": "user",
                                             "content": json.dumps( result ),
+                                            "name": f"{tool["name"]} tool"
+                                        }
+                                    )
+                                else:
+                                    conversation.append(
+                                        {
+                                            "role": "user",
+                                            "content": str( result ),
+                                            "name": f"{tool["name"]} tool"
                                         }
                                     )
 
-                        print( f"{do_response=}, {responses=}" )
+                        # print( f"{do_response=}, {responses=}" )
                         responses.append( do_response )
                     for response in responses:
                         if response:
                             do_response = True
                             break
-                    print( f"{do_response=}" )
+                    # print( f"{do_response=}" )
                     if not_understand:
                         content["tools"] = []
                         break

@@ -945,10 +945,16 @@ def main():
 
         # print( "GUI updated" )
 
-        font_size = max( 12, int( 36 * rika.current_size[0] / ( WIDTH / 3 ) ) )
-        font = pygame.font.Font( FONT, font_size )
 
-        max_text_width = rika.current_size[0]
+        if rika.current_size[0]/2560 > 1/4:
+            font_size = max( 12, int( 36 * rika.current_size[0] / ( WIDTH / 3 ) ) )
+            max_text_width = rika.current_size[0]
+        else:
+            font_size = max( 12, int( 50 * rika.current_size[0] / ( WIDTH / 3 ) ) )
+            max_text_width = WIDTH/2-rika.current_size[0]
+
+
+        font = pygame.font.Font( FONT, font_size )
         lines = wrapText( text, font, max_text_width )
 
         # Calcule la position de base
