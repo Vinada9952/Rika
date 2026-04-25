@@ -59,6 +59,16 @@ OUTILS DISPONIBLES :
 - stopChrono
   - arrêter le chronomètre et retourner le temps mesuré
 
+- startTimer
+  - partir un timer
+  - un seul timer à la fois
+  - params:
+    -> duration (float) : temps du timer
+    -> message (string) : message à dire à la fin du timer
+
+- getRemainingTime
+  - obtenir le temps restant du timer
+
 - sleepSystem
   - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
   - CE N'EST PAS UNE EXTINCTION DÉFNITIVE, l'utilisateur te rappellera après

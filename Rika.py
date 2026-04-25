@@ -993,6 +993,8 @@ if SERVER_URL:
     data = requests.get( f"{SERVER_URL}/{GET_CONVERSATION}" )
     conversation = data.json()
     del data
+
+conversation_mutex = threading.Lock()
 # data = Json.read( "./conversation.json" )
 # print( data )
 # print( data.json() )
@@ -1062,6 +1064,16 @@ OUTILS DISPONIBLES :
 
 - stopChrono
   - arrêter le chronomètre et retourner le temps mesuré
+
+- startTimer
+  - partir un timer
+  - un seul timer à la fois
+  - params:
+    -> duration (float) : temps du timer
+    -> message (string) : message à dire à la fin du timer
+
+- getRemainingTime
+  - obtenir le temps restant du timer
 
 - sleepSystem
   - Te mettre en veille lorsque l'utilisateur n'a plus besoin de toi pour l'instant.
@@ -2029,10 +2041,11 @@ def doProtocol( name ):
     for i in range( len( PROTOCOLS ) ):
         if name == PROTOCOLS[i]["name"]:
             if PROTOCOLS[i]["command"] == "/delete-memory":
-                conversation = [ conversation[0], conversation[1] ]
-                if SERVER_URL:
-                    requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
-                Json.write( conversation, "./conversation.json" )
+                with conversation_mutex:
+                    conversation = [ conversation[0], conversation[1] ]
+                    if SERVER_URL:
+                        requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
+                    Json.write( conversation, "./conversation.json" )
                 sendNotification( "Mémoire effacée", "Votre historique a été effacé pour alléger la conversation" )
             else:
                 subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
@@ -2047,7 +2060,8 @@ def autoEraseConversation():
     print( text )
     GUI.setTextToDisplay( text )
     with open( f"{os.path.expanduser("~")}/Downloads/{file_name}", 'w', encoding="utf-8" ) as f:
-        json.dump( conversation, f, indent=4, ensure_ascii=False )
+        with conversation_mutex:
+            json.dump( conversation, f, indent=4, ensure_ascii=False )
     if AUDIO:
         Sound.waitForSoundTofinish()
         Sound.generateVoice( text, VOICE )
@@ -2143,6 +2157,10 @@ class StopWatch:
         """Chrono not stopped"""
         pass
 
+    class TimerNotStarted( Exception ):
+        """Timer not started"""
+        pass
+
     def timestampToDict(total_seconds: float):
         if total_seconds < 0:
             return {"error": "La durée ne peut pas être négative."}
@@ -2226,6 +2244,7 @@ class StopWatch:
         target = None
         args = ()
         thread = None
+        start_time = -1
         def __init__( self, duration, finish_target, args = () ):
             self.duration = duration
             self.target = finish_target
@@ -2233,18 +2252,57 @@ class StopWatch:
             
         def _cooldown( self ):
             time.sleep( self.duration )
+            self.start_time = -1
             self.target(*self.args)
         
         def start( self ):
-            self.thread = threading.Thread( target=self._cooldown )
+            self.thread = threading.Thread( target=self._cooldown, name="timer" )
+            self.start_time = time.time()
             self.thread.start()
+        
+        def getRemainingTime( self ):
+            if self.start_time == -1:
+                raise StopWatch.TimerNotStarted( "Timer not started. Please start timer before getting remaining time" )
+            difference = time.time() - self.start_time
+            duration = StopWatch.timestampToDict( difference )["duree_totale_secondes"]
+            if self.duration - duration < 0:
+                return 0.0
+            return self.duration - duration
         
         def waitTimer( self ):
             self.thread.join()
 
 loadPrint()#c
 
+timer = None
 chrono = StopWatch.chrono()
+
+loadPrint()#c
+
+def whenTimerFinished( say, audio ):
+    global conversation
+    sendNotification( "Timer terminé", say )
+    if audio:
+        Sound.waitForSoundTofinish()
+        Sound.generateVoice( say, VOICE )
+        Sound.playVoice()
+
+loadPrint()#c
+
+def startTimer( say, duration ):
+    global timer, AUDIO
+    timer = StopWatch.timer( duration, whenTimerFinished, ( say, AUDIO ) )
+    timer.start()
+    return f"Timer de {duration} secondes parti", False
+
+loadPrint()#c
+
+def getRemainingTimerTime():
+    global timer
+    try:
+        return "Il reste " + str( timer.getRemainingTime() ) + "s au timer", True
+    except StopWatch.TimerNotStarted:
+        return "Le timer n'a pas été parti ou est terminé", True
 
 loadPrint()#c
 
@@ -2963,9 +3021,10 @@ def sleepSystem( exception ):
     #         "content": f"{moment()}"
     #     }
     # )
-    if SERVER_URL:
-        requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
-    Json.write( conversation, "./conversation.json" )
+    with conversation_mutex:
+        if SERVER_URL:
+            requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
+        Json.write( conversation, "./conversation.json" )
     Sound.waitForSoundTofinish()
     if exception:
         raise ExitAgent()
@@ -3349,30 +3408,35 @@ def chat():
         if WIFI:
             emails = email_thread.join()
             for email in emails:
-                conversation.append(
-                    {
-                        "role": "user",
-                        "content": "Email reçu :\n\n" + json.dumps( email, indent=4 ),
-                        "name": "getEmail tool"
-                    }
-                )
+                with conversation_mutex:
+                    conversation.append(
+                        {
+                            "role": "user",
+                            "content": "Email reçu :\n\n" + json.dumps( email, indent=4 ),
+                            "name": "getEmail tool"
+                        }
+                    )
 
         if type( user_input ) == str:
 
             # print( f"{type( conversation )=}" )
             # print( f"{conversation=}" )
-            conversation.append(
-                {
-                    "role": "user",
-                    "content": user_input,
-                    "name": USERNAME
-                }
-            )
+            with conversation_mutex:
+                conversation.append(
+                    {
+                        "role": "user",
+                        "content": user_input,
+                        "name": USERNAME
+                    }
+                )
 
             response = None
             # while True:
             print( "ask model for chatting (1)" )
-            response = Model.askGroqModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+
+            with conversation_mutex:
+                tmp = conversation
+            response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
 
             content = json.loads( response )
             
@@ -3380,12 +3444,13 @@ def chat():
                 _ = content["tools"]
             except KeyError:
                 content["tools"] = []
-            conversation.append( 
-                {
-                    "role": "assistant",
-                    "content": response
-                }
-            )
+            with conversation_mutex:
+                conversation.append( 
+                    {
+                        "role": "assistant",
+                        "content": response
+                    }
+                )
             treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
             treating_response.start()
             # treated_text = treadTextResponse( content["message"] )
@@ -3439,6 +3504,10 @@ def chat():
                             result, do_response = startChrono()
                         elif tool["name"] == "stopChrono":
                             result, do_response = getChrono()
+                        elif tool["name"] == "startTimer":
+                            result, do_response = startTimer( tool["params"]["message"], tool["params"]["duration"] )
+                        elif tool["name"] == "getRemainingTime":
+                            result, do_response = getRemainingTimerTime()
                         elif tool["name"] == "openApp":
                             result, do_response = openApp( tool["params"]["app"] )
                         elif tool["name"] == "doProtocol":
@@ -3478,21 +3547,22 @@ def chat():
                         print( "tool use finished" )
                         
                         if not not_understand:
-                            if type( result ) == str:
-                                conversation.append( 
-                                    {
-                                        "role": "user",
-                                        "content": result,
-                                        "name": f"{tool["name"]} tool"
-                                    }
-                                )
-                            elif type( result ) == dict:
-                                conversation.append( 
-                                    {
-                                        "role": role,
-                                        "content": json.dumps( result ),
-                                    }
-                                )
+                            with conversation_mutex:
+                                if type( result ) == str:
+                                    conversation.append( 
+                                        {
+                                            "role": "user",
+                                            "content": result,
+                                            "name": f"{tool["name"]} tool"
+                                        }
+                                    )
+                                elif type( result ) == dict:
+                                    conversation.append( 
+                                        {
+                                            "role": role,
+                                            "content": json.dumps( result ),
+                                        }
+                                    )
 
                         print( f"{do_response=}, {responses=}" )
                         responses.append( do_response )
@@ -3508,14 +3578,17 @@ def chat():
                         treating_response.join()
                         
                         print( "ask model for chatting (2)" )
-                        response = Model.askGroqModel( MAIN_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+                        with conversation_mutex:
+                            tmp = conversation
+                        response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
                         print( "append to convesation" )
-                        conversation.append( 
-                            {
-                                "role": "assistant",
-                                "content": response
-                            }
-                        )
+                        with conversation_mutex:
+                            conversation.append( 
+                                {
+                                    "role": "assistant",
+                                    "content": response
+                                }
+                            )
                         content = json.loads( response )
                         treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
                         treating_response.start()
