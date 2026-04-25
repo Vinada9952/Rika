@@ -549,13 +549,13 @@ class SpotifyPlayer:
     # ------------------------------------------------------------------ #
     #  Lecture / Pause / Stop                                              #
     # ------------------------------------------------------------------ #
-    # def setVolume(self, volume: int):
-    #     """Définit le volume (0-100)."""
+    def setVolume(self, volume: int):
+        """Définit le volume (0-100)."""
         
-    #     # Limiter le volume entre 0 et 100
-    #     volume = max(0, min(100, volume))
-    #     self.sp.volume(volume)
-    #     # print(f"🔊  Volume : {volume}%")
+        # Limiter le volume entre 0 et 100
+        volume = max(0, min(100, volume))
+        self.sp.volume(volume)
+        # print(f"🔊  Volume : {volume}%")
 
     def play(self, uri: str | None = None, device_id: str | None = None):
         if device_id is None:
@@ -1896,7 +1896,7 @@ def playMusic( search, types, choosed_device, volume ):
         if not found:
             return "Appareil impossible à trouver. Assurez vous que l'application est ouverte sur l'appareil en question", True
         results, _ = spotify.search( search, types )
-        # spotify.setVolume( volume )
+        spotify.setVolume( volume )
         spotify.play( results[0]["uri"], device_id )
         return "Succès pour faire jouer le titre", False
     except Exception as e:
