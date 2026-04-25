@@ -1069,7 +1069,7 @@ OUTILS DISPONIBLES :
   - partir un timer
   - un seul timer à la fois
   - params:
-    -> duration (float) : temps du timer
+    -> duration (float) : temps du timer, en secondes
     -> message (string) : message à dire à la fin du timer
 
 - getRemainingTime
