@@ -3344,7 +3344,6 @@ loadPrint()#c
 def getUserInput():
     # print( "getting input" )
     user_input = ''
-    print( "YOU > ", end='' )
     if AUDIO:
         Sound.waitForSoundTofinish()
         user_input = Sound.listen()
@@ -3363,7 +3362,7 @@ def getUserInput():
             if user_input:
                 GUI.textInput( False )
                 break
-        print( f"User input: {user_input}" )
+        print( f"YOU > {user_input}" )
     return user_input
 
 loadPrint()#c
@@ -3409,6 +3408,7 @@ def chat():
         # print( "asking user" )
         treating_response.join()
         # sendNotification( "Attente de votre message", "Rika attend votre message, vous pouvez maintenant parler" )
+        print( "Talk..." )
         user_input = getUserInput()
         # WIFI = hasWifiAccess()
         if WIFI:
