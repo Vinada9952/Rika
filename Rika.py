@@ -554,7 +554,8 @@ class SpotifyPlayer:
         
         # Limiter le volume entre 0 et 100
         volume = max(0, min(100, volume))
-        time.sleep( 0.1 )
+        while len( self.listDevices() ) == 0:
+            pass
         self.sp.volume(volume)
         # print(f"🔊  Volume : {volume}%")
 
@@ -3287,8 +3288,8 @@ Garde le plus d'informations importantes possible en respectant la limite de mot
 
 loadPrint()#c
 
-def treadTextResponse( response: str ):
-    return response.replace( "**", '' )
+def treatTextResponse( response: str ):
+    return response.replace( "**", '' ).replace( "‑", "-" )
 
 loadPrint()#c
 
@@ -3367,7 +3368,7 @@ loadPrint()#c
 
 def treatResponse( response: str ):
     if len( response ) != 0:
-        treated_text = treadTextResponse( response )
+        treated_text = treatTextResponse( response )
         GUI.setTextToDisplay( treated_text )
         if AUDIO:
             treatAudioResponse( response )
@@ -3592,6 +3593,9 @@ def chat():
                         with conversation_mutex:
                             tmp = conversation
                         response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+                        content = json.loads( response )
+                        treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
+                        treating_response.start()
                         print( "append to convesation" )
                         with conversation_mutex:
                             conversation.append( 
@@ -3600,9 +3604,6 @@ def chat():
                                     "content": response
                                 }
                             )
-                        content = json.loads( response )
-                        treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
-                        treating_response.start()
                         # treated_text = treadTextResponse( content["message"] )
                         # GUI.setTextToDisplay( treated_text )
                         # print( f"{ASSISTANT_NAME} >", treated_text )
