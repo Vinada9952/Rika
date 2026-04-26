@@ -3012,11 +3012,12 @@ loadPrint()#c
 # =====================
 # TOOL: sleepSystem
 # =====================
-def sleepSystem( exception ):
+def sleepSystem( exception, audio ):
     global conversation, called, AUDIO
+    Sound.waitForSoundTofinish()
     AUDIO = True
-    GUI.setTextToDisplay( '' )
     GUI.textInput( False )
+    GUI.setTextToDisplay( '' )
     GUI.displayRika( False )
     called = False
     # conversation.append(
@@ -3029,7 +3030,8 @@ def sleepSystem( exception ):
         if SERVER_URL:
             requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
         Json.write( conversation, "./conversation.json" )
-    Sound.waitForSoundTofinish()
+    if audio:
+        Sound.playFile( CONFIRMATION_SOUND, True )
     if exception:
         raise ExitAgent()
     # exit( 0 )
@@ -3542,9 +3544,7 @@ def chat():
                             not_understand = True
                             break
                         elif tool["name"] == "sleepSystem":
-                            if AUDIO:
-                                Sound.playFile( CONFIRMATION_SOUND, True )
-                            sleepSystem( True )
+                            sleepSystem( True, AUDIO )
                         else:
                             result = f"No tool found for {tool["name"]}"
                         print( "tool use finished" )

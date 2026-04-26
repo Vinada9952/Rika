@@ -946,9 +946,9 @@ def main():
         # print( "GUI updated" )
 
 
-        font_size = max( 12, int( 36 * rika.current_size[0] / ( WIDTH / 3 ) ) )
+        font_size = max( 12, int( 25 * rika.current_size[0] / ( WIDTH / 3 ) ) )
         if rika.current_size[0]/2560 > 1/4:
-            max_text_width = rika.current_size[0]
+            max_text_width = WIDTH/3
         else:
             max_text_width = WIDTH/2-rika.current_size[0]
 
