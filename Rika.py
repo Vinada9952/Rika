@@ -1092,12 +1092,6 @@ OUTILS DISPONIBLES :
     -> demande de code
     -> discussion active
 
-- closeSystem
-  - Éteindre le programme de l'agent
-  - C'est une extinction définitive, jusqu'à ce que l'utilisateur ré-ouvre le programme
-  - Dans la majorité des cas, utilise simplement sleepSystem.
-  - À utiliser quand l'utilisateur demande de t'éteindre/fermer (et pas de te mettre en veille)
-
 - notUnderstand
   - Quand tu ne comprends pas le prompt de l'utilisateur, utilise cet outil pour clarifier le prompt
 
@@ -3501,7 +3495,7 @@ def chat():
             emails = email_thread.join()
             for email in emails:
                 if not incognito:
-                    print( "adding to regular conversation" )
+                    # print( "adding to regular conversation" )
                     with conversation_mutex:
                         conversation.append(
                             {
@@ -3511,7 +3505,7 @@ def chat():
                             }
                         )
                 else:
-                    print( "adding to private conversation" )
+                    # print( "adding to private conversation" )
                     private_history.append(
                         {
                             "role": "user",
@@ -3525,7 +3519,7 @@ def chat():
             # print( f"{type( conversation )=}" )
             # print( f"{conversation=}" )
             if not incognito:
-                print( "adding to regular conversation", not incognito )
+                # print( "adding to regular conversation", not incognito )
                 with conversation_mutex:
                     conversation.append(
                         {
@@ -3535,7 +3529,7 @@ def chat():
                         }
                     )
             else:
-                print( "adding to private conversation", incognito )
+                # print( "adding to private conversation", incognito )
                 private_history.append(
                     {
                         "role": "user",
@@ -3562,7 +3556,7 @@ def chat():
             except KeyError:
                 content["tools"] = []
             if not incognito:
-                print( "adding to regular conversation" )
+                # print( "adding to regular conversation" )
                 with conversation_mutex:
                     conversation.append(
                         {
@@ -3571,7 +3565,7 @@ def chat():
                         }
                     )
             else:
-                print( "adding to private conversation" )
+                # print( "adding to private conversation" )
                 private_history.append(
                     {
                         "role": "assistant",
@@ -3697,11 +3691,6 @@ def chat():
                             break
                         elif tool["name"] == "sleepSystem":
                             sleepSystem( True, AUDIO )
-                        elif tool["name"] == "closeSystem":
-                            sleepSystem( False, AUDIO )
-                            sys.exit()
-                            exit()
-                            quit()
                         else:
                             result = f"No tool found for {tool["name"]}"
                         print( "tool use finished" )
@@ -3726,11 +3715,11 @@ def chat():
                                     "name": f"{tool["name"]} tool"
                                 }
                             if not incognito:
-                                print( "adding to regular conversation" )
+                                # print( "adding to regular conversation" )
                                 with conversation_mutex:
                                     conversation.append( to_append )
                             else:
-                                print( "adding to private conversation" )
+                                # print( "adding to private conversation" )
                                 private_history.append( to_append )
 
                         # print( f"{do_response=}, {responses=}" )
@@ -3758,7 +3747,7 @@ def chat():
                         treating_response.start()
                         print( "append to convesation" )
                         if not incognito:
-                            print( "adding to regular conversation" )
+                            # print( "adding to regular conversation" )
                             with conversation_mutex:
                                 conversation.append(
                                     {
@@ -3767,7 +3756,7 @@ def chat():
                                     }
                                 )
                         else:
-                            print( "adding to private conversation" )
+                            # print( "adding to private conversation" )
                             private_history.append(
                                 {
                                     "role": "assistant",
