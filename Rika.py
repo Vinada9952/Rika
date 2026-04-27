@@ -3669,6 +3669,7 @@ def chat():
                             incognito = tool["params"]["value"]
                             if incognito:
                                 result = "Le mode incognito est activé"
+                                sendNotification( "Mode incognito", result )
                             else:
                                 with conversation_mutex:
                                     conversation.append(
@@ -3678,6 +3679,7 @@ def chat():
                                         }
                                     )
                                 result = "Le mode incognito est désactivé"
+                                sendNotification( "Mode incognito", result )
                                 private_history = []
                             do_response = False
                         elif tool["name"] == "getIncognito":
