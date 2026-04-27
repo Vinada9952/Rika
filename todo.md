@@ -23,4 +23,3 @@ MRA API
 auto update wifi
 audio cycle a bit slow (time between when user can talk)
 add sound when user can speak
-more control for spotify, like pause, next, previous
