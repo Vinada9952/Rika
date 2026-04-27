@@ -1092,6 +1092,12 @@ OUTILS DISPONIBLES :
     -> demande de code
     -> discussion active
 
+- closeSystem
+  - Éteindre le programme de l'agent
+  - C'est une extinction définitive, jusqu'à ce que l'utilisateur ré-ouvre le programme
+  - Dans la majorité des cas, utilise simplement sleepSystem.
+  - À utiliser quand l'utilisateur demande de t'éteindre/fermer (et pas de te mettre en veille)
+
 - notUnderstand
   - Quand tu ne comprends pas le prompt de l'utilisateur, utilise cet outil pour clarifier le prompt
 
@@ -3691,6 +3697,11 @@ def chat():
                             break
                         elif tool["name"] == "sleepSystem":
                             sleepSystem( True, AUDIO )
+                        elif tool["name"] == "closeSystem":
+                            sleepSystem( False, AUDIO )
+                            sys.exit()
+                            exit()
+                            quit()
                         else:
                             result = f"No tool found for {tool["name"]}"
                         print( "tool use finished" )
