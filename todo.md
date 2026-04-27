@@ -12,7 +12,6 @@ make Rika API with flask for tools
 make web version
 Add alarms
 add reminders
-organize how models are used
 make log output real json and not string json
 if prompt is also in call, just make the response without anything else. otherwise, continue conversation
 MRA API
