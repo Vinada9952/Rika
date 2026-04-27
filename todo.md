@@ -1,12 +1,8 @@
 upload files
-mode incognito
 add output diagram in Json
 connect to school portal
 time for the user to refuse a prompt or the ai tofind unintended prompts
-Log
-User can choose language of assistant
 notifications
-mac adaptation (and maybe linux)
 make assistant resum video screenshot or webcam
 assistant can send documents in mails
 fix webcam index
@@ -23,3 +19,6 @@ MRA API
 auto update wifi
 audio cycle a bit slow (time between when user can talk)
 add sound when user can speak
+test multimodal questions with normal prompts for chatgpt
+tool to get system performance
+tool to entirely close agent

@@ -1209,6 +1209,14 @@ OUTILS DISPONIBLES :
 - recognizeMusic
   - Reconaitre la musique qui joue
 
+- setIncognito
+  - Mode de navigation privé. Si à true, active le mode de navigation privé. Le désactive à false
+  - params:
+    -> value (bool): si activé ou non
+
+- getIncognito
+  - Savoir si le mode incognito est activé (alias navigation privé)
+
 RÈGLES IMPORTANTES :
 - Soit consis, exact, juste, précis
 - Ne JAMAIS écrire autre chose que du JSON.
@@ -1338,7 +1346,7 @@ client_max = len( clients )
 
 class Model:
     def askOllamaModel(model: str, conversation: List[Dict[str, str]]) -> str:
-        print( "asking ollama" )
+        # print( "asking ollama" )
         global ollama_client
         """
         Envoie une requête de chat à un modèle Ollama local en utilisant l'historique de la conversation.
@@ -1420,7 +1428,7 @@ class Model:
                         request_params["tools"] = [{"type": "browser_search"}]
                     
                     # Faire l'appel à l'API
-                    print( "asking groq" )
+                    # print( "asking groq" )
                     response = client.chat.completions.create(**request_params)
                     print( "response given" )
                     
@@ -1437,12 +1445,12 @@ class Model:
                     )
                     
                     ans = response.choices[0].message.content
-                    print( "logged" )
+                    # print( "logged" )
                 else:
-                    print( "asking ollama..." )
+                    # print( "asking ollama..." )
                     ans = Model.askOllamaModel( OLLAMA_MODEL, message )
-                    print( "response given" )
-                print( "verification" )
+                    # print( "response given" )
+                # print( "verification" )
                 # Vérifier si la réponse est vide et logger les détails
                 if not ans or ans.strip() == "":
                     log(
@@ -1464,11 +1472,11 @@ class Model:
                     },
                     "info"
                 )
-                print( "final verification" )
+                # print( "final verification" )
                 if not verification( ans ):
                     print( "verification didn't match" )
                     raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__}, response is {ans}" )
-                print( "return..." )
+                # print( "return..." )
                 return ans
             except BadRequestError as e:
                 log(
@@ -2351,6 +2359,14 @@ def whenTimerFinished( say, audio ):
         Sound.waitForSoundTofinish()
         Sound.generateVoice( say, VOICE )
         Sound.playVoice()
+    with conversation_mutex:
+        conversation.append(
+            {
+                "role": "user",
+                "content": "Timer terminé",
+                "name": "timerFinished"
+            }
+        )
 
 loadPrint()#c
 
@@ -3445,6 +3461,9 @@ loadPrint()#c
 # =====================
 def chat():
     global conversation, treating_response
+
+    incognito = False
+    private_history = []
     
     april_fools_rickroll()
     if AUDIO:
@@ -3459,7 +3478,7 @@ def chat():
     # )
 
     while True:
-        
+        print( f"{incognito=}" )
         # print( "getting emails" )
 
         if WIFI:
@@ -3475,8 +3494,19 @@ def chat():
         if WIFI:
             emails = email_thread.join()
             for email in emails:
-                with conversation_mutex:
-                    conversation.append(
+                if not incognito:
+                    print( "adding to regular conversation" )
+                    with conversation_mutex:
+                        conversation.append(
+                            {
+                                "role": "user",
+                                "content": "Email reçu :\n\n" + json.dumps( email, indent=4 ),
+                                "name": "getEmail tool"
+                            }
+                        )
+                else:
+                    print( "adding to private conversation" )
+                    private_history.append(
                         {
                             "role": "user",
                             "content": "Email reçu :\n\n" + json.dumps( email, indent=4 ),
@@ -3488,8 +3518,19 @@ def chat():
 
             # print( f"{type( conversation )=}" )
             # print( f"{conversation=}" )
-            with conversation_mutex:
-                conversation.append(
+            if not incognito:
+                print( "adding to regular conversation", not incognito )
+                with conversation_mutex:
+                    conversation.append(
+                        {
+                            "role": "user",
+                            "content": user_input,
+                            "name": USERNAME
+                        }
+                    )
+            else:
+                print( "adding to private conversation", incognito )
+                private_history.append(
                     {
                         "role": "user",
                         "content": user_input,
@@ -3502,7 +3543,10 @@ def chat():
             print( "ask model for chatting (1)" )
 
             with conversation_mutex:
-                tmp = conversation
+                tmp = conversation.copy()
+            if incognito:
+                print( "using private conversation" )
+                tmp.extend( private_history )
             response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
 
             content = json.loads( response )
@@ -3511,8 +3555,18 @@ def chat():
                 _ = content["tools"]
             except KeyError:
                 content["tools"] = []
-            with conversation_mutex:
-                conversation.append( 
+            if not incognito:
+                print( "adding to regular conversation" )
+                with conversation_mutex:
+                    conversation.append(
+                        {
+                            "role": "assistant",
+                            "content": response
+                        }
+                    )
+            else:
+                print( "adding to private conversation" )
+                private_history.append(
                     {
                         "role": "assistant",
                         "content": response
@@ -3611,6 +3665,27 @@ def chat():
                                 result, do_response = webSearch( tool["params"]["query"] )
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "setIncognito":
+                            incognito = tool["params"]["value"]
+                            if incognito:
+                                result = "Le mode incognito est activé"
+                            else:
+                                with conversation_mutex:
+                                    conversation.append(
+                                        {
+                                            "role": "system",
+                                            "content": "... Conversation masquée ..."
+                                        }
+                                    )
+                                result = "Le mode incognito est désactivé"
+                                private_history = []
+                            do_response = False
+                        elif tool["name"] == "getIncognito":
+                            if incognito:
+                                result = "Le mode incognito est activé"
+                            else:
+                                result = "Le mode incognito est désactivé"
+                            do_response = True
                         elif tool["name"] == "notUnderstand":
                             not_understand = True
                             break
@@ -3621,31 +3696,31 @@ def chat():
                         print( "tool use finished" )
                         
                         if not not_understand:
-                            with conversation_mutex:
-                                if type( result ) == str:
-                                    conversation.append( 
-                                        {
-                                            "role": "user",
-                                            "content": result,
-                                            "name": f"{tool["name"]} tool"
-                                        }
-                                    )
-                                elif type( result ) == dict:
-                                    conversation.append( 
-                                        {
-                                            "role": "user",
-                                            "content": json.dumps( result ),
-                                            "name": f"{tool["name"]} tool"
-                                        }
-                                    )
-                                else:
-                                    conversation.append(
-                                        {
-                                            "role": "user",
-                                            "content": str( result ),
-                                            "name": f"{tool["name"]} tool"
-                                        }
-                                    )
+                            if type( result ) == str:
+                                to_append = {
+                                    "role": "user",
+                                    "content": result,
+                                    "name": f"{tool["name"]} tool"
+                                }
+                            elif type( result ) == dict:
+                                to_append = {
+                                    "role": "user",
+                                    "content": json.dumps( result ),
+                                    "name": f"{tool["name"]} tool"
+                                }
+                            else:
+                                to_append = {
+                                    "role": "user",
+                                    "content": str( result ),
+                                    "name": f"{tool["name"]} tool"
+                                }
+                            if not incognito:
+                                print( "adding to regular conversation" )
+                                with conversation_mutex:
+                                    conversation.append( to_append )
+                            else:
+                                print( "adding to private conversation" )
+                                private_history.append( to_append )
 
                         # print( f"{do_response=}, {responses=}" )
                         responses.append( do_response )
@@ -3662,14 +3737,27 @@ def chat():
                         
                         print( "ask model for chatting (2)" )
                         with conversation_mutex:
-                            tmp = conversation
+                            tmp = conversation.copy()
+                        if incognito:
+                            print( "using private conversation" )
+                            tmp.extend( private_history )
                         response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
                         content = json.loads( response )
                         treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
                         treating_response.start()
                         print( "append to convesation" )
-                        with conversation_mutex:
-                            conversation.append( 
+                        if not incognito:
+                            print( "adding to regular conversation" )
+                            with conversation_mutex:
+                                conversation.append(
+                                    {
+                                        "role": "assistant",
+                                        "content": response
+                                    }
+                                )
+                        else:
+                            print( "adding to private conversation" )
+                            private_history.append(
                                 {
                                     "role": "assistant",
                                     "content": response

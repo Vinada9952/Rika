@@ -201,6 +201,14 @@ OUTILS DISPONIBLES :
 - recognizeMusic
   - Reconaitre la musique qui joue
 
+- setIncognito
+  - Mode de navigation privé. Si à true, active le mode de navigation privé. Le désactive à false
+  - params:
+    -> value (bool): si activé ou non
+
+- getIncognito
+  - Savoir si le mode incognito est activé (alias navigation privé)
+
 RÈGLES IMPORTANTES :
 - Soit consis, exact, juste, précis
 - Ne JAMAIS écrire autre chose que du JSON.
