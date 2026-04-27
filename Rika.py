@@ -1195,6 +1195,17 @@ OUTILS DISPONIBLES :
   - l'appareil par défaut est "{DEFAULT_DEVICE}". Si l'utilisateur ne demande pas d'appareils précis, utilise celui-ci
   - Le volume par défaut est {DEFAULT_VOLUME}. Si l'utilisateur ne demande pas un volume précis, utilise celui-ci
 
+- setMusicState
+  - Pauser/reprendre la musique
+  - params:
+    -> state (bool): false pour mettre la musique sur pause ou l'arrêter, true pour la reprendre ou la partir
+
+- changeMusicTrack
+  - Changer la musique qui joue
+  - params:
+    -> target (string): la musique à jouer
+  - target doit soit être "next" OU "previous"
+
 - recognizeMusic
   - Reconaitre la musique qui joue
 
@@ -1875,11 +1886,61 @@ def recognizeMusic() -> dict:
 
 loadPrint()#c
 
+def setMusicState( state: bool ):
+    global spotify
+
+    if not IS_THERE_SPOTIFY:
+        log( "Playing spotify error", "No spotify, Impossible de faire jouer de la musique", "error" )
+        return "Impossible de faire jouer de la musique", True
+    
+    while True:
+        devices = spotify.listDevices()
+        # print( f"{devices=}" )
+        log( "Spotify devices", devices, "info" )
+        if devices == []:
+            spotify.openSpotify()
+        else:
+            break
+
+
+    if state:
+        spotify.resume()
+        return "La chanson a bien été repartie", False
+    else:
+        spotify.pause()
+        return "La chanson a bien été pausé", False
+
+loadPrint()#c
+
+def changeMusicTrack( target: str ):
+    global spotify
+
+    if not IS_THERE_SPOTIFY:
+        log( "Playing spotify error", "No spotify, Impossible de faire jouer de la musique", "error" )
+        return "Impossible de faire jouer de la musique", True
+    
+    while True:
+        devices = spotify.listDevices()
+        # print( f"{devices=}" )
+        log( "Spotify devices", devices, "info" )
+        if devices == []:
+            spotify.openSpotify()
+        else:
+            break
+
+    if target == "next":
+        spotify.nextTrack()
+        return "La prochaine musique joue maintenant", False
+    elif target == "previous":
+        spotify.previousTrack()
+        return "La musique précédente joue maintenant", False
+    else:
+        return f"Le choix \"{target}\" n'est pas valide, acceptés : \"next\" ou \"previous\"", True
+
+loadPrint()#c
+
 def playMusic( search, types, choosed_device, volume ):
-    # print( "ceci ne sera pas affiché" )
-    # print( f"{search=}, {types=}, {choosed_device=}, {volume=}" )
     devices = spotify.listDevices()
-    # if spotify.SearchTypes.isInTypes( types ):
     if not IS_THERE_SPOTIFY:
         log( "Playing spotify error", "No spotify, Impossible de faire jouer de la musique", "error" )
         return "Impossible de faire jouer de la musique", True
@@ -3531,6 +3592,16 @@ def chat():
                         elif tool["name"] == "recognizeMusic":
                             if WIFI:
                                 result, do_response = recognizeMusic()
+                            else:
+                                result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "setMusicState":
+                            if WIFI:
+                                result, do_response = setMusicState( tool["params"]["state"] )
+                            else:
+                                result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
+                        elif tool["name"] == "changeMusicTrack":
+                            if WIFI:
+                                result, do_response = changeMusicTrack( tool["params"]["target"] )
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "saveFile":
