@@ -19,5 +19,4 @@ audio cycle a bit slow (time between when user can talk)
 add sound when user can speak
 test multimodal questions with normal prompts for chatgpt
 tool to get system performance
-tool to entirely close agent
-closeSystem tool
+tool to entirely close agent (closeSystem tool)
