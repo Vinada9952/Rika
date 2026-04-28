@@ -8,7 +8,6 @@ assistant can send documents in mails
 fix webcam index
 fix notUnderstand
 add sonor effects when assistant activates and deactivate
-make Rika API with flask for tools
 make web version
 Add alarms
 add reminders
@@ -20,3 +19,4 @@ add sound when user can speak
 test multimodal questions with normal prompts for chatgpt
 tool to get system performance
 tool to entirely close agent (closeSystem tool)
+tool execute python script

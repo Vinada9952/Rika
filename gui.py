@@ -481,6 +481,15 @@ class TextInputSprite(pygame.sprite.Sprite):
     visible = False
     state = "hidden"
 
+    replacement = {
+        "^e": "ê",
+        "`u": "ù",
+        "¨i": "ï",
+        "¨e": "ë",
+        "¨a": "ä",
+        "~n": "ñ"
+    }
+
     def __init__(self, pos: tuple, size: tuple):
         super().__init__()
 
@@ -602,6 +611,10 @@ class TextInputSprite(pygame.sprite.Sprite):
         self.last_image = surface
         self.rect.x     = self.pos[0]
         self.rect.y     = self.pos[1]
+
+        for i in self.replacement.keys():
+            self.input_text = self.input_text.replace( i, self.replacement[i] )
+            self.submitted_text = self.submitted_text.replace( i, self.replacement[i] )
 
     def getText(self):
         if self.submitted_text == "":

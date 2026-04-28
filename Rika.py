@@ -2,6 +2,7 @@ print( "importing librairies..." )
 from requests.exceptions import ConnectionError, Timeout, RequestException
 from pygrabber.dshow_graph import FilterGraph
 from email.utils import parsedate_to_datetime
+from flask import Flask, request, jsonify
 from spotipy.oauth2 import SpotifyOAuth
 from email.header import decode_header
 from email.mime.text import MIMEText
@@ -466,6 +467,52 @@ def hasWifiAccess( url = "http://www.google.com", timeout = 3 ) -> bool:
         # Capture toutes les autres erreurs de la bibliothèque requests.
         # print(f"❌ Erreur réseau imprévue : {e}")
         return False
+
+loadPrint()#c
+
+app = Flask( __name__ )
+
+loadPrint()#c
+
+@app.route( "/conversation/get", methods=["GET"] )
+def getConversationAPI():
+    global conversation
+    with conversation_mutex:
+        tmp = conversation.copy()
+    return jsonify( tmp ), 200
+
+loadPrint()#c
+
+@app.route( "/conversation/set", methods=["POST"] )
+def setConversationAPI():
+    global conversation
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing JSON in request"}), 400
+    with conversation_mutex:
+        conversation = data
+    return jsonify( {"return": "success"} ), 200
+
+loadPrint()#c
+
+@app.route( "/conversation/append", methods=["POST"] )
+def appendConversationAPI():
+    global conversation
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing JSON in request"}), 400
+    with conversation_mutex:
+        conversation.append( data )
+    return jsonify( {"return": "success"} ), 200
+
+loadPrint()#c
+
+@app.route( "/conversation/last-message", methods=["GET"] )
+def lastMessageConversationAPI():
+    global conversation
+    with conversation_mutex:
+        tmp = conversation.copy()
+    return jsonify( tmp[-1] ), 200
 
 loadPrint()#c
 
@@ -3776,7 +3823,18 @@ def chat():
                 pass 
 
 loadPrint()#c
+
+def runAPI():
+    app.run( "127.0.0.1", 6879 )
+
+loadPrint()#c
+
+run_api = threading.Thread( target=runAPI, name="agent API" )
+
+loadPrint()#c
+
 time.sleep( 0.5 )
+
 
 # =====================
 # START
@@ -3784,6 +3842,7 @@ time.sleep( 0.5 )
 try:
     if __name__ == "__main__":
         # print( "" )
+        # run_api.run()
         keyboard.add_hotkey( CALL_HOTKEY, toggleRika )
         check_audio_call.start()
         while True:
