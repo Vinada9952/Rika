@@ -3767,8 +3767,13 @@ def chat():
                                 result = "Le mode incognito est désactivé"
                             do_response = True
                         elif tool["name"] == "notUnderstand":
-                            not_understand = True
-                            break
+                            if not fast_called:
+                                not_understand = True
+                                break
+                            else:
+                                treating_response.join()
+                                Sound.waitForSoundTofinish()
+                                sleepSystem( True, AUDIO )
                         elif tool["name"] == "sleepSystem":
                             treating_response.join()
                             Sound.waitForSoundTofinish()
