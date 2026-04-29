@@ -1377,7 +1377,7 @@ def checkAudioCall():
                         if call.find( call_name.lower() ) != -1:
                             log( "call name found", {"full": question, "detected": call_name, "all": call_names, "agent": ASSISTANT_NAME}, "info" )
                             prompt = question.lower().replace( call_name.lower(), ASSISTANT_NAME )
-                            if len( calls ) > 2:
+                            if len( calls ) > 1:
                                 fast_called = True
                                 print( prompt )
                             called = True
@@ -3503,7 +3503,7 @@ def getUserInput():
             if user_input:
                 GUI.textInput( False )
                 break
-        print( f"YOU > {user_input}" )
+    print( f"YOU > {user_input}" )
     return user_input
 
 loadPrint()#c
@@ -3542,7 +3542,7 @@ def chat():
     # )
 
     while True:
-        print( f"{incognito=}" )
+        # print( f"{incognito=}" )
         # print( "getting emails" )
 
         if WIFI:
@@ -3770,6 +3770,7 @@ def chat():
                             not_understand = True
                             break
                         elif tool["name"] == "sleepSystem":
+                            treating_response.join()
                             Sound.waitForSoundTofinish()
                             sleepSystem( True, AUDIO )
                         else:
