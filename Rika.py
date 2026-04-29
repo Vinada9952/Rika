@@ -862,6 +862,8 @@ loadPrint()#c
 
 # call settings
 call_names = settings["call"]["names"]
+call_names = sorted( call_names, key=len, reverse=True )
+# print( call_names )
 CALL_HOTKEY = settings["call"]["hotkey"]
 
 loadPrint()#c
@@ -1377,13 +1379,14 @@ def checkAudioCall():
                             prompt = question.lower().replace( call_name.lower(), ASSISTANT_NAME )
                             if len( calls ) > 2:
                                 fast_called = True
+                                print( prompt )
                             called = True
                             break
                     if called:
                         break
             if not called:
                 print( question )
-            if called:
+            if called and not fast_called:
                 print( ASSISTANT_NAME )
         time.sleep( 1 )
 
@@ -3549,11 +3552,11 @@ def chat():
         # print( "asking user" )
         treating_response.join()
         # sendNotification( "Attente de votre message", "Rika attend votre message, vous pouvez maintenant parler" )
-        print( "Talk..." )
+        if not fast_called:
+            print( "Talk..." )
         Sound.waitForSoundTofinish()
         if fast_called:
             user_input = prompt
-            print( "YOU >", prompt )
         else:
             user_input = getUserInput()
         # WIFI = hasWifiAccess()
@@ -3767,6 +3770,7 @@ def chat():
                             not_understand = True
                             break
                         elif tool["name"] == "sleepSystem":
+                            Sound.waitForSoundTofinish()
                             sleepSystem( True, AUDIO )
                         else:
                             result = f"No tool found for {tool["name"]}"
