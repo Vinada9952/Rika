@@ -11,7 +11,6 @@ add sonor effects when assistant activates and deactivate
 make web version
 Add alarms
 add reminders
-if prompt is also in call, just make the response without anything else. otherwise, continue conversation
 MRA API
 auto update wifi
 audio cycle a bit slow (time between when user can talk)
@@ -20,3 +19,4 @@ test multimodal questions with normal prompts for chatgpt
 tool to get system performance
 tool to entirely close agent (closeSystem tool)
 tool execute python script
+disable rika after 10 second of inactivity

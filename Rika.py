@@ -368,10 +368,11 @@ class Sound:
         return Sound._generateVoice( text, voice )
     
     def _playVoice():
-        global sound_mutex
+        global sound_mutex, VOICE_VOLUME
         try:
             with sound_mutex:
                 pygame.mixer.music.load( "./cache/output.mp3" )
+                pygame.mixer.music.set_volume( VOICE_VOLUME )
             pygame.mixer.music.play()
         except pygame.error as e:
             log(
@@ -387,6 +388,7 @@ class Sound:
             print( f"Erreur: Impossible de charger le fichier MP3: {e}" )
     
     def _playFile( file_path, reverse: bool = False ):
+        global VOICE_VOLUME
         try:
             file_to_play = file_path
             
@@ -405,6 +407,7 @@ class Sound:
                 audio_reversed.export( file_to_play, format="mp3" )
             
             pygame.mixer.music.load( file_to_play )
+            pygame.mixer.music.set_volume( VOICE_VOLUME )
             pygame.mixer.music.play()
         except pygame.error as e:
             log(
@@ -880,6 +883,7 @@ VOICE = settings["audio"]["voice"]
 AUDIO_DURATION_LIMIT = settings["audio"]["audio-duration-threshold"]
 CONFIRMATION_SOUND = settings["audio"]["confirmation-sound"]
 LISTEN_TIME_LIMIT = settings["audio"]["listen-time-limit"]
+VOICE_VOLUME = settings["audio"]["voice-volume"]
 
 loadPrint()#c
 
@@ -1351,8 +1355,13 @@ def toggleRika():
 
 loadPrint()#c
 
+fast_called = False
+prompt = ""
+
+loadPrint()#c
+
 def checkAudioCall():
-    global called
+    global called, fast_called, prompt
     while True:
         # print( f"check if called by audio : {called=}" )
         if not called:
@@ -1364,6 +1373,10 @@ def checkAudioCall():
                 for call_name in call_names:
                     for call in calls:
                         if call.find( call_name.lower() ) != -1:
+                            log( "call name found", {"full": question, "detected": call_name, "all": call_names, "agent": ASSISTANT_NAME}, "info" )
+                            prompt = question.lower().replace( call_name.lower(), ASSISTANT_NAME )
+                            if len( calls ) > 2:
+                                fast_called = True
                             called = True
                             break
                     if called:
@@ -3137,8 +3150,9 @@ loadPrint()#c
 # TOOL: sleepSystem
 # =====================
 def sleepSystem( exception, audio ):
-    global conversation, called, AUDIO
+    global conversation, called, AUDIO, fast_called
     Sound.waitForSoundTofinish()
+    fast_called = False
     AUDIO = True
     GUI.textInput( False )
     GUI.setTextToDisplay( '' )
@@ -3471,7 +3485,7 @@ def getUserInput():
     if AUDIO:
         Sound.waitForSoundTofinish()
         user_input = Sound.listen()
-        print( user_input )
+        # print( user_input )
     else:
         # user_input = input( "YOU > " )
         while True:
@@ -3507,7 +3521,7 @@ loadPrint()#c
 # MAIN LOOP
 # =====================
 def chat():
-    global conversation, treating_response
+    global conversation, treating_response, prompt, fast_called
 
     incognito = False
     private_history = []
@@ -3536,7 +3550,12 @@ def chat():
         treating_response.join()
         # sendNotification( "Attente de votre message", "Rika attend votre message, vous pouvez maintenant parler" )
         print( "Talk..." )
-        user_input = getUserInput()
+        Sound.waitForSoundTofinish()
+        if fast_called:
+            user_input = prompt
+            print( "YOU >", prompt )
+        else:
+            user_input = getUserInput()
         # WIFI = hasWifiAccess()
         if WIFI:
             emails = email_thread.join()
@@ -3602,6 +3621,10 @@ def chat():
                 _ = content["tools"]
             except KeyError:
                 content["tools"] = []
+
+            treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
+            treating_response.start()
+
             if not incognito:
                 # print( "adding to regular conversation" )
                 with conversation_mutex:
@@ -3619,8 +3642,13 @@ def chat():
                         "content": response
                     }
                 )
-            treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
-            treating_response.start()
+            
+            if fast_called and content["tools"] == []:
+                content["tools"].append(
+                    {
+                        "name": "sleepSystem"
+                    }
+                )
             # treated_text = treadTextResponse( content["message"] )
             
             # print( f"{ASSISTANT_NAME} >", treated_text )
@@ -3792,6 +3820,10 @@ def chat():
                             tmp.extend( private_history )
                         response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
                         content = json.loads( response )
+                        try:
+                            _ = content["tools"]
+                        except KeyError:
+                            content["tools"] = []
                         treating_response = threading.Thread( target=treatResponse, args=( content["message"], ), name="process model response" )
                         treating_response.start()
                         print( "append to convesation" )
@@ -3810,6 +3842,13 @@ def chat():
                                 {
                                     "role": "assistant",
                                     "content": response
+                                }
+                            )
+                        
+                        if fast_called and content["tools"] == []:
+                            content["tools"].append(
+                                {
+                                    "name": "sleepSystem"
                                 }
                             )
                         # treated_text = treadTextResponse( content["message"] )
