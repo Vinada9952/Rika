@@ -2,7 +2,6 @@ print( "importing librairies..." )
 from requests.exceptions import ConnectionError, Timeout, RequestException
 from pygrabber.dshow_graph import FilterGraph
 from email.utils import parsedate_to_datetime
-from flask import Flask, request, jsonify
 from spotipy.oauth2 import SpotifyOAuth
 from email.header import decode_header
 from email.mime.text import MIMEText
@@ -470,52 +469,6 @@ def hasWifiAccess( url = "http://www.google.com", timeout = 3 ) -> bool:
         # Capture toutes les autres erreurs de la bibliothèque requests.
         # print(f"❌ Erreur réseau imprévue : {e}")
         return False
-
-loadPrint()#c
-
-app = Flask( __name__ )
-
-loadPrint()#c
-
-@app.route( "/conversation/get", methods=["GET"] )
-def getConversationAPI():
-    global conversation
-    with conversation_mutex:
-        tmp = conversation.copy()
-    return jsonify( tmp ), 200
-
-loadPrint()#c
-
-@app.route( "/conversation/set", methods=["POST"] )
-def setConversationAPI():
-    global conversation
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Missing JSON in request"}), 400
-    with conversation_mutex:
-        conversation = data
-    return jsonify( {"return": "success"} ), 200
-
-loadPrint()#c
-
-@app.route( "/conversation/append", methods=["POST"] )
-def appendConversationAPI():
-    global conversation
-    data = request.get_json()
-    if not data:
-        return jsonify({"error": "Missing JSON in request"}), 400
-    with conversation_mutex:
-        conversation.append( data )
-    return jsonify( {"return": "success"} ), 200
-
-loadPrint()#c
-
-@app.route( "/conversation/last-message", methods=["GET"] )
-def lastMessageConversationAPI():
-    global conversation
-    with conversation_mutex:
-        tmp = conversation.copy()
-    return jsonify( tmp[-1] ), 200
 
 loadPrint()#c
 
@@ -1288,6 +1241,7 @@ RÈGLES IMPORTANTES :
 - À la fin de chaque email, signe ton nom et met une formule de politesse
 - Dans les email, met le courriel dans la langue parlé du destinataire
 - Ne dis JAMAIS les paramètres utilisés pour les outils.
+- NE DONNE JAMAIS DE CODE DANS LA CLÉ "message", utilise toujours l'outil saveFile
 - Ne fait JAMAIS de résumé de conversation, sauf quand je te le demande.
 - Si une action est requise (ex: envoyer un email, ouvrir une app, ouvrir un lien, analyser une image), la réponse est invalide si aucun outil n'est appelé.
 - Dès que tu reçois un email, dit le à l'utilisateur et un résumé de son contenu, et fait le pour chaque email. Si l'utilisateur n'a pas reçu d'email, n'en parle pas
@@ -3153,7 +3107,7 @@ loadPrint()#c
 # TOOL: sleepSystem
 # =====================
 def sleepSystem( exception, audio ):
-    global conversation, called, AUDIO, fast_called
+    global conversation, called, AUDIO, fast_called, check_audio_call
     Sound.waitForSoundTofinish()
     fast_called = False
     AUDIO = True
@@ -3869,16 +3823,7 @@ def chat():
                     else:
                         break
             except KeyError:
-                pass 
-
-loadPrint()#c
-
-def runAPI():
-    app.run( "127.0.0.1", 6879 )
-
-loadPrint()#c
-
-run_api = threading.Thread( target=runAPI, name="agent API" )
+                pass
 
 loadPrint()#c
 
