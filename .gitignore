@@ -1,7 +1,7 @@
 *.json
 test.py
 **/__pycache__/
-**/Old_Rika_memory/
+**/Old-Rika/
 **/cache/
 **/screenshots/
 **/for_RPI/
