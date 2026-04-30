@@ -95,6 +95,7 @@ def onReceiveSocket():
                 global gui_ready
                 gui_ready = data["value"]
             # print( "new data receive in socket :", json.dumps( data, indent=4 ) )
+        time.sleep( 0.1 )
 
 def send():
     global to_send, queue_send, socket_running, client_socket, gui_mutex
@@ -553,14 +554,12 @@ class SpotifyPlayer:
     # ------------------------------------------------------------------ #
     #  Lecture / Pause / Stop                                              #
     # ------------------------------------------------------------------ #
-    def setVolume(self, volume: int):
+    def setVolume(self, volume: int, device):
         """Définit le volume (0-100)."""
         
         # Limiter le volume entre 0 et 100
         volume = max(0, min(100, volume))
-        while len( self.listDevices() ) == 0:
-            pass
-        self.sp.volume(volume)
+        self.sp.volume(volume, device)
         # print(f"🔊  Volume : {volume}%")
 
     def play(self, uri: str | None = None, device_id: str | None = None):
@@ -1988,7 +1987,7 @@ def playMusic( search, types, choosed_device, volume ):
             return "Appareil impossible à trouver. Assurez vous que l'application est ouverte sur l'appareil en question", True
         results, _ = spotify.search( search, types )
         spotify.play( results[0]["uri"], device_id )
-        spotify.setVolume( volume )
+        spotify.setVolume( volume, device_id )
         return "Succès pour faire jouer le titre", False
     except Exception as e:
         log( "Spotify error", str( e ), "error" )
@@ -3109,6 +3108,7 @@ loadPrint()#c
 # =====================
 def sleepSystem( exception, audio ):
     global conversation, called, AUDIO, fast_called, check_audio_call
+    time.sleep( 0.5 )
     Sound.waitForSoundTofinish()
     fast_called = False
     AUDIO = True

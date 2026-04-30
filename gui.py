@@ -711,8 +711,8 @@ def send():
 
 def onReceiveSocket():
     global socket_running
-    while socket_running:
-        try:
+    try:
+        while socket_running:
             received = client_socket.recv( 1024 ).decode( 'utf-8' )
             if received.find( '\n' ) != -1:
                 informations = received.split( '\n' )
@@ -733,10 +733,11 @@ def onReceiveSocket():
                         callFunction( data["function"] )
                 except json.JSONDecodeError as e:
                     print( e )
-        except ConnectionResetError:
-            print( "Connection closed by server" )
-            socket_running = False
-            GUI.quitGUI()
+            time.sleep( 0.1 )
+    except ConnectionResetError:
+        print( "Connection closed by server" )
+        socket_running = False
+        GUI.quitGUI()
 
 
 def sendDataSocket( value ):
