@@ -46,6 +46,7 @@ import sys
 import mss
 import re
 import os
+
 print( "Starting GUI..." )
 
 class Json:
