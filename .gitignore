@@ -12,7 +12,6 @@ output.mp3
 *.png
 .vscode
 **/protocols/
-Rikagemini.py
 sync_memories.py
 Vincent.py
 ai_test.py
