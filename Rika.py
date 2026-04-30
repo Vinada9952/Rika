@@ -1238,6 +1238,7 @@ RÈGLES IMPORTANTES :
 - En envoyant des email, ne te fait pas passer pour l'utilisateur, mais pour son assistant. 
 - Dans les email, ne parle pas de l'utilisateur à la 1re personne, mais à la 3e personne.
 - Quand tu répond que tu as envoyé un email, FAIT-LE avec l'outil sendEmail
+- Chaque fois qu'on te demande la météo, date ou localisation, ne te fie pas sur l'historique de la conversation, mais va chercher à chaque fois les outils
 - À la fin de chaque email, signe ton nom et met une formule de politesse
 - Dans les email, met le courriel dans la langue parlé du destinataire
 - Ne dis JAMAIS les paramètres utilisés pour les outils.
@@ -2453,19 +2454,19 @@ def getLocalisation() -> dict:
             if data.get("status") != "success":
                 raise ValueError(data.get("message", "Réponse inattendue"))
             return {
-                    "method": "ip",
-                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
-                    "ip_address": data.get("query"),
-                    "isp": data.get("isp"),
-                    "organisation": data.get("org"),
-                    "country": data.get("country"),
-                    "region": data.get("regionName"),
-                    "city": data.get("city"),
-                    "zip": data.get("zip"),
-                    "latitude": data.get("lat"),
-                    "longitude": data.get("lon"),
-                    "accuracy_note": "Précision typique : ville (~5-50 km)",
-                }
+                "method": "ip",
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                "ip_address": data.get("query"),
+                "isp": data.get("isp"),
+                "organisation": data.get("org"),
+                "country": data.get("country"),
+                "region": data.get("regionName"),
+                "city": data.get("city"),
+                "zip": data.get("zip"),
+                "latitude": data.get("lat"),
+                "longitude": data.get("lon"),
+                "accuracy_note": "Précision typique : ville (~5-50 km)",
+            }
         except Exception as exc:
             return {"method": "ip", "error": str(exc)}
 
@@ -2509,20 +2510,20 @@ def getLocalisation() -> dict:
             source = src_map.get(getattr(coord, "PositionSource", -1), "Unknown")
 
             return {
-                    "method": "windows",
-                    "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-                    "latitude":            geo.Latitude,
-                    "longitude":           geo.Longitude,
-                    "altitude_m":          geo.Altitude if geo.Altitude != 0 else None,
-                    "accuracy_m":          round(accuracy, 2) if accuracy else None,
-                    "altitude_accuracy_m": round(alt_acc, 2)  if alt_acc  else None,
-                    "speed_ms":            round(speed, 2)    if speed    else None,
-                    "heading_deg":         round(heading, 1)  if heading  else None,
-                    "position_source":     source,
-                    "accuracy_note":       "Précision typique : GPS ~5 m, Wi-Fi ~15-40 m",
-                }
+                "method": "windows",
+                "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                "latitude":            geo.Latitude,
+                "longitude":           geo.Longitude,
+                "altitude_m":          geo.Altitude if geo.Altitude != 0 else None,
+                "accuracy_m":          round(accuracy, 2) if accuracy else None,
+                "altitude_accuracy_m": round(alt_acc, 2)  if alt_acc  else None,
+                "speed_ms":            round(speed, 2)    if speed    else None,
+                "heading_deg":         round(heading, 1)  if heading  else None,
+                "position_source":     source,
+                "accuracy_note":       "Précision typique : GPS ~5 m, Wi-Fi ~15-40 m",
+            }
         except Exception as exc:
-            return str( {"method": "windows", "error": str(exc)} ), True
+            return {"method": "windows", "error": str(exc)}
 
     def _compare(ip: dict, win: dict) -> dict:
         if "error" in ip or "error" in win:
@@ -2535,15 +2536,15 @@ def getLocalisation() -> dict:
             a = math.sin(dlat/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlon/2)**2
             dist = round(R * 2 * math.asin(math.sqrt(a)), 3)
             return {
-                    "distance_km": dist,
-                    "distance_note": (
-                        "Écart faible" if dist < 5 else
-                        "Écart modéré" if dist < 20 else
-                        "Écart important"
-                    ),
-                    "win_accuracy_m": win.get("accuracy_m"),
-                    "win_source":     win.get("position_source"),
-                }
+                "distance_km": dist,
+                "distance_note": (
+                    "Écart faible" if dist < 5 else
+                    "Écart modéré" if dist < 20 else
+                    "Écart important"
+                ),
+                "win_accuracy_m": win.get("accuracy_m"),
+                "win_source":     win.get("position_source"),
+            }
         except Exception as exc:
             return {"note": f"Calcul impossible : {exc}"}
 
@@ -2767,9 +2768,9 @@ def weather(lat: float = None, lon: float = None, city: str = None) -> dict:
             "region": address_details.get("state", ""),
             "country": address_details.get("country", ""),
             "timezone": w_data.get("timezone", ""),
-            # "ip": auto_location.get("ip", ""),
-            # "isp": auto_location.get("isp", ""),
-            # "geolocation_method": "ip-geolocation (auto)" if auto_location else "manuel",
+            "ip": auto_location.get("ip", ""),
+            "isp": auto_location.get("isp", ""),
+            "geolocation_method": "ip-geolocation (auto)" if auto_location else "manuel",
         },
 
         # ── Conditions actuelles ──────────────────────────────────────
@@ -2802,32 +2803,32 @@ def weather(lat: float = None, lon: float = None, city: str = None) -> dict:
         },
 
         # ── Prévisions 7 jours ────────────────────────────────────────
-        # "daily_forecast": [
-        #     {
-        #         "date": daily["time"][i],
-        #         "condition": WMO_CODES.get(daily["weather_code"][i], "Inconnu"),
-        #         "weather_code": daily["weather_code"][i],
-        #         "temp_max_c": daily["temperature_2m_max"][i],
-        #         "temp_min_c": daily["temperature_2m_min"][i],
-        #         "feels_like_max_c": daily["apparent_temperature_max"][i],
-        #         "feels_like_min_c": daily["apparent_temperature_min"][i],
-        #         "sunrise": daily["sunrise"][i],
-        #         "sunset": daily["sunset"][i],
-        #         "daylight_duration_sec": daily["daylight_duration"][i],
-        #         "uv_index_max": daily["uv_index_max"][i],
-        #         "precipitation_sum_mm": daily["precipitation_sum"][i],
-        #         "precipitation_probability_max_percent": daily["precipitation_probability_max"][i],
-        #         "wind_speed_max_kmh": daily["wind_speed_10m_max"][i],
-        #         "wind_gusts_max_kmh": daily["wind_gusts_10m_max"][i],
-        #     }
-        #     for i in range(len(daily.get("time", [])))
-        # ],
+        "daily_forecast": [
+            {
+                "date": daily["time"][i],
+                "condition": WMO_CODES.get(daily["weather_code"][i], "Inconnu"),
+                "weather_code": daily["weather_code"][i],
+                "temp_max_c": daily["temperature_2m_max"][i],
+                "temp_min_c": daily["temperature_2m_min"][i],
+                "feels_like_max_c": daily["apparent_temperature_max"][i],
+                "feels_like_min_c": daily["apparent_temperature_min"][i],
+                "sunrise": daily["sunrise"][i],
+                "sunset": daily["sunset"][i],
+                "daylight_duration_sec": daily["daylight_duration"][i],
+                "uv_index_max": daily["uv_index_max"][i],
+                "precipitation_sum_mm": daily["precipitation_sum"][i],
+                "precipitation_probability_max_percent": daily["precipitation_probability_max"][i],
+                "wind_speed_max_kmh": daily["wind_speed_10m_max"][i],
+                "wind_gusts_max_kmh": daily["wind_gusts_10m_max"][i],
+            }
+            for i in range(len(daily.get("time", [])))
+        ],
 
         # ── Métadonnées ───────────────────────────────────────────────
         "meta": {
-            # "source": "Open-Meteo (https://open-meteo.com)",
-            # "geocoding": "OpenStreetMap Nominatim",
-            # "fetched_at": datetime.now().isoformat(),
+            "source": "Open-Meteo (https://open-meteo.com)",
+            "geocoding": "OpenStreetMap Nominatim",
+            "fetched_at": datetime.datetime.now().isoformat(),
             "units": {
                 "temperature": "°C",
                 "wind_speed": "km/h",
@@ -2836,7 +2837,7 @@ def weather(lat: float = None, lon: float = None, city: str = None) -> dict:
                 "pressure": "hPa",
                 "visibility": "mètres",
             },
-        }
+        },
     }
 
     return result
@@ -2847,13 +2848,16 @@ def getWeather():
     
     # Vérifier si une erreur s'est produite
     # print( json.dumps( indent=4, obj=data ) )
-    if "error" in data:
+    if "error" in str( data ):
         log( "Exception when get weather", data["error"], "error" )
         return "Erreur pour obtenir la météo", False
-    
+    log( "Result raw getWeather", data, "debug" )
     current = data["current"]
+    forecast = data["daily_forecast"][0]
+
     # print( "Getting localisation..." )
     location, _ = getLocalisation()
+    log( "Result raw getLocalisaiton", location, "debug" )
     # print( json.dumps( location, indent=4 ) )
     location = location["ip_location"]
     # print( json.dumps( location, indent=4 ) )
@@ -2880,14 +2884,28 @@ def getWeather():
         wind_direction = "nord"
 
     # print( f"{location=}, {current=}, {wind_direction=}" )
+    try:
+        to_return = f"""
+En ce moment, à {location["city"]}, {location["region"]}, {location["country"]}, le {current["timestamp"]}, il fait {current["temperature_c"]}°C.
+La température ressentie est de {current["feels_like_c"]}°C avec une humidité de {current["humidity_percent"]} %.
+Le ciel est {current["condition"]} et recouvert de nuages à {current["cloud_cover_percent"]} %.
+Il y a {current["precipitation_mm"]} mm de précipitations, {current["rain_mm"]} mm de pluie et {current["snowfall_cm"]} cm de neige.
+Le vent souffle à {current["wind_speed_kmh"]} km/h avec des rafales à {current["wind_gusts_kmh"]} km/h en provenance du {wind_direction}.
 
-    to_return = f"""
-En ce moment, à {location["city"]}, {location["region"]}, {location["country"]}, le {current["timestamp"]} il fait {current["temperature_c"]}.
-La température ressentie est de {current["feels_like_c"]} avec un facteur humidex à {current["humidity_percent"]} %.
-Le ciel est {current["condition"]} et sera recouvert par des nuages à {current["cloud_cover_percent"]} pourcent.
-On annonce {current["precipitation_mm"]} mm de précipitations, {current["rain_mm"]} mm de pluie et {current["snowfall_cm"]} mm de neige.
-Le vent soufflera à {current["wind_speed_kmh"]} km/h avec des rafales à {current["wind_gusts_kmh"]} km/h. Le vent viendrait du {wind_direction}.
+La condition prévue est {forecast["condition"]}, avec une température maximale de {forecast["temp_max_c"]}°C ressentie {forecast["feels_like_max_c"]}°C et une température minimale de {forecast["temp_min_c"]}°C ressentie {forecast["feels_like_min_c"]}°C.
+Le soleil se lèvera à {forecast["sunrise"]} et se couchera à {forecast["sunset"]}.
+La durée du jour sera de {forecast["daylight_duration_sec"]} secondes. L'indice UV sera de {forecast["uv_index_max"]}.
+Les précipitations attendues sont de {forecast["precipitation_sum_mm"]} mm avec une probabilité de {forecast["precipitation_probability_max_percent"]} %.
+Les rafales de vent seront de maximum {forecast["wind_gusts_max_kmh"]} km/h avec du vent à maximum {forecast["wind_speed_max_kmh"]} km/h.
 """
+    except Exception as e:
+        log( "Error while creating simple text for weather", {"error": str( e ), "location": location, "current": current, "forecast": forecast}, "error" )
+        to_return = "Erreur lors de l'obtention de la météo"
+    # to_return = {
+    #     "localisation": location,
+    #     "current": current,
+    #     "forecast": forecast
+    # }
     print( to_return )
     return to_return, True
     # except Exception as e:
