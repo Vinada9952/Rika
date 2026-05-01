@@ -1322,7 +1322,6 @@ def checkAudioCall():
     while True:
         # print( f"check if called by audio : {called=}" )
         if not called:
-            os.system( "cls" )
             print( "..." )
             question = Sound.listen()
 
@@ -1344,7 +1343,8 @@ def checkAudioCall():
                 print( question )
             if called and not fast_called:
                 print( ASSISTANT_NAME )
-        # time.sleep( 1 )
+        else:
+            time.sleep( 1 )
 
 check_audio_call = threading.Thread( target=checkAudioCall, name="Check voice call" )
 
