@@ -21,4 +21,3 @@ tool to entirely close agent (closeSystem tool)
 tool execute python script
 disable rika after 10 second of inactivity
 optimise Rika
-Doesn't detect rain ?

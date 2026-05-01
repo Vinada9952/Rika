@@ -1322,6 +1322,7 @@ def checkAudioCall():
     while True:
         # print( f"check if called by audio : {called=}" )
         if not called:
+            os.system( "cls" )
             print( "..." )
             question = Sound.listen()
 
@@ -1343,7 +1344,7 @@ def checkAudioCall():
                 print( question )
             if called and not fast_called:
                 print( ASSISTANT_NAME )
-        time.sleep( 1 )
+        # time.sleep( 1 )
 
 check_audio_call = threading.Thread( target=checkAudioCall, name="Check voice call" )
 
@@ -3126,7 +3127,7 @@ loadPrint()#c
 # =====================
 def sleepSystem( exception, audio ):
     global conversation, called, AUDIO, fast_called, check_audio_call
-    time.sleep( 0.5 )
+    time.sleep( 1 )
     Sound.waitForSoundTofinish()
     fast_called = False
     AUDIO = True
@@ -3746,10 +3747,12 @@ def chat():
                             else:
                                 treating_response.join()
                                 Sound.waitForSoundTofinish()
+                                log( "Use sleepSystem", "call 1", "info" )
                                 sleepSystem( True, AUDIO )
                         elif tool["name"] == "sleepSystem":
                             treating_response.join()
                             Sound.waitForSoundTofinish()
+                            log( "Use sleepSystem", "call 2", "info" )
                             sleepSystem( True, AUDIO )
                         else:
                             result = f"No tool found for {tool["name"]}"
@@ -3781,13 +3784,20 @@ def chat():
                             else:
                                 # print( "adding to private conversation" )
                                 private_history.append( to_append )
-
                         # print( f"{do_response=}, {responses=}" )
                         responses.append( do_response )
+                    
+
                     for response in responses:
                         if response:
                             do_response = True
                             break
+                    
+                    if fast_called and not do_response:
+                        treating_response.join()
+                        Sound.waitForSoundTofinish()
+                        log( "Use sleepSystem", "call 3", "info" )
+                        sleepSystem( True, AUDIO )
                     # print( f"{do_response=}" )
                     if not_understand:
                         content["tools"] = []
