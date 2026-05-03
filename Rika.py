@@ -12,12 +12,16 @@ import speech_recognition as sr
 from plyer import notification
 from typing import List, Dict
 from shazamio import Shazam
+from tkinter import font
 import soundfile as sf
+import win32clipboard
 from PIL import Image
 from groq import Groq
 import pyaudiowpatch
+import tkinter as tk
 import numpy as np
 import webbrowser
+import statistics
 import subprocess
 import threading
 import tempfile
@@ -26,11 +30,16 @@ import edge_tts
 import keyboard
 import calendar
 import datetime
+import win32con
+import win32api
+import win32gui
 import asyncio
+import win32ui
 import smtplib
 import logging
 import spotipy
 import imaplib
+import ctypes
 import ollama
 import base64
 import pygame
@@ -44,6 +53,7 @@ import time
 import cv2
 import sys
 import mss
+import io
 import re
 import os
 
@@ -324,6 +334,161 @@ loadPrint()#c
 pygame.mixer.init()
 sound_mutex = threading.Lock()
 class Sound:
+    def listenSRWhisper() -> str | int:
+        def _recognize_fast(audio_data):
+            r = sr.Recognizer()
+            try:
+                return r.recognize_google(audio_data, language="fr-FR")
+            except:
+                return ""
+
+        def _recognize_whisper(audio_data, result_container):
+            try:
+                wav_bytes = audio_data.get_wav_data()
+
+                with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                    tmp.write(wav_bytes)
+                    tmp_path = tmp.name
+
+                
+                for i in range( MAX_RETRIES ):
+                    try:
+                        with open(tmp_path, "rb") as f:
+
+                            client = Model.getNextClient()
+                            result = client.audio.transcriptions.create(
+                                model="whisper-large-v3",
+                                file=("audio.wav", f, "audio/wav"),
+                                language="fr",
+                                response_format="text",
+                                prompt="Transcription de commandes vocales générales, langage naturel."
+                            )
+
+                        result_container["text"] = str(result).strip()
+                    except:
+                        pass
+                    finally:
+                        os.unlink(tmp_path)
+
+            except:
+                result_container["text"] = ""
+
+        def _fuse_with_llm(sr_text, whisper_text):
+            # Cas critiques
+            if not sr_text and not whisper_text:
+                return -1
+            if not sr_text:
+                return whisper_text
+            if not whisper_text:
+                return sr_text
+
+            # Skip si identique
+            if sr_text == whisper_text:
+                return sr_text
+
+            config = """
+        Tu corriges une transcription vocale.
+
+        IMPORTANT :
+        - SR est souvent faux sur mots rares/tecnhiques
+        - Whisper hallucine souvent
+
+        Ta priorité ABSOLUE :
+        → garder les mots rares de Whisper
+        → garder la structure de SR
+
+        Règles STRICTES :
+        - N'invente RIEN
+        - Si un mot est différent entre les deux, choisis celui qui semble le plus adapté au contexte.
+        - Si aucun des 2 mots est adapté au contexte, choisis en un adapté au contexte (ex. Netherite et Minecraft)
+        - Si 2 mots peuvent être valide dans un même contexte, privilégie whisper
+        - Corrige les erreurs évidentes
+        - Phrase courte et naturelle
+        - Aucune explication
+
+        Exemples :
+        - SR: quelle est la meilleure couche dans Minecraft pour trouver de la NASA right
+        - WHISPER: Quelle est la meilleure couche en Minecraft pour trouver de la netherite ?
+        - result : Quelle est la meilleur couche dans Minecraft pour trouver le la netherite ?
+        """
+
+            prompt = f"""
+        SR:
+        {sr_text}
+
+        Whisper:
+        {whisper_text}
+
+        Phrase finale:
+        """
+
+            for i in range( MAX_RETRIES ):
+                try:
+                    
+                    client = Model.getNextClient()
+                    completion = client.chat.completions.create(
+                        model="llama-3.1-8b-instant",
+                        messages=[
+                            {"role": "system", "content": config},
+                            {"role": "user", "content": prompt}
+                        ],
+                        temperature=0.2,
+                    )
+
+                    return completion.choices[0].message.content.strip()
+
+                except:
+                    return sr_text or whisper_text or -2
+
+        r = sr.Recognizer()
+
+        with sr.Microphone() as source:
+            try:
+                r.adjust_for_ambient_noise(source, duration=0.5)
+            except:
+                pass
+
+            audio_data = r.listen(source, phrase_time_limit=6)
+
+        # =========================
+        # 1. SR EN PREMIER
+        # =========================
+        sr_text = _recognize_fast(audio_data)
+        print( f"{sr_text=}" )
+
+        if not sr_text:
+            return -1
+
+        # =========================
+        # 2. WHISPER (SEULEMENT SI SR OK)
+        # =========================
+        whisper_result = {"text": ""}
+
+        whisper_thread = threading.Thread(
+            target=_recognize_whisper,
+            args=(audio_data, whisper_result)
+        )
+        whisper_thread.start()
+
+        # ⏱️ attendre un peu Whisper
+        start_wait = time.time()
+        while whisper_thread.is_alive():
+            if time.time() - start_wait > 0.6:
+                break
+            time.sleep(0.01)
+
+        whisper_text = whisper_result["text"]
+        # if not whisper_text:
+        #     return -1
+        print( f"{whisper_text=}" )
+
+        # =========================
+        # 3. FUSION
+        # =========================
+        if not whisper_text:
+            return sr_text
+
+        return _fuse_with_llm(sr_text, whisper_text)
 
     def listen( language: str = "fr-FR" ):
         r = sr.Recognizer()
@@ -483,7 +648,7 @@ def log( message, info, level ):
             "info": info
         }
     )
-    Json.write( logs, "log.log" )
+    Json.write( logs, "log.json" )
 
 loadPrint()#c
 
@@ -963,6 +1128,10 @@ for playlist in PLAYLISTS:
 
 loadPrint()#c
 
+THEME_COLOR = settings["gui"]["color"]
+
+loadPrint()#c
+
 # server settings
 SERVER_URL = settings["server"]["url"]
 SET_CONVERSATION = settings["server"]["set-conversation"]
@@ -1223,7 +1392,59 @@ OUTILS DISPONIBLES :
 - getIncognito
   - Savoir si le mode incognito est activé (alias navigation privé)
 
+- createChart
+  - créer un diagramme
+  - exemples d'utilisation:
+    -> quelle est la production de prétrole des 10 dernières années
+    -> Combien de médailles olympiques ont chaque pays d'Europe gagnés
+  - params:
+    -> type (string): Le type de diagramme que tu veux créer
+    -> title (string): Le titre du diagramme
+    -> x-axis-title (string): Le titre de l'axe X du diagramme, si présent. Met le vide si pas nécéssaires. Met les unitées de mesures s'il y en a
+    -> y-axis-title (string): Le titre de l'axe y du diagramme, si présent. Met le vide si pas nécéssaires. Met les unitées de mesures s'il y en a
+    -> data (json): Les données pour le diagramme. En fonction du diagramme, le format peut être différent
+  - types et formats:
+    -> bandChart:
+      - diagramme à bande
+      - à utiliser par défaut
+      - format:
+        {"{"}
+          "colone sur l'axe X 1 (string)": donnée axe y 1 (float),
+          "colone sur l'axe X 2 (string)": donnée axe y 2 (float),
+          "colone sur l'axe X 3 (string)": donnée axe y 3 (float)
+        {"}"}
+    -> pieChart:
+      - diagramme à pointes de tarte
+      - À utiliser pour démontrer une proportion
+      - Les valeurs n'ont pas besoind d'être sur 100, 360 ou 2pi, donne les vrais valeurs, la fonction va s'en occuper toute seule pour définir les proportion
+      - format:
+        {"{"}
+          "nom de la région 1 (string)": valeur de la région 1 (float),
+          "nom de la région 2 (string)": valeur de la région 2 (float),
+          "nom de la région 3 (string)": valeur de la région 3 (float)
+        {"}"}
+    -> lineChart:
+      - diagramme à lignes brisées
+      - À utiliser pour démontrer une donnée au travers du temps, d'événements ou d'un parcours
+      - format:
+        {"{"}
+          "point sur l'axe X 1 (string)": donnée axe y 1 (float),
+          "point sur l'axe X 2 (string)": donnée axe y 2 (float),
+          "point sur l'axe X 3 (string)": donnée axe y 3 (float)
+        {"}"}
+    -> boxChart:
+      - diagramme de quartiles
+      - À utiliser pour démontrer un étendu, une dispersion et/ou une concentration
+      - format:
+        {"{"}
+          "groupe 1 (string)": [donnée1, donnée2, donnée3, donnée4],
+          "groupe 2 (string)": [donnée1, donnée2, donnée3, donnée4],
+          "groupe 3 (string)": [donnée1, donnée2, donnée3, donnée4],
+          "groupe 4 (string)": [donnée1, donnée2, donnée3, donnée4]
+        {"}"}
+
 RÈGLES IMPORTANTES :
+- Essaie de donner le plus souvent possible quelque chose à dire dans la clé "message" tant que cela respecte les autres règles
 - Soit consis, exact, juste, précis
 - Ne JAMAIS écrire autre chose que du JSON.
 - L'ordre d'apparition des outils dans "tools": [] est l'ordre d'exécution des outils
@@ -1242,6 +1463,8 @@ RÈGLES IMPORTANTES :
 - À la fin de chaque email, signe ton nom et met une formule de politesse
 - Dans les email, met le courriel dans la langue parlé du destinataire
 - Ne dis JAMAIS les paramètres utilisés pour les outils.
+- utilise l'outil createChart dès que tu as des donnée à dire au lieu de les afficher
+- ne dit JAMAIS des données demandés dans la clé "message", mais utilise l'outil createChart
 - NE DONNE JAMAIS DE CODE DANS LA CLÉ "message", utilise toujours l'outil saveFile
 - Ne fait JAMAIS de résumé de conversation, sauf quand je te le demande.
 - Si une action est requise (ex: envoyer un email, ouvrir une app, ouvrir un lien, analyser une image), la réponse est invalide si aucun outil n'est appelé.
@@ -1323,7 +1546,8 @@ def checkAudioCall():
         # print( f"check if called by audio : {called=}" )
         if not called:
             print( "..." )
-            question = Sound.listen()
+            # question = Sound.listen()
+            question = Sound.listenSRWhisper()
 
             if type( question ) == str:
                 calls = question.lower().split( ' ' )
@@ -1638,6 +1862,1502 @@ def _record_stream_callback(frames_holder: list, num_chunks_target: int, done_ev
             return (None, pyaudiowpatch.paComplete)
         return (None, pyaudiowpatch.paContinue)
     return callback
+
+loadPrint()#c
+
+def bandChart(title, data, title_x_axis, title_y_axis, x_pos=100, y_pos=100):
+    """
+    Crée et affiche un diagramme en barres interactif.
+    La taille s'adapte automatiquement au nombre de barres et à la longueur des labels.
+    Non-bloquant : s'exécute dans un thread séparé et retourne immédiatement.
+
+    Raccourcis clavier (widget en focus) :
+        Ctrl+C  -> copie une capture PNG transparent dans le presse-papiers
+        Ctrl+X  -> idem + ferme le widget
+    """
+
+    def _run():
+        # ── Calcul automatique des dimensions ────────────────────────────────
+        # Fenêtre temporaire pour mesurer les polices avant de créer le widget
+        _tmp        = tk.Tk()
+        _tmp.withdraw()
+        _label_font = font.Font(family='Helvetica', size=10)
+        _title_font = font.Font(family='Helvetica', size=14, weight='bold')
+
+        max_label_w = max(_label_font.measure(str(k)) for k in data.keys())
+        title_w     = _title_font.measure(title)
+        max_val_tmp = max(data.values())
+        y_max_tmp   = (int(max_val_tmp * 2) + 1) / 2.0
+        grad_w      = max(_label_font.measure(f"{i * y_max_tmp / 5:.2f}") for i in range(6))
+        _tmp.destroy()
+
+        TITLE_BAR_H   = 24
+        MARGIN_LEFT   = int(grad_w) + 30
+        MARGIN_RIGHT  = 20
+        MARGIN_TOP    = 60 + TITLE_BAR_H
+        MARGIN_BOTTOM = max(50, int(max_label_w) + 20)
+
+        # Largeur par barre : basée sur le label le plus long, entre 60 et 120 px
+        BAR_SLOT = max(60, min(120, int(max_label_w) + 20))
+        chart_w  = BAR_SLOT * len(data)
+        chart_w  = max(chart_w, int(title_w) + 40)
+
+        WIN_W = MARGIN_LEFT + chart_w + MARGIN_RIGHT
+        WIN_H = 420
+
+        # ── Fenêtre fantôme (porte l'icône taskbar) ───────────────────────────
+        # overrideredirect supprime l'icône taskbar ET bloque ImageGrab.
+        # Solution : une fenêtre parent native (avec décoration) minuscule,
+        # cachée hors écran, qui porte le titre et l'icône dans la taskbar.
+        ghost = tk.Tk()
+        ghost.title(title)
+        ghost.geometry(f"1x1+-32000+-32000")   # hors écran
+        ghost.resizable(False, False)
+        # On la rend invisible visuellement mais elle reste dans la taskbar
+        ghost.attributes('-alpha', 0.01)        # quasi transparent
+        ghost.configure(bg='black')
+
+        # ── Fenêtre principale (widget flottant) ──────────────────────────────
+        root = tk.Toplevel(ghost)
+        root.title(title)
+        root.geometry(f"{WIN_W}x{WIN_H}+{x_pos}+{y_pos}")
+        root.configure(bg='black')
+        root.overrideredirect(True)
+        root.transient(ghost)   # lie les deux fenêtres
+
+        # ── Drag ─────────────────────────────────────────────────────────────
+        drag_state = {"x": 0, "y": 0, "dragging": False}
+
+        def on_drag_start(event):
+            drag_state["x"] = event.x_root
+            drag_state["y"] = event.y_root
+            drag_state["dragging"] = True
+
+        def on_drag_motion(event):
+            if not drag_state["dragging"]:
+                return
+            dx = event.x_root - drag_state["x"]
+            dy = event.y_root - drag_state["y"]
+            drag_state["x"] = event.x_root
+            drag_state["y"] = event.y_root
+            root.geometry(f"+{root.winfo_x() + dx}+{root.winfo_y() + dy}")
+
+        def on_drag_stop(event):
+            drag_state["dragging"] = False
+
+        # ── Win32 : transparence couleur-clé ──────────────────────────────────
+        root.update_idletasks()
+        hwnd = root.winfo_id()
+        ghost_hwnd = ghost.winfo_id()
+
+        if sys.platform.startswith('win'):
+            # Fenêtre principale : transparence + toolwindow (pas dans taskbar)
+            style_ex = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+            style_ex = (style_ex | win32con.WS_EX_LAYERED | win32con.WS_EX_TOOLWINDOW) \
+                       & ~win32con.WS_EX_APPWINDOW
+            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, style_ex)
+            win32gui.SetLayeredWindowAttributes(
+                hwnd, win32api.RGB(0, 0, 0), 0, win32con.LWA_COLORKEY
+            )
+
+            # Fenêtre fantôme : forcer APPWINDOW pour avoir l'icône taskbar
+            ghost_style = win32gui.GetWindowLong(ghost_hwnd, win32con.GWL_EXSTYLE)
+            ghost_style = (ghost_style | win32con.WS_EX_APPWINDOW) \
+                          & ~win32con.WS_EX_TOOLWINDOW
+            win32gui.SetWindowLong(ghost_hwnd, win32con.GWL_EXSTYLE, ghost_style)
+            win32gui.ShowWindow(ghost_hwnd, win32con.SW_HIDE)
+            win32gui.ShowWindow(ghost_hwnd, win32con.SW_SHOW)
+
+        def bring_to_front(event=None):
+            """Remet le widget au premier plan (clic sur icône taskbar)."""
+            try:
+                root.lift()
+                root.focus_force()
+                win32gui.SetWindowPos(
+                    hwnd, win32con.HWND_TOP, 0, 0, 0, 0,
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
+                )
+            except Exception:
+                pass
+
+        # Clic sur l'icône taskbar -> ghost reçoit <Map> ou <FocusIn>
+        ghost.bind("<Map>", bring_to_front)
+        ghost.bind("<FocusIn>", bring_to_front)
+
+        def close_all():
+            root.destroy()
+            ghost.destroy()
+
+        # ── Canvas ────────────────────────────────────────────────────────────
+        canvas = tk.Canvas(root, width=WIN_W, height=WIN_H, bg='black', highlightthickness=0)
+        canvas.pack(fill='both', expand=True)
+
+        # ── Barre de titre (drag handle) ──────────────────────────────────────
+        TITLE_BAR_H = 24
+        title_bar = canvas.create_rectangle(
+            0, 0, WIN_W, TITLE_BAR_H,
+            fill='#1a1a1a', outline='#333333', width=1
+        )
+        title_bar_label = canvas.create_text(
+            WIN_W / 2, TITLE_BAR_H / 2,
+            text=title, fill="#AAAAAA",
+            font=font.Font(family='Helvetica', size=9)
+        )
+
+        for item in (title_bar, title_bar_label):
+            canvas.tag_bind(item, "<ButtonPress-1>",  on_drag_start)
+            canvas.tag_bind(item, "<B1-Motion>",       on_drag_motion)
+            canvas.tag_bind(item, "<ButtonRelease-1>", on_drag_stop)
+
+        # ── Bouton X ──────────────────────────────────────────────────────────
+        CLOSE_SIZE = 18
+        CLOSE_X    = WIN_W - CLOSE_SIZE - 4
+        CLOSE_Y    = 3
+        close_btn  = canvas.create_rectangle(
+            CLOSE_X, CLOSE_Y,
+            CLOSE_X + CLOSE_SIZE, CLOSE_Y + CLOSE_SIZE,
+            fill='#cc3333', outline='', width=0
+        )
+        canvas.create_text(
+            CLOSE_X + CLOSE_SIZE / 2, CLOSE_Y + CLOSE_SIZE / 2,
+            text="X", fill="white",
+            font=font.Font(family='Helvetica', size=9, weight='bold')
+        )
+
+        def on_click(event):
+            if (CLOSE_X <= event.x <= CLOSE_X + CLOSE_SIZE and
+                    CLOSE_Y <= event.y <= CLOSE_Y + CLOSE_SIZE):
+                close_all()
+
+        def on_hover(event):
+            inside = (CLOSE_X <= event.x <= CLOSE_X + CLOSE_SIZE and
+                      CLOSE_Y <= event.y <= CLOSE_Y + CLOSE_SIZE)
+            canvas.itemconfig(close_btn, fill='#ff5555' if inside else '#cc3333')
+
+        canvas.bind("<ButtonPress-1>", on_click)
+        canvas.bind("<Motion>", on_hover)
+
+        # ── Marges graphique (déjà calculées plus haut) ───────────────────────
+        chart_width  = WIN_W - MARGIN_LEFT - MARGIN_RIGHT
+        chart_height = WIN_H - MARGIN_TOP  - MARGIN_BOTTOM
+
+        canvas.create_line(MARGIN_LEFT, MARGIN_TOP,
+                           MARGIN_LEFT, WIN_H - MARGIN_BOTTOM,
+                           fill="#FFFFFF", width=2)
+        canvas.create_line(MARGIN_LEFT, WIN_H - MARGIN_BOTTOM,
+                           WIN_W - MARGIN_RIGHT, WIN_H - MARGIN_BOTTOM,
+                           fill="#FFFFFF", width=2)
+
+        title_font    = font.Font(family='Helvetica', size=14, weight='bold')
+        label_font    = font.Font(family='Helvetica', size=10)
+        chart_title_y = TITLE_BAR_H + (MARGIN_TOP - TITLE_BAR_H) / 2
+
+        canvas.create_text(WIN_W / 2, chart_title_y,
+                           text=title, fill="#FFFFFF", font=title_font)
+        canvas.create_text(WIN_W / 2, WIN_H - MARGIN_BOTTOM / 3,
+                           text=title_x_axis, fill="#FFFFFF", font=label_font)
+        canvas.create_text(MARGIN_LEFT / 3, WIN_H / 2,
+                           text=title_y_axis, fill="#FFFFFF", font=label_font, angle=90)
+
+        max_val = max(data.values())
+        y_max   = (int(max_val * 2) + 1) / 2.0
+        step    = y_max / 5
+        for i in range(6):
+            y_val = i * step
+            y = MARGIN_TOP + chart_height - (y_val / y_max) * chart_height
+            canvas.create_line(MARGIN_LEFT - 5, y, MARGIN_LEFT, y, fill="#FFFFFF", width=1)
+            canvas.create_text(MARGIN_LEFT - 10, y,
+                               text=f"{y_val:.2f}", fill="#FFFFFF",
+                               font=label_font, anchor='e')
+
+        # ── Barres ────────────────────────────────────────────────────────────
+        num_bars    = len(data)
+        bar_spacing = BAR_SLOT          # 1 slot par barre, déjà calculé
+        bar_width   = bar_spacing * 0.6
+        bars        = []
+
+        for idx, (label, value) in enumerate(data.items()):
+            x_center = MARGIN_LEFT + bar_spacing * (idx + 0.5)
+            x0, x1   = x_center - bar_width / 2, x_center + bar_width / 2
+            rect_id  = canvas.create_rectangle(
+                x0, WIN_H - MARGIN_BOTTOM,
+                x1, WIN_H - MARGIN_BOTTOM,
+                fill='#{:02x}{:02x}{:02x}'.format(*THEME_COLOR),
+                width=0
+            )
+            bars.append((rect_id, value))
+            canvas.create_text(x_center, WIN_H - MARGIN_BOTTOM + 15,
+                               text=label, fill="#FFFFFF",
+                               font=label_font, anchor='n')
+
+        # ── Capture PNG transparent via PrintWindow (Win32) ──────────────────
+        def capture_transparent_png():
+            """
+            Utilise PrintWindow() pour rendre la fenêtre dans un bitmap GDI,
+            même si elle est derrière d'autres fenêtres ou overrideredirect.
+            Aucune dépendance à Ghostscript.
+            Le fond noir (couleur-clé) devient transparent.
+            """
+            root.update_idletasks()
+
+            # Créer un DC compatible et un bitmap de la taille de la fenêtre
+            hwnd_dc  = win32gui.GetWindowDC(hwnd)
+            mfc_dc   = win32ui.CreateDCFromHandle(hwnd_dc)
+            save_dc  = mfc_dc.CreateCompatibleDC()
+            bmp      = win32ui.CreateBitmap()
+            bmp.CreateCompatibleBitmap(mfc_dc, WIN_W, WIN_H)
+            save_dc.SelectObject(bmp)
+
+            # PrintWindow : demande à la fenêtre de se dessiner dans le DC
+            # PW_RENDERFULLCONTENT (0x2) force le rendu complet sous Win8+
+            PW_RENDERFULLCONTENT = 0x2
+            ctypes.windll.user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), PW_RENDERFULLCONTENT)
+
+            # Convertir le bitmap GDI en image Pillow
+            bmp_info = bmp.GetInfo()
+            bmp_bits = bmp.GetBitmapBits(True)
+            img = Image.frombuffer(
+                'RGB',
+                (bmp_info['bmWidth'], bmp_info['bmHeight']),
+                bmp_bits, 'raw', 'BGRX', 0, 1
+            ).convert("RGBA")
+
+            # Libérer les ressources GDI
+            win32gui.DeleteObject(bmp.GetHandle())
+            save_dc.DeleteDC()
+            mfc_dc.DeleteDC()
+            win32gui.ReleaseDC(hwnd, hwnd_dc)
+
+            # Remplacer les pixels noirs (fond couleur-clé) par transparent
+            pixels   = img.load()
+            w, h     = img.size
+            TOLERANCE = 15
+            for py in range(h):
+                for px in range(w):
+                    r, g, b, a = pixels[px, py]
+                    if r <= TOLERANCE and g <= TOLERANCE and b <= TOLERANCE:
+                        pixels[px, py] = (0, 0, 0, 0)
+            return img
+
+        def copy_to_clipboard(img):
+            """
+            Copie en deux formats :
+              PNG  -> préserve la transparence (Discord, Slack, navigateurs)
+              DIB  -> compatibilité (Word, Paint, etc.)
+            """
+            png_buf = io.BytesIO()
+            img.save(png_buf, format="PNG")
+            png_data = png_buf.getvalue()
+
+            CF_PNG = win32clipboard.RegisterClipboardFormat("PNG")
+
+            dib_buf = io.BytesIO()
+            bg = Image.new("RGB", img.size, (0, 0, 0))
+            bg.paste(img, mask=img.split()[3])
+            bg.save(dib_buf, format="BMP")
+            dib_data = dib_buf.getvalue()[14:]
+
+            win32clipboard.OpenClipboard()
+            try:
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(CF_PNG, png_data)
+                win32clipboard.SetClipboardData(win32con.CF_DIB, dib_data)
+            finally:
+                win32clipboard.CloseClipboard()
+
+        def on_ctrl_c(event=None):
+            img = capture_transparent_png()
+            copy_to_clipboard(img)
+
+        def on_ctrl_x(event=None):
+            img = capture_transparent_png()
+            copy_to_clipboard(img)
+            root.after(50, close_all)
+
+        root.bind("<Control-c>", on_ctrl_c)
+        root.bind("<Control-x>", on_ctrl_x)
+        ghost.bind("<Control-c>", on_ctrl_c)
+        ghost.bind("<Control-x>", on_ctrl_x)
+
+        # ── Animation (easing exponentiel) ────────────────────────────────────
+        DELAY_MS        = 16
+        EASE            = 0.08
+        THRESHOLD       = 0.5
+        current_heights = [0.0] * len(bars)
+
+        def animate():
+            done = True
+            for i, (rect_id, target_val) in enumerate(bars):
+                target_h = (target_val / y_max) * chart_height
+                diff     = target_h - current_heights[i]
+                if abs(diff) < THRESHOLD:
+                    current_heights[i] = target_h
+                else:
+                    current_heights[i] += diff * EASE
+                    done = False
+                y_top  = MARGIN_TOP + chart_height - current_heights[i]
+                coords = canvas.coords(rect_id)
+                canvas.coords(rect_id, coords[0], y_top, coords[2], WIN_H - MARGIN_BOTTOM)
+            if not done:
+                root.after(DELAY_MS, animate)
+
+        root.after(200, animate)
+        ghost.mainloop()
+
+    threading.Thread(target=_run, daemon=True).start()
+
+loadPrint()#c
+
+def _generate_shades(base_rgb, n):
+    """
+    Génère n teintes à partir de la couleur thème.
+    On fait varier la luminosité et légèrement la saturation en HSV.
+    """
+    import colorsys
+    r, g, b = [x / 255.0 for x in base_rgb]
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    shades = []
+    for i in range(n):
+        # Répartir les teintes : alterner luminosité + décaler légèrement la teinte
+        t        = i / max(n - 1, 1)
+        new_h    = (h + t * 0.18) % 1.0        # légère rotation de teinte
+        new_s    = max(0.3, s - t * 0.25)       # désaturation progressive
+        new_v    = 0.95 - t * 0.45              # de lumineux à sombre
+        nr, ng, nb = colorsys.hsv_to_rgb(new_h, new_s, new_v)
+        shades.append('#{:02x}{:02x}{:02x}'.format(
+            int(nr * 255), int(ng * 255), int(nb * 255)
+        ))
+    return shades
+
+loadPrint()#c
+
+def pieChart(title, data, x_pos=100, y_pos=100):
+    """
+    Crée et affiche un diagramme circulaire (camembert) interactif.
+    Non-bloquant : s'exécute dans un thread séparé et retourne immédiatement.
+
+    Les proportions sont calculées automatiquement sur la somme totale des valeurs
+    (peu importe que la somme soit 100, 360, 5000, etc.)
+
+    Chaque part affiche son pourcentage à l'intérieur, près du bord,
+    et son label à l'extérieur avec une ligne de repère.
+
+    Raccourcis clavier (widget en focus) :
+        Ctrl+C  -> copie une capture PNG transparent dans le presse-papiers
+        Ctrl+X  -> idem + ferme le widget
+
+    Args:
+        title (str): Titre principal du diagramme
+        data (dict): Dictionnaire {label: valeur}
+        x_pos (int): Position X de la fenêtre (défaut: 100)
+        y_pos (int): Position Y de la fenêtre (défaut: 100)
+    """
+
+    def _run():
+        # ── Mesure des labels pour calculer la marge nécessaire ─────────────
+        _tmp        = tk.Tk()
+        _tmp.withdraw()
+        _label_font = font.Font(family='Helvetica', size=9)
+        _title_font = font.Font(family='Helvetica', size=14, weight='bold')
+
+        max_label_w = max(_label_font.measure(str(k)) for k in data.keys())
+        title_w     = _title_font.measure(title)
+        _tmp.destroy()
+
+        # ── Dimensions ───────────────────────────────────────────────────────
+        TITLE_BAR_H  = 24
+        LINE_OUT     = 30    # longueur de la ligne de repère
+        TEXT_PAD     = 6     # espace entre la fin de la ligne et le bord du texte
+        # Marge = ligne de repère + largeur max du label + padding
+        LABEL_MARGIN = LINE_OUT + int(max_label_w) + TEXT_PAD + 10
+        LABEL_MARGIN = max(LABEL_MARGIN, 90)   # minimum confortable
+
+        PIE_SIZE = 340
+        WIN_W    = max(PIE_SIZE + LABEL_MARGIN * 2, int(title_w) + 40)
+        WIN_H    = PIE_SIZE + LABEL_MARGIN * 2 + TITLE_BAR_H + 40
+
+        CX = WIN_W / 2
+        CY = TITLE_BAR_H + 40 + LABEL_MARGIN + PIE_SIZE / 2
+        R  = PIE_SIZE / 2
+
+        # ── Fenêtre fantôme (porte l'icône taskbar) ───────────────────────────
+        ghost = tk.Tk()
+        ghost.title(title)
+        ghost.geometry("1x1+-32000+-32000")
+        ghost.resizable(False, False)
+        ghost.attributes('-alpha', 0.01)
+        ghost.configure(bg='black')
+
+        # ── Fenêtre principale ────────────────────────────────────────────────
+        root = tk.Toplevel(ghost)
+        root.title(title)
+        root.geometry(f"{WIN_W}x{WIN_H}+{x_pos}+{y_pos}")
+        root.configure(bg='black')
+        root.overrideredirect(True)
+        root.transient(ghost)
+
+        # ── Drag ──────────────────────────────────────────────────────────────
+        drag_state = {"x": 0, "y": 0}
+
+        def on_drag_start(event):
+            drag_state["x"] = event.x_root
+            drag_state["y"] = event.y_root
+
+        def on_drag_motion(event):
+            dx = event.x_root - drag_state["x"]
+            dy = event.y_root - drag_state["y"]
+            drag_state["x"] = event.x_root
+            drag_state["y"] = event.y_root
+            root.geometry(f"+{root.winfo_x() + dx}+{root.winfo_y() + dy}")
+
+        # ── Win32 setup ───────────────────────────────────────────────────────
+        root.update_idletasks()
+        hwnd       = root.winfo_id()
+        ghost_hwnd = ghost.winfo_id()
+
+        if sys.platform.startswith('win'):
+            style_ex = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+            style_ex = (style_ex | win32con.WS_EX_LAYERED | win32con.WS_EX_TOOLWINDOW) \
+                       & ~win32con.WS_EX_APPWINDOW
+            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, style_ex)
+            win32gui.SetLayeredWindowAttributes(
+                hwnd, win32api.RGB(0, 0, 0), 0, win32con.LWA_COLORKEY
+            )
+            ghost_style = win32gui.GetWindowLong(ghost_hwnd, win32con.GWL_EXSTYLE)
+            ghost_style = (ghost_style | win32con.WS_EX_APPWINDOW) \
+                          & ~win32con.WS_EX_TOOLWINDOW
+            win32gui.SetWindowLong(ghost_hwnd, win32con.GWL_EXSTYLE, ghost_style)
+            win32gui.ShowWindow(ghost_hwnd, win32con.SW_HIDE)
+            win32gui.ShowWindow(ghost_hwnd, win32con.SW_SHOW)
+
+        def bring_to_front(event=None):
+            try:
+                root.lift()
+                root.focus_force()
+                win32gui.SetWindowPos(
+                    hwnd, win32con.HWND_TOP, 0, 0, 0, 0,
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE
+                )
+            except Exception:
+                pass
+
+        ghost.bind("<Map>", bring_to_front)
+        ghost.bind("<FocusIn>", bring_to_front)
+
+        def close_all():
+            root.destroy()
+            ghost.destroy()
+
+        # ── Canvas ────────────────────────────────────────────────────────────
+        canvas = tk.Canvas(root, width=WIN_W, height=WIN_H,
+                           bg='black', highlightthickness=0)
+        canvas.pack(fill='both', expand=True)
+
+        # ── Barre de titre ────────────────────────────────────────────────────
+        title_bar = canvas.create_rectangle(
+            0, 0, WIN_W, TITLE_BAR_H,
+            fill='#1a1a1a', outline='#333333', width=1
+        )
+        title_bar_lbl = canvas.create_text(
+            WIN_W / 2, TITLE_BAR_H / 2,
+            text=title, fill="#AAAAAA",
+            font=font.Font(family='Helvetica', size=9)
+        )
+        for item in (title_bar, title_bar_lbl):
+            canvas.tag_bind(item, "<ButtonPress-1>",  on_drag_start)
+            canvas.tag_bind(item, "<B1-Motion>",       on_drag_motion)
+
+        # ── Bouton X ──────────────────────────────────────────────────────────
+        CLOSE_SIZE = 18
+        CLOSE_X    = WIN_W - CLOSE_SIZE - 4
+        CLOSE_Y    = 3
+        close_btn  = canvas.create_rectangle(
+            CLOSE_X, CLOSE_Y,
+            CLOSE_X + CLOSE_SIZE, CLOSE_Y + CLOSE_SIZE,
+            fill='#cc3333', outline='', width=0
+        )
+        canvas.create_text(
+            CLOSE_X + CLOSE_SIZE / 2, CLOSE_Y + CLOSE_SIZE / 2,
+            text="X", fill="white",
+            font=font.Font(family='Helvetica', size=9, weight='bold')
+        )
+
+        def on_click(event):
+            if (CLOSE_X <= event.x <= CLOSE_X + CLOSE_SIZE and
+                    CLOSE_Y <= event.y <= CLOSE_Y + CLOSE_SIZE):
+                close_all()
+
+        def on_hover(event):
+            inside = (CLOSE_X <= event.x <= CLOSE_X + CLOSE_SIZE and
+                      CLOSE_Y <= event.y <= CLOSE_Y + CLOSE_SIZE)
+            canvas.itemconfig(close_btn, fill='#ff5555' if inside else '#cc3333')
+
+        canvas.bind("<ButtonPress-1>", on_click)
+        canvas.bind("<Motion>", on_hover)
+
+        # ── Titre du graphique ────────────────────────────────────────────────
+        title_font = font.Font(family='Helvetica', size=14, weight='bold')
+        label_font = font.Font(family='Helvetica', size=9)
+        pct_font   = font.Font(family='Helvetica', size=9, weight='bold')
+
+        canvas.create_text(
+            WIN_W / 2, TITLE_BAR_H + 20,
+            text=title, fill="#FFFFFF", font=title_font
+        )
+
+        # ── Calcul des parts ──────────────────────────────────────────────────
+        labels  = list(data.keys())
+        values  = list(data.values())
+        total   = sum(values)
+        n       = len(values)
+        shades  = _generate_shades(THEME_COLOR, n)
+
+        # Angles cibles (en degrés, sens horaire depuis le haut = -90°)
+        target_angles = [v / total * 360.0 for v in values]
+
+        # ── Créer les arcs (initialement à 0°) ───────────────────────────────
+        # Tkinter create_arc : start=angle de départ (0=est), extent=amplitude
+        # On part du haut (-90°) et on tourne dans le sens horaire (extent négatif)
+        arc_ids      = []
+        label_ids    = []   # (line_id, label_id, pct_id)
+        current_start = -90.0   # départ en haut
+
+        for i in range(n):
+            arc_id = canvas.create_arc(
+                CX - R, CY - R, CX + R, CY + R,
+                start=current_start,
+                extent=0,           # commence à 0, l'animation va l'étendre
+                fill=shades[i],
+                outline='#000000',
+                width=1,
+                style=tk.PIESLICE
+            )
+            arc_ids.append(arc_id)
+            current_start -= target_angles[i]   # avance pour la prochaine part
+
+        # Labels extérieurs et pourcentages intérieurs (créés vides, positionnés après animation)
+        for i in range(n):
+            pct_val  = values[i] / total * 100.0
+            line_id  = canvas.create_line(0, 0, 0, 0, fill="#888888", width=1)
+            lbl_id   = canvas.create_text(0, 0, text=labels[i],
+                                          fill="#FFFFFF", font=label_font,
+                                          anchor='center')
+            pct_id   = canvas.create_text(0, 0,
+                                          text=f"{pct_val:.1f}%",
+                                          fill="#000000", font=pct_font,
+                                          anchor='center')
+            label_ids.append((line_id, lbl_id, pct_id))
+
+        def place_labels(extents):
+            """
+            Place les labels extérieurs et les % intérieurs
+            en fonction des angles courants.
+            """
+            start_deg = -90.0
+            for i in range(n):
+                ext = extents[i]
+                mid_deg = start_deg - ext / 2.0          # angle du milieu de la part
+                mid_rad = math.radians(mid_deg)
+
+                # -- Pourcentage intérieur (à 72% du rayon) --
+                pr   = R * 0.72
+                px   = CX + pr * math.cos(mid_rad)
+                py   = CY - pr * math.sin(mid_rad)
+                canvas.coords(label_ids[i][2], px, py)
+
+                # -- Label extérieur avec ligne de repère --
+                # Point sur le bord du cercle
+                bx = CX + R * math.cos(mid_rad)
+                by = CY - R * math.sin(mid_rad)
+                # Point intermédiaire (légèrement au-delà)
+                mx = CX + (R + 12) * math.cos(mid_rad)
+                my = CY - (R + 12) * math.sin(mid_rad)
+                # Point final du label (plus loin)
+                lx = CX + (R + LINE_OUT) * math.cos(mid_rad)
+                ly = CY - (R + LINE_OUT) * math.sin(mid_rad)
+
+                canvas.coords(label_ids[i][0], bx, by, mx, my)
+
+                # Ancre du texte selon le côté du cercle
+                cos_v = math.cos(mid_rad)
+                if cos_v > 0.15:
+                    anchor = 'w'
+                elif cos_v < -0.15:
+                    anchor = 'e'
+                else:
+                    anchor = 'center'
+                canvas.itemconfig(label_ids[i][1], anchor=anchor)
+                canvas.coords(label_ids[i][1], lx, ly)
+
+                start_deg -= ext
+
+        # ── Animation (easing exponentiel sur les extents) ────────────────────
+        DELAY_MS        = 16
+        EASE            = 0.08
+        THRESHOLD       = 0.08   # degrés
+        current_extents = [0.0] * n
+
+        def animate():
+            done = True
+            start_deg = -90.0
+            for i in range(n):
+                diff = target_angles[i] - current_extents[i]
+                if abs(diff) < THRESHOLD:
+                    current_extents[i] = target_angles[i]
+                else:
+                    current_extents[i] += diff * EASE
+                    done = False
+                canvas.itemconfig(arc_ids[i],
+                                  start=start_deg,
+                                  extent=-current_extents[i])
+                start_deg -= current_extents[i]
+
+            place_labels(current_extents)
+
+            if not done:
+                root.after(DELAY_MS, animate)
+
+        root.after(200, animate)
+
+        # ── Capture PNG transparent ───────────────────────────────────────────
+        def capture_transparent_png():
+            root.update_idletasks()
+            hwnd_dc = win32gui.GetWindowDC(hwnd)
+            mfc_dc  = win32ui.CreateDCFromHandle(hwnd_dc)
+            save_dc = mfc_dc.CreateCompatibleDC()
+            bmp     = win32ui.CreateBitmap()
+            bmp.CreateCompatibleBitmap(mfc_dc, WIN_W, WIN_H)
+            save_dc.SelectObject(bmp)
+            ctypes.windll.user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 0x2)
+            bmp_info = bmp.GetInfo()
+            bmp_bits = bmp.GetBitmapBits(True)
+            img = Image.frombuffer(
+                'RGB',
+                (bmp_info['bmWidth'], bmp_info['bmHeight']),
+                bmp_bits, 'raw', 'BGRX', 0, 1
+            ).convert("RGBA")
+            win32gui.DeleteObject(bmp.GetHandle())
+            save_dc.DeleteDC()
+            mfc_dc.DeleteDC()
+            win32gui.ReleaseDC(hwnd, hwnd_dc)
+            pixels    = img.load()
+            w, h      = img.size
+            TOLERANCE = 15
+            for py in range(h):
+                for px in range(w):
+                    r, g, b, a = pixels[px, py]
+                    if r <= TOLERANCE and g <= TOLERANCE and b <= TOLERANCE:
+                        pixels[px, py] = (0, 0, 0, 0)
+            return img
+
+        def copy_to_clipboard(img):
+            png_buf  = io.BytesIO()
+            img.save(png_buf, format="PNG")
+            png_data = png_buf.getvalue()
+            CF_PNG   = win32clipboard.RegisterClipboardFormat("PNG")
+            dib_buf  = io.BytesIO()
+            bg = Image.new("RGB", img.size, (0, 0, 0))
+            bg.paste(img, mask=img.split()[3])
+            bg.save(dib_buf, format="BMP")
+            dib_data = dib_buf.getvalue()[14:]
+            win32clipboard.OpenClipboard()
+            try:
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(CF_PNG, png_data)
+                win32clipboard.SetClipboardData(win32con.CF_DIB, dib_data)
+            finally:
+                win32clipboard.CloseClipboard()
+
+        def on_ctrl_c(event=None):
+            copy_to_clipboard(capture_transparent_png())
+
+        def on_ctrl_x(event=None):
+            copy_to_clipboard(capture_transparent_png())
+            root.after(50, close_all)
+
+        root.bind("<Control-c>", on_ctrl_c)
+        root.bind("<Control-x>", on_ctrl_x)
+        ghost.bind("<Control-c>", on_ctrl_c)
+        ghost.bind("<Control-x>", on_ctrl_x)
+
+        ghost.mainloop()
+
+    threading.Thread(target=_run, daemon=True).start()
+
+loadPrint()#c
+
+def lineChart(title, data, title_x_axis, title_y_axis, x_pos=100, y_pos=100):
+    """
+    Diagramme à ligne brisée interactif.
+    data = {label_x: valeur, ...} — points dans l'ordre d'insertion.
+    Non-bloquant. Ctrl+C = copie PNG transparent, Ctrl+X = copie + ferme.
+    """
+
+    def _run():
+
+        # ── Mesure des polices pour dimensionner la fenêtre ──────────────────
+        _tmp        = tk.Tk()
+        _tmp.withdraw()
+        _lf  = font.Font(family='Helvetica', size=10)
+        _tf  = font.Font(family='Helvetica', size=14, weight='bold')
+
+        max_label_w = max(_lf.measure(str(k)) for k in data.keys())
+        title_w     = _tf.measure(title)
+        min_val     = min(data.values())
+        max_val     = max(data.values())
+
+        # Calcul de l'échelle Y (même logique que bandChart)
+        val_range   = max_val - min_val if max_val != min_val else max_val
+        raw_top     = max_val + val_range * 0.1
+        y_max       = (int(raw_top * 2) + 1) / 2.0
+        y_min       = min(0.0, min_val)
+        grad_w      = max(_lf.measure(f"{y_min + i * (y_max - y_min) / 5:.2f}") for i in range(6))
+        _tmp.destroy()
+
+        TITLE_BAR_H   = 24
+        MARGIN_LEFT   = int(grad_w) + 30
+        MARGIN_RIGHT  = max(int(max_label_w) // 2 + 10, 20)  # dernière étiquette X peut dépasser
+        MARGIN_TOP    = 60 + TITLE_BAR_H
+        MARGIN_BOTTOM = max(50, int(max_label_w) + 20)
+
+        PT_SLOT = max(60, min(120, int(max_label_w) + 20))
+        chart_w = PT_SLOT * len(data)
+        chart_w = max(chart_w, int(title_w) + 40)
+
+        WIN_W = MARGIN_LEFT + chart_w + MARGIN_RIGHT
+        WIN_H = 420
+
+        # ── Fenêtre fantôme (icône taskbar) ───────────────────────────────────
+        ghost = tk.Tk()
+        ghost.title(title)
+        ghost.geometry("1x1+-32000+-32000")
+        ghost.resizable(False, False)
+        ghost.attributes('-alpha', 0.01)
+        ghost.configure(bg='black')
+
+        root = tk.Toplevel(ghost)
+        root.title(title)
+        root.geometry(f"{WIN_W}x{WIN_H}+{x_pos}+{y_pos}")
+        root.configure(bg='black')
+        root.overrideredirect(True)
+        root.transient(ghost)
+
+        # ── Drag ──────────────────────────────────────────────────────────────
+        drag_state = {"x": 0, "y": 0, "dragging": False}
+
+        def on_drag_start(e):
+            drag_state["x"] = e.x_root
+            drag_state["y"] = e.y_root
+            drag_state["dragging"] = True
+
+        def on_drag_motion(e):
+            if not drag_state["dragging"]:
+                return
+            dx = e.x_root - drag_state["x"]
+            dy = e.y_root - drag_state["y"]
+            drag_state["x"] = e.x_root
+            drag_state["y"] = e.y_root
+            root.geometry(f"+{root.winfo_x() + dx}+{root.winfo_y() + dy}")
+
+        def on_drag_stop(e):
+            drag_state["dragging"] = False
+
+        # ── Win32 ─────────────────────────────────────────────────────────────
+        root.update_idletasks()
+        hwnd       = root.winfo_id()
+        ghost_hwnd = ghost.winfo_id()
+
+        if sys.platform.startswith('win'):
+            sx = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+            sx = (sx | win32con.WS_EX_LAYERED | win32con.WS_EX_TOOLWINDOW) \
+                 & ~win32con.WS_EX_APPWINDOW
+            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, sx)
+            win32gui.SetLayeredWindowAttributes(
+                hwnd, win32api.RGB(0, 0, 0), 0, win32con.LWA_COLORKEY)
+
+            gx = win32gui.GetWindowLong(ghost_hwnd, win32con.GWL_EXSTYLE)
+            gx = (gx | win32con.WS_EX_APPWINDOW) & ~win32con.WS_EX_TOOLWINDOW
+            win32gui.SetWindowLong(ghost_hwnd, win32con.GWL_EXSTYLE, gx)
+            win32gui.ShowWindow(ghost_hwnd, win32con.SW_HIDE)
+            win32gui.ShowWindow(ghost_hwnd, win32con.SW_SHOW)
+
+        def bring_to_front(e=None):
+            try:
+                root.lift(); root.focus_force()
+                win32gui.SetWindowPos(hwnd, win32con.HWND_TOP, 0, 0, 0, 0,
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+            except Exception:
+                pass
+
+        ghost.bind("<Map>",      bring_to_front)
+        ghost.bind("<FocusIn>",  bring_to_front)
+
+        def close_all():
+            root.destroy()
+            ghost.destroy()
+
+        # ── Canvas ────────────────────────────────────────────────────────────
+        canvas = tk.Canvas(root, width=WIN_W, height=WIN_H,
+                           bg='black', highlightthickness=0)
+        canvas.pack(fill='both', expand=True)
+
+        # ── Barre de titre ────────────────────────────────────────────────────
+        tb  = canvas.create_rectangle(0, 0, WIN_W, TITLE_BAR_H,
+                                      fill='#1a1a1a', outline='#333333', width=1)
+        tbl = canvas.create_text(WIN_W / 2, TITLE_BAR_H / 2, text=title,
+                                 fill="#AAAAAA",
+                                 font=font.Font(family='Helvetica', size=9))
+        for item in (tb, tbl):
+            canvas.tag_bind(item, "<ButtonPress-1>",  on_drag_start)
+            canvas.tag_bind(item, "<B1-Motion>",       on_drag_motion)
+            canvas.tag_bind(item, "<ButtonRelease-1>", on_drag_stop)
+
+        # ── Bouton X ──────────────────────────────────────────────────────────
+        CS = 18
+        CX_btn = WIN_W - CS - 4
+        CY_btn = 3
+        cb = canvas.create_rectangle(CX_btn, CY_btn, CX_btn + CS, CY_btn + CS,
+                                     fill='#cc3333', outline='', width=0)
+        canvas.create_text(CX_btn + CS / 2, CY_btn + CS / 2, text="X",
+                           fill="white",
+                           font=font.Font(family='Helvetica', size=9, weight='bold'))
+
+        def on_click(e):
+            if CX_btn <= e.x <= CX_btn + CS and CY_btn <= e.y <= CY_btn + CS:
+                close_all()
+
+        def on_hover(e):
+            inside = CX_btn <= e.x <= CX_btn + CS and CY_btn <= e.y <= CY_btn + CS
+            canvas.itemconfig(cb, fill='#ff5555' if inside else '#cc3333')
+
+        canvas.bind("<ButtonPress-1>", on_click)
+        canvas.bind("<Motion>",        on_hover)
+
+        # ── Zone graphique ────────────────────────────────────────────────────
+        chart_width  = WIN_W - MARGIN_LEFT - MARGIN_RIGHT
+        chart_height = WIN_H - MARGIN_TOP  - MARGIN_BOTTOM
+
+        # Axes
+        canvas.create_line(MARGIN_LEFT, MARGIN_TOP,
+                           MARGIN_LEFT, WIN_H - MARGIN_BOTTOM,
+                           fill="#FFFFFF", width=2)
+        canvas.create_line(MARGIN_LEFT, WIN_H - MARGIN_BOTTOM,
+                           WIN_W - MARGIN_RIGHT, WIN_H - MARGIN_BOTTOM,
+                           fill="#FFFFFF", width=2)
+
+        # Polices
+        title_font = font.Font(family='Helvetica', size=14, weight='bold')
+        label_font = font.Font(family='Helvetica', size=10)
+
+        chart_title_y = TITLE_BAR_H + (MARGIN_TOP - TITLE_BAR_H) / 2
+        canvas.create_text(WIN_W / 2, chart_title_y,
+                           text=title, fill="#FFFFFF", font=title_font)
+        canvas.create_text(WIN_W / 2, WIN_H - MARGIN_BOTTOM / 3,
+                           text=title_x_axis, fill="#FFFFFF", font=label_font)
+        canvas.create_text(MARGIN_LEFT / 3, WIN_H / 2,
+                           text=title_y_axis, fill="#FFFFFF", font=label_font, angle=90)
+
+        # Graduations Y + grille pointillée
+        y_range = y_max - y_min
+        step    = y_range / 5
+        for i in range(6):
+            y_val = y_min + i * step
+            y_px  = WIN_H - MARGIN_BOTTOM - (y_val - y_min) / y_range * chart_height
+            canvas.create_line(MARGIN_LEFT - 5, y_px, MARGIN_LEFT, y_px,
+                               fill="#FFFFFF", width=1)
+            canvas.create_text(MARGIN_LEFT - 10, y_px,
+                               text=f"{y_val:.2f}", fill="#FFFFFF",
+                               font=label_font, anchor='e')
+            if i > 0:   # grille horizontale légère
+                canvas.create_line(MARGIN_LEFT, y_px, WIN_W - MARGIN_RIGHT, y_px,
+                                   fill="#333333", width=1, dash=(4, 6))
+
+        # ── Points cibles ─────────────────────────────────────────────────────
+        labels  = list(data.keys())
+        values  = list(data.values())
+        n       = len(values)
+        TC      = '#{:02x}{:02x}{:02x}'.format(*THEME_COLOR)
+
+        def val_to_px(v):
+            """Convertit une valeur en coordonnée Y canvas."""
+            return WIN_H - MARGIN_BOTTOM - (v - y_min) / y_range * chart_height
+
+        def idx_to_x(i):
+            """Coordonnée X du i-ème point."""
+            return MARGIN_LEFT + PT_SLOT * (i + 0.5)
+
+        # Labels X sous l'axe
+        for i, lbl in enumerate(labels):
+            canvas.create_text(idx_to_x(i), WIN_H - MARGIN_BOTTOM + 15,
+                               text=lbl, fill="#FFFFFF",
+                               font=label_font, anchor='n')
+
+        # Segments de ligne (coordonnées initiales superposées sur le 1er point)
+        # Ils seront mis à jour à chaque frame d'animation
+        # On stocke les segments séparément des points
+        seg_ids  = []    # un segment entre point i et i+1
+        dot_ids  = []    # cercle plein à chaque point
+        val_ids  = []    # label de valeur au-dessus de chaque point
+
+        target_ys = [val_to_px(v) for v in values]
+        base_y    = val_to_px(y_min)   # bas du graphique = point de départ animation
+
+        for i in range(n - 1):
+            seg = canvas.create_line(
+                idx_to_x(i), base_y, idx_to_x(i + 1), base_y,
+                fill=TC, width=2, capstyle=tk.ROUND
+            )
+            seg_ids.append(seg)
+
+        for i in range(n):
+            dot = canvas.create_oval(
+                idx_to_x(i) - 4, base_y - 4,
+                idx_to_x(i) + 4, base_y + 4,
+                fill=TC, outline='#000000', width=1
+            )
+            dot_ids.append(dot)
+            vid = canvas.create_text(
+                idx_to_x(i), base_y - 14,
+                text=f"{values[i]:.2f}",
+                fill="#FFFFFF", font=label_font, anchor='s'
+            )
+            val_ids.append(vid)
+
+        # ── Animation (easing exponentiel) ────────────────────────────────────
+        DELAY_MS = 16
+        EASE     = 0.08
+        THR      = 0.3   # seuil en pixels
+
+        current_ys = [float(base_y)] * n
+
+        def animate():
+            done = True
+            for i in range(n):
+                diff = target_ys[i] - current_ys[i]
+                if abs(diff) < THR:
+                    current_ys[i] = target_ys[i]
+                else:
+                    current_ys[i] += diff * EASE
+                    done = False
+
+                cx = idx_to_x(i)
+                cy = current_ys[i]
+
+                # Mise à jour du point
+                canvas.coords(dot_ids[i], cx - 4, cy - 4, cx + 4, cy + 4)
+                canvas.coords(val_ids[i], cx, cy - 14)
+
+                # Mise à jour du segment vers le point suivant
+                if i < n - 1:
+                    canvas.coords(seg_ids[i],
+                                  cx, cy,
+                                  idx_to_x(i + 1), current_ys[i + 1])
+
+            if not done:
+                root.after(DELAY_MS, animate)
+
+        root.after(200, animate)
+
+        # ── Capture PNG transparent (PrintWindow) ─────────────────────────────
+        def capture_transparent_png():
+            root.update_idletasks()
+            hwnd_dc = win32gui.GetWindowDC(hwnd)
+            mfc_dc  = win32ui.CreateDCFromHandle(hwnd_dc)
+            save_dc = mfc_dc.CreateCompatibleDC()
+            bmp     = win32ui.CreateBitmap()
+            bmp.CreateCompatibleBitmap(mfc_dc, WIN_W, WIN_H)
+            save_dc.SelectObject(bmp)
+            ctypes.windll.user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 0x2)
+            bmp_info = bmp.GetInfo()
+            bmp_bits = bmp.GetBitmapBits(True)
+            img = Image.frombuffer('RGB',
+                (bmp_info['bmWidth'], bmp_info['bmHeight']),
+                bmp_bits, 'raw', 'BGRX', 0, 1).convert("RGBA")
+            win32gui.DeleteObject(bmp.GetHandle())
+            save_dc.DeleteDC(); mfc_dc.DeleteDC()
+            win32gui.ReleaseDC(hwnd, hwnd_dc)
+            pixels = img.load()
+            for py in range(img.height):
+                for px in range(img.width):
+                    r, g, b, a = pixels[px, py]
+                    if r <= 15 and g <= 15 and b <= 15:
+                        pixels[px, py] = (0, 0, 0, 0)
+            return img
+
+        def copy_to_clipboard(img):
+            png_buf = io.BytesIO()
+            img.save(png_buf, format="PNG")
+            CF_PNG  = win32clipboard.RegisterClipboardFormat("PNG")
+            dib_buf = io.BytesIO()
+            bg = Image.new("RGB", img.size, (0, 0, 0))
+            bg.paste(img, mask=img.split()[3])
+            bg.save(dib_buf, format="BMP")
+            win32clipboard.OpenClipboard()
+            try:
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(CF_PNG, png_buf.getvalue())
+                win32clipboard.SetClipboardData(win32con.CF_DIB,
+                                                dib_buf.getvalue()[14:])
+            finally:
+                win32clipboard.CloseClipboard()
+
+        def on_ctrl_c(e=None):
+            copy_to_clipboard(capture_transparent_png())
+
+        def on_ctrl_x(e=None):
+            copy_to_clipboard(capture_transparent_png())
+            root.after(50, close_all)
+
+        root.bind("<Control-c>",  on_ctrl_c)
+        root.bind("<Control-x>",  on_ctrl_x)
+        ghost.bind("<Control-c>", on_ctrl_c)
+        ghost.bind("<Control-x>", on_ctrl_x)
+
+        ghost.mainloop()
+
+    threading.Thread(target=_run, daemon=True).start()
+
+loadPrint()#c
+
+def boxChart(title, data, title_x_axis, title_y_axis, x_pos=100, y_pos=100):
+    """
+    Diagramme de quartiles horizontal (boîtes à moustaches).
+    Chaque catégorie = une ligne. Les boîtes s'étendent de gauche à droite.
+    Les valeurs min, Q1, médiane, Q3, max sont affichées sur chaque ligne.
+    Non-bloquant. Ctrl+C = PNG transparent, Ctrl+X = PNG + ferme.
+
+    data = {label: [liste de valeurs numériques]}
+    """
+
+    def _run():
+
+        # ── Statistiques ──────────────────────────────────────────────────────
+        stats = {}
+        for lbl, vals in data.items():
+            s     = sorted(vals)
+            n     = len(s)
+            med   = statistics.median(s)
+            lower = s[:n // 2]
+            upper = s[n // 2 + (n % 2):]
+            q1    = statistics.median(lower) if lower else s[0]
+            q3    = statistics.median(upper) if upper else s[-1]
+            iqr   = q3 - q1
+            w_low  = max(s[0],  q1 - 1.5 * iqr)
+            w_high = min(s[-1], q3 + 1.5 * iqr)
+            outliers = [v for v in s if v < w_low or v > w_high]
+            stats[lbl] = (w_low, q1, med, q3, w_high, outliers)
+
+        all_vals   = [v for lst in data.values() for v in lst]
+        global_min = min(all_vals)
+        global_max = max(all_vals)
+
+        # ── Mesure polices ────────────────────────────────────────────────────
+        _tmp = tk.Tk()
+        _tmp.withdraw()
+        _lf  = font.Font(family='Helvetica', size=10)
+        _sf  = font.Font(family='Helvetica', size=8)
+        _tf  = font.Font(family='Helvetica', size=14, weight='bold')
+
+        max_label_w = max(_lf.measure(str(k)) for k in data.keys())
+        title_w     = _tf.measure(title)
+
+        val_range_raw = global_max - global_min if global_max != global_min else abs(global_max)
+        raw_right = global_max + val_range_raw * 0.08
+        raw_left  = global_min - val_range_raw * 0.08
+        x_max     = (int(raw_right * 2) + 1) / 2.0
+        x_min     = (int(raw_left  * 2))     / 2.0
+        x_range   = x_max - x_min
+
+        # Largeur des graduations X (sous l'axe)
+        grad_w = max(_lf.measure(f"{x_min + i * x_range / 5:.2f}") for i in range(6))
+
+        # Largeur des valeurs affichées sur les lignes (ex: "123.45")
+        sample_val_w = _sf.measure(f"{global_max:.2f}")
+        _tmp.destroy()
+
+        TITLE_BAR_H   = 24
+        # Marge gauche : assez pour les labels de catégorie
+        MARGIN_LEFT   = int(max_label_w) + 20
+        # Marge droite : assez pour afficher la valeur max (w_high) sans coupure
+        MARGIN_RIGHT  = int(sample_val_w) + 16
+        MARGIN_TOP    = 50 + TITLE_BAR_H
+        # Marge bas : pour les graduations X et leur titre
+        MARGIN_BOTTOM = 55
+
+        # Hauteur par boîte
+        BOX_SLOT = 60
+        chart_h  = BOX_SLOT * len(data)
+
+        WIN_H = MARGIN_TOP + chart_h + MARGIN_BOTTOM
+        WIN_W = max(600, int(title_w) + 80,
+                    MARGIN_LEFT + int(grad_w) * 6 + MARGIN_RIGHT)
+
+        # ── Fenêtre fantôme ───────────────────────────────────────────────────
+        ghost = tk.Tk()
+        ghost.title(title)
+        ghost.geometry("1x1+-32000+-32000")
+        ghost.resizable(False, False)
+        ghost.attributes('-alpha', 0.01)
+        ghost.configure(bg='black')
+
+        root = tk.Toplevel(ghost)
+        root.title(title)
+        root.geometry(f"{WIN_W}x{WIN_H}+{x_pos}+{y_pos}")
+        root.configure(bg='black')
+        root.overrideredirect(True)
+        root.transient(ghost)
+
+        # ── Drag ──────────────────────────────────────────────────────────────
+        drag_state = {"x": 0, "y": 0, "dragging": False}
+
+        def on_drag_start(e):
+            drag_state["x"] = e.x_root; drag_state["y"] = e.y_root
+            drag_state["dragging"] = True
+
+        def on_drag_motion(e):
+            if not drag_state["dragging"]: return
+            dx = e.x_root - drag_state["x"]; dy = e.y_root - drag_state["y"]
+            drag_state["x"] = e.x_root;      drag_state["y"] = e.y_root
+            root.geometry(f"+{root.winfo_x()+dx}+{root.winfo_y()+dy}")
+
+        def on_drag_stop(e): drag_state["dragging"] = False
+
+        # ── Win32 ─────────────────────────────────────────────────────────────
+        root.update_idletasks()
+        hwnd = root.winfo_id(); ghost_hwnd = ghost.winfo_id()
+
+        if sys.platform.startswith('win'):
+            sx = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+            sx = (sx | win32con.WS_EX_LAYERED | win32con.WS_EX_TOOLWINDOW) \
+                 & ~win32con.WS_EX_APPWINDOW
+            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, sx)
+            win32gui.SetLayeredWindowAttributes(
+                hwnd, win32api.RGB(0, 0, 0), 0, win32con.LWA_COLORKEY)
+            gx = win32gui.GetWindowLong(ghost_hwnd, win32con.GWL_EXSTYLE)
+            gx = (gx | win32con.WS_EX_APPWINDOW) & ~win32con.WS_EX_TOOLWINDOW
+            win32gui.SetWindowLong(ghost_hwnd, win32con.GWL_EXSTYLE, gx)
+            win32gui.ShowWindow(ghost_hwnd, win32con.SW_HIDE)
+            win32gui.ShowWindow(ghost_hwnd, win32con.SW_SHOW)
+
+        def bring_to_front(e=None):
+            try:
+                root.lift(); root.focus_force()
+                win32gui.SetWindowPos(hwnd, win32con.HWND_TOP, 0, 0, 0, 0,
+                    win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+            except Exception: pass
+
+        ghost.bind("<Map>",     bring_to_front)
+        ghost.bind("<FocusIn>", bring_to_front)
+
+        def close_all():
+            root.destroy(); ghost.destroy()
+
+        # ── Canvas ────────────────────────────────────────────────────────────
+        canvas = tk.Canvas(root, width=WIN_W, height=WIN_H,
+                           bg='black', highlightthickness=0)
+        canvas.pack(fill='both', expand=True)
+
+        # Barre titre
+        tb  = canvas.create_rectangle(0, 0, WIN_W, TITLE_BAR_H,
+                                      fill='#1a1a1a', outline='#333333', width=1)
+        tbl = canvas.create_text(WIN_W/2, TITLE_BAR_H/2, text=title,
+                                 fill="#AAAAAA",
+                                 font=font.Font(family='Helvetica', size=9))
+        for item in (tb, tbl):
+            canvas.tag_bind(item, "<ButtonPress-1>",  on_drag_start)
+            canvas.tag_bind(item, "<B1-Motion>",       on_drag_motion)
+            canvas.tag_bind(item, "<ButtonRelease-1>", on_drag_stop)
+
+        # Bouton X
+        CS = 18; CX_btn = WIN_W - CS - 4; CY_btn = 3
+        cb = canvas.create_rectangle(CX_btn, CY_btn, CX_btn+CS, CY_btn+CS,
+                                     fill='#cc3333', outline='', width=0)
+        canvas.create_text(CX_btn+CS/2, CY_btn+CS/2, text="X", fill="white",
+                           font=font.Font(family='Helvetica', size=9, weight='bold'))
+
+        def on_click(e):
+            if CX_btn <= e.x <= CX_btn+CS and CY_btn <= e.y <= CY_btn+CS:
+                close_all()
+
+        def on_hover(e):
+            inside = CX_btn <= e.x <= CX_btn+CS and CY_btn <= e.y <= CY_btn+CS
+            canvas.itemconfig(cb, fill='#ff5555' if inside else '#cc3333')
+
+        canvas.bind("<ButtonPress-1>", on_click)
+        canvas.bind("<Motion>",        on_hover)
+
+        # ── Polices ───────────────────────────────────────────────────────────
+        title_font = font.Font(family='Helvetica', size=14, weight='bold')
+        label_font = font.Font(family='Helvetica', size=10)
+        small_font = font.Font(family='Helvetica', size=8)
+
+        chart_width  = WIN_W - MARGIN_LEFT - MARGIN_RIGHT
+        chart_height = WIN_H - MARGIN_TOP  - MARGIN_BOTTOM
+
+        # ── Axes ──────────────────────────────────────────────────────────────
+        # Axe X (horizontal, en bas)
+        canvas.create_line(MARGIN_LEFT, WIN_H - MARGIN_BOTTOM,
+                           WIN_W - MARGIN_RIGHT, WIN_H - MARGIN_BOTTOM,
+                           fill="#FFFFFF", width=2)
+        # Axe Y (vertical, à gauche)
+        canvas.create_line(MARGIN_LEFT, MARGIN_TOP,
+                           MARGIN_LEFT, WIN_H - MARGIN_BOTTOM,
+                           fill="#FFFFFF", width=2)
+
+        # Titre principal
+        chart_title_y = TITLE_BAR_H + (MARGIN_TOP - TITLE_BAR_H) / 2
+        canvas.create_text(WIN_W/2, chart_title_y,
+                           text=title, fill="#FFFFFF", font=title_font)
+
+        # Titre axe X (bas)
+        canvas.create_text(WIN_W/2, WIN_H - 12,
+                           text=title_x_axis, fill="#FFFFFF", font=label_font)
+
+        # Titre axe Y (gauche, vertical) — ici c'est les catégories
+        canvas.create_text(12, WIN_H/2,
+                           text=title_y_axis, fill="#FFFFFF",
+                           font=label_font, angle=90)
+
+        # Graduations X + grille verticale
+        def val_to_x(v):
+            return MARGIN_LEFT + (v - x_min) / x_range * chart_width
+
+        x_step = x_range / 5
+        for i in range(6):
+            xv = x_min + i * x_step
+            xp = val_to_x(xv)
+            canvas.create_line(xp, WIN_H - MARGIN_BOTTOM,
+                               xp, WIN_H - MARGIN_BOTTOM + 5,
+                               fill="#FFFFFF", width=1)
+            canvas.create_text(xp, WIN_H - MARGIN_BOTTOM + 14,
+                               text=f"{xv:.2f}", fill="#FFFFFF",
+                               font=small_font, anchor='n')
+            if i > 0:
+                canvas.create_line(xp, MARGIN_TOP, xp, WIN_H - MARGIN_BOTTOM,
+                                   fill="#333333", width=1, dash=(4, 6))
+
+        # ── Couleurs thème ────────────────────────────────────────────────────
+        TC      = '#{:02x}{:02x}{:02x}'.format(*THEME_COLOR)
+        TC_DARK = '#{:02x}{:02x}{:02x}'.format(
+            int(THEME_COLOR[0]*0.4), int(THEME_COLOR[1]*0.4), int(THEME_COLOR[2]*0.4))
+        TC_MED  = '#{:02x}{:02x}{:02x}'.format(
+            int(THEME_COLOR[0]*0.12), int(THEME_COLOR[1]*0.12), int(THEME_COLOR[2]*0.12))
+
+        # ── Construction des boîtes horizontales ──────────────────────────────
+        labels_list = list(stats.keys())
+        BOX_H       = BOX_SLOT * 0.40   # hauteur visuelle de la boîte
+        WHISKER_H   = BOX_SLOT * 0.18   # hauteur des capuchons
+
+        boxes = []
+
+        for i, lbl in enumerate(labels_list):
+            w_low, q1, med, q3, w_high, outliers = stats[lbl]
+            cy = MARGIN_TOP + BOX_SLOT * (i + 0.5)   # centre Y de la boîte
+
+            # Positions X cibles
+            tx_wlow  = val_to_x(w_low)
+            tx_q1    = val_to_x(q1)
+            tx_med   = val_to_x(med)
+            tx_q3    = val_to_x(q3)
+            tx_whigh = val_to_x(w_high)
+            tx_med0  = val_to_x(med)   # point de départ animation
+
+            # Label de catégorie (axe Y gauche)
+            canvas.create_text(MARGIN_LEFT - 10, cy,
+                               text=lbl, fill="#FFFFFF",
+                               font=label_font, anchor='e')
+
+            # Ligne de séparation horizontale légère entre boîtes
+            if i > 0:
+                canvas.create_line(MARGIN_LEFT, cy - BOX_SLOT/2,
+                                   WIN_W - MARGIN_RIGHT, cy - BOX_SLOT/2,
+                                   fill="#222222", width=1)
+
+            # ── Éléments graphiques (tous partent de la médiane) ───────────
+            box_rect   = canvas.create_rectangle(
+                tx_med0, cy - BOX_H/2, tx_med0, cy + BOX_H/2,
+                fill=TC_MED, outline=TC, width=2)
+
+            med_line   = canvas.create_line(
+                tx_med0, cy - BOX_H/2, tx_med0, cy + BOX_H/2,
+                fill=TC, width=2)
+
+            whisk_low  = canvas.create_line(
+                tx_med0, cy, tx_med0, cy,
+                fill=TC_DARK, width=1, dash=(4, 3))
+
+            whisk_high = canvas.create_line(
+                tx_med0, cy, tx_med0, cy,
+                fill=TC_DARK, width=1, dash=(4, 3))
+
+            cap_low    = canvas.create_line(
+                tx_med0, cy - WHISKER_H/2, tx_med0, cy + WHISKER_H/2,
+                fill=TC, width=2)
+
+            cap_high   = canvas.create_line(
+                tx_med0, cy - WHISKER_H/2, tx_med0, cy + WHISKER_H/2,
+                fill=TC, width=2)
+
+            # ── Labels de valeur sur chaque ligne ─────────────────────────
+            # Positionnés au-dessus de la boîte, alignés sur leur ligne respective
+            LY = cy - BOX_H/2 - 5   # Y des labels (au-dessus de la boîte)
+
+            lbl_wlow  = canvas.create_text(tx_med0, LY, anchor='s',
+                text=f"{w_low:.2f}",  fill="#AAAAAA", font=small_font)
+            lbl_q1    = canvas.create_text(tx_med0, LY, anchor='s',
+                text=f"{q1:.2f}",    fill=TC,        font=small_font)
+            lbl_med   = canvas.create_text(tx_med,  LY, anchor='s',
+                text=f"{med:.2f}",   fill=TC,        font=small_font)
+            lbl_q3    = canvas.create_text(tx_med0, LY, anchor='s',
+                text=f"{q3:.2f}",    fill=TC,        font=small_font)
+            lbl_whigh = canvas.create_text(tx_med0, LY, anchor='s',
+                text=f"{w_high:.2f}", fill="#AAAAAA", font=small_font)
+
+            # Outliers
+            out_ids = []
+            for ov in outliers:
+                ox  = val_to_x(ov)
+                oid = canvas.create_oval(ox-3, cy-3, ox+3, cy+3,
+                                         fill='', outline=TC, width=1)
+                out_ids.append(oid)
+
+            boxes.append({
+                'cy': cy, 'LY': LY,
+                'box_rect': box_rect, 'med_line': med_line,
+                'whisk_low': whisk_low, 'whisk_high': whisk_high,
+                'cap_low': cap_low, 'cap_high': cap_high,
+                'lbl_wlow': lbl_wlow, 'lbl_q1': lbl_q1, 'lbl_med': lbl_med,
+                'lbl_q3': lbl_q3, 'lbl_whigh': lbl_whigh,
+                'out_ids': out_ids,
+                # cibles
+                'tx_wlow': tx_wlow, 'tx_q1': tx_q1,
+                'tx_q3':   tx_q3,   'tx_whigh': tx_whigh,
+                'tx_med':  tx_med,
+                # courants (animation depuis la médiane)
+                'cx_wlow': tx_med0, 'cx_q1': tx_med0,
+                'cx_q3':   tx_med0, 'cx_whigh': tx_med0,
+            })
+
+        # ── Animation ─────────────────────────────────────────────────────────
+        DELAY_MS = 16
+        EASE     = 0.08
+        THR      = 0.3
+
+        def animate():
+            done = True
+            for b in boxes:
+                cy  = b['cy']
+                LY  = b['LY']
+                bh  = BOX_H / 2
+                wh  = WHISKER_H / 2
+
+                for key_cur, key_tgt in (
+                    ('cx_q1',    'tx_q1'),
+                    ('cx_q3',    'tx_q3'),
+                    ('cx_wlow',  'tx_wlow'),
+                    ('cx_whigh', 'tx_whigh'),
+                ):
+                    diff = b[key_tgt] - b[key_cur]
+                    if abs(diff) < THR:
+                        b[key_cur] = b[key_tgt]
+                    else:
+                        b[key_cur] += diff * EASE
+                        done = False
+
+                cq1 = b['cx_q1'];  cq3 = b['cx_q3']
+                cwl = b['cx_wlow']; cwh = b['cx_whigh']
+                cmd = b['tx_med']   # médiane : fixe
+
+                canvas.coords(b['box_rect'],   cq1, cy-bh,  cq3, cy+bh)
+                canvas.coords(b['med_line'],   cmd, cy-bh,  cmd, cy+bh)
+                canvas.coords(b['whisk_low'],  cwl, cy,     cq1, cy)
+                canvas.coords(b['whisk_high'], cq3, cy,     cwh, cy)
+                canvas.coords(b['cap_low'],    cwl, cy-wh,  cwl, cy+wh)
+                canvas.coords(b['cap_high'],   cwh, cy-wh,  cwh, cy+wh)
+
+                # Mise à jour positions labels
+                canvas.coords(b['lbl_wlow'],  cwl, LY)
+                canvas.coords(b['lbl_q1'],    cq1, LY)
+                canvas.coords(b['lbl_q3'],    cq3, LY)
+                canvas.coords(b['lbl_whigh'], cwh, LY)
+                # lbl_med est fixe, déjà positionné
+
+            if not done:
+                root.after(DELAY_MS, animate)
+
+        root.after(200, animate)
+
+        # ── Capture & clipboard ───────────────────────────────────────────────
+        def capture_transparent_png():
+            root.update_idletasks()
+            hwnd_dc = win32gui.GetWindowDC(hwnd)
+            mfc_dc  = win32ui.CreateDCFromHandle(hwnd_dc)
+            save_dc = mfc_dc.CreateCompatibleDC()
+            bmp     = win32ui.CreateBitmap()
+            bmp.CreateCompatibleBitmap(mfc_dc, WIN_W, WIN_H)
+            save_dc.SelectObject(bmp)
+            ctypes.windll.user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 0x2)
+            bmp_info = bmp.GetInfo(); bmp_bits = bmp.GetBitmapBits(True)
+            img = Image.frombuffer('RGB',
+                (bmp_info['bmWidth'], bmp_info['bmHeight']),
+                bmp_bits, 'raw', 'BGRX', 0, 1).convert("RGBA")
+            win32gui.DeleteObject(bmp.GetHandle())
+            save_dc.DeleteDC(); mfc_dc.DeleteDC()
+            win32gui.ReleaseDC(hwnd, hwnd_dc)
+            pixels = img.load()
+            for py in range(img.height):
+                for px in range(img.width):
+                    r, g, b, a = pixels[px, py]
+                    if r <= 15 and g <= 15 and b <= 15:
+                        pixels[px, py] = (0, 0, 0, 0)
+            return img
+
+        def copy_to_clipboard(img):
+            png_buf = io.BytesIO(); img.save(png_buf, format="PNG")
+            CF_PNG  = win32clipboard.RegisterClipboardFormat("PNG")
+            dib_buf = io.BytesIO()
+            bg = Image.new("RGB", img.size, (0, 0, 0))
+            bg.paste(img, mask=img.split()[3]); bg.save(dib_buf, format="BMP")
+            win32clipboard.OpenClipboard()
+            try:
+                win32clipboard.EmptyClipboard()
+                win32clipboard.SetClipboardData(CF_PNG, png_buf.getvalue())
+                win32clipboard.SetClipboardData(win32con.CF_DIB, dib_buf.getvalue()[14:])
+            finally:
+                win32clipboard.CloseClipboard()
+
+        def on_ctrl_c(e=None): copy_to_clipboard(capture_transparent_png())
+        def on_ctrl_x(e=None):
+            copy_to_clipboard(capture_transparent_png())
+            root.after(50, close_all)
+
+        root.bind("<Control-c>",  on_ctrl_c)
+        root.bind("<Control-x>",  on_ctrl_x)
+        ghost.bind("<Control-c>", on_ctrl_c)
+        ghost.bind("<Control-x>", on_ctrl_x)
+
+        ghost.mainloop()
+
+    threading.Thread(target=_run, daemon=True).start()
+
+loadPrint()#c
+
+def createChart( chart: str, title: str, data: dict, x_axis_title: str, y_axis_title: str ):
+    try:
+        if chart == "bandChart":
+            bandChart( title, data, x_axis_title, y_axis_title )
+        elif chart == "pieChart":
+            pieChart( title, data )
+        elif chart == "lineChart":
+            lineChart( title, data, x_axis_title, y_axis_title )
+        elif chart == "boxChart":
+            boxChart( title, data, x_axis_title, y_axis_title )
+        else:
+            return f"Auncun diagramme disponible sous le nom de {chart}", True
+        return f"Diagramme {chart} créé", False
+    except Exception as e:
+        log( "Error while creating chart", {"error": str( e ), "data": data, "type": chart}, "error" )
+        return f"Erreur lors de la création du diagramme : {str( e )}", True
 
 loadPrint()#c
 
@@ -2164,14 +3884,18 @@ def autoEraseConversation():
 loadPrint()#c
 
 def saveFile( name, content ):
-    if os.path.exists( f"{os.path.expanduser("~")}/Downloads/{name}" ):
-        return f"Le fichier {name} existe déjà", True
-    file = open( f"{os.path.expanduser("~")}/Downloads/{name}", 'w' )
-    file.write( content )
-    file.close()
-    subprocess.Popen( ["notepad", f"{os.path.expanduser("~")}/Downloads/{name}"], creationflags=subprocess.DETACHED_PROCESS, shell=True)
-    # os.system( f"notepad {os.path.expanduser("~")}/Downloads/{name}" )
-    return f"Le fichier {name} a bien été créé", False
+    try:
+        if os.path.exists( f"{os.path.expanduser("~")}/Downloads/{name}" ):
+            return f"Le fichier {name} existe déjà", True
+        file = open( f"{os.path.expanduser("~")}/Downloads/{name}", 'w' )
+        file.write( content )
+        file.close()
+        subprocess.Popen( ["notepad", f"{os.path.expanduser("~")}/Downloads/{name}"], creationflags=subprocess.DETACHED_PROCESS, shell=True)
+        # os.system( f"notepad {os.path.expanduser("~")}/Downloads/{name}" )
+        return f"Le fichier {name} a bien été créé", False
+    except Exception as e:
+        log( "Error while creating file", str( e ), "error" )
+        return "Erreur lors de la création du fichier", True
 
 loadPrint()#c
 
@@ -3461,7 +5185,8 @@ def getUserInput():
     user_input = ''
     if AUDIO:
         Sound.waitForSoundTofinish()
-        user_input = Sound.listen()
+        # user_input = Sound.listen()
+        user_input = Sound.listenSRWhisper()
         # print( user_input )
     else:
         # user_input = input( "YOU > " )
@@ -3527,7 +5252,10 @@ def chat():
         treating_response.join()
         # sendNotification( "Attente de votre message", "Rika attend votre message, vous pouvez maintenant parler" )
         if not fast_called:
-            print( "Talk..." )
+            if AUDIO:
+                print( "Talk..." )
+            else:
+                print( "Write..." )
         Sound.waitForSoundTofinish()
         if fast_called:
             user_input = prompt
@@ -3621,11 +5349,10 @@ def chat():
                 )
             
             if fast_called and content["tools"] == []:
-                content["tools"].append(
-                    {
-                        "name": "sleepSystem"
-                    }
-                )
+                treating_response.join()
+                Sound.waitForSoundTofinish()
+                log( "Use sleepSystem", "call 1", "info" )
+                sleepSystem( True, AUDIO )
             # treated_text = treadTextResponse( content["message"] )
             
             # print( f"{ASSISTANT_NAME} >", treated_text )
@@ -3638,25 +5365,27 @@ def chat():
             responses = []
             try:
                 while len( content["tools"] ) != 0:
+                    responses = []
                     for tool in content["tools"]:
+                        params = tool["params"]
                         print( f"Using {tool["name"]} tool\n\n" )
-                        log( "Using tool", tool["name"], "info" )
+                        log( "Using tool", tool, "info" )
                         if tool["name"] == "analyseOldImage":
-                            result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], False )
+                            result, do_response = analyseImage( params["source"], params["prompt"], False )
                         elif tool["name"] == "analyseNewImage":
-                            result, do_response = analyseImage( tool["params"]["source"], tool["params"]["prompt"], True )
+                            result, do_response = analyseImage( params["source"], params["prompt"], True )
                         elif tool["name"] == "sendEmail":
                             if WIFI:
-                                result, do_response = sendEmail( tool["params"]["receiver"], tool["params"]["subject"], tool["params"]["content"] )
+                                result, do_response = sendEmail( params["receiver"], params["subject"], params["content"] )
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "openLink":
                             if WIFI:
                                 try:
-                                    query = tool["params"]["query"]
+                                    query = params["query"]
                                     result, do_response = openLink( query, False )
                                 except KeyError:
-                                    query = tool["params"]["link"]
+                                    query = params["link"]
                                     result, do_response = openLink( query, True )
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
@@ -3672,27 +5401,32 @@ def chat():
                                 result, do_response =f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "getTime":
                             result, do_response = getTime()
+                        elif tool["name"] == "createChart":
+                            if fast_called:
+                                result, do_response = "Erreur lors de la création du diagramme, veuillez aller en conversation longue pour l'affichage du diagramme", True
+                            else:
+                                result, do_response = createChart( params["type"], params["title"], params["data"], params["x-axis-title"], params["y-axis-title"] )
                         elif tool["name"] == "startChrono":
                             result, do_response = startChrono()
                         elif tool["name"] == "stopChrono":
                             result, do_response = getChrono()
                         elif tool["name"] == "startTimer":
-                            result, do_response = startTimer( tool["params"]["message"], tool["params"]["duration"] )
+                            result, do_response = startTimer( params["message"], params["duration"] )
                         elif tool["name"] == "getRemainingTime":
                             result, do_response = getRemainingTimerTime()
                         elif tool["name"] == "openApp":
-                            result, do_response = openApp( tool["params"]["app"] )
+                            result, do_response = openApp( params["app"] )
                         elif tool["name"] == "doProtocol":
-                            result, do_response = doProtocol( tool["params"]["protocol"] )
+                            result, do_response = doProtocol( params["protocol"] )
                         elif tool["name"] == "playMusic":
                             if WIFI:
                                 # print( "ceci sera affiché" )
-                                # print( tool["params"] )
+                                # print( params )
                                 try:
-                                    _ = tool["params"]["volume"]
+                                    _ = params["volume"]
                                 except KeyError:
-                                    tool["params"]["volume"] = DEFAULT_VOLUME
-                                result, do_response = playMusic( tool["params"]["search"], tool["params"]["type"], tool["params"]["device"], tool["params"]["volume"] )
+                                    params["volume"] = DEFAULT_VOLUME
+                                result, do_response = playMusic( params["search"], params["type"], params["device"], params["volume"] )
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "recognizeMusic":
@@ -3702,23 +5436,23 @@ def chat():
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "setMusicState":
                             if WIFI:
-                                result, do_response = setMusicState( tool["params"]["state"] )
+                                result, do_response = setMusicState( params["state"] )
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "changeMusicTrack":
                             if WIFI:
-                                result, do_response = changeMusicTrack( tool["params"]["target"] )
+                                result, do_response = changeMusicTrack( params["target"] )
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "saveFile":
-                            result, do_response = saveFile( tool["params"]["name"], tool["params"]["content"] )
+                            result, do_response = saveFile( params["name"], params["content"] )
                         elif tool["name"] == "webSearch":
                             if WIFI:
-                                result, do_response = webSearch( tool["params"]["query"] )
+                                result, do_response = webSearch( params["query"] )
                             else:
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "setIncognito":
-                            incognito = tool["params"]["value"]
+                            incognito = params["value"]
                             if incognito:
                                 result = "Le mode incognito est activé"
                                 sendNotification( "Mode incognito", result )
@@ -3747,12 +5481,12 @@ def chat():
                             else:
                                 treating_response.join()
                                 Sound.waitForSoundTofinish()
-                                log( "Use sleepSystem", "call 1", "info" )
+                                log( "Use sleepSystem", "call 2", "info" )
                                 sleepSystem( True, AUDIO )
                         elif tool["name"] == "sleepSystem":
                             treating_response.join()
                             Sound.waitForSoundTofinish()
-                            log( "Use sleepSystem", "call 2", "info" )
+                            log( "Use sleepSystem", "call 3", "info" )
                             sleepSystem( True, AUDIO )
                         else:
                             result = f"No tool found for {tool["name"]}"
@@ -3796,7 +5530,7 @@ def chat():
                     if fast_called and not do_response:
                         treating_response.join()
                         Sound.waitForSoundTofinish()
-                        log( "Use sleepSystem", "call 3", "info" )
+                        log( "Use sleepSystem", "call 4", "info" )
                         sleepSystem( True, AUDIO )
                     # print( f"{do_response=}" )
                     if not_understand:
@@ -3839,11 +5573,11 @@ def chat():
                             )
                         
                         if fast_called and content["tools"] == []:
-                            content["tools"].append(
-                                {
-                                    "name": "sleepSystem"
-                                }
-                            )
+                            treating_response.join()
+                            Sound.waitForSoundTofinish()
+                            log( "Use sleepSystem", "call 5", "info" )
+                            sleepSystem( True, AUDIO )
+                            
                         # treated_text = treadTextResponse( content["message"] )
                         # GUI.setTextToDisplay( treated_text )
                         # print( f"{ASSISTANT_NAME} >", treated_text )

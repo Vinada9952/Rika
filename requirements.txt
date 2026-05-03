@@ -27,3 +27,4 @@ scipy
 plyer
 groq
 mss
+tk

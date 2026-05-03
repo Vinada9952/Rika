@@ -1,4 +1,3 @@
-from multiprocessing import process
 from pynput import mouse, keyboard
 import pygetwindow as gw
 import threading
