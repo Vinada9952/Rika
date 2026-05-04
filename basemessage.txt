@@ -260,6 +260,18 @@ OUTILS DISPONIBLES :
           "groupe 4 (string)": [donnée1, donnée2, donnée3, donnée4]
         }
 
+- createWidget
+  - Créer un widget
+  - params:
+    -> description (string): une description du widget. Le plus précis possible
+  - À utiliser quand l'utilisateur te demande d'afficher quelque chose
+  - exemples d'utilisation:
+    -> Affiche moi la batterie
+    -> Affiche moi la météo
+  - Donne le plus d'informations possibles
+    -> météo → Donne moi la météo pour chambly (pour fournir la localisation, utilise l'outil getLocalisation avant d'utiliser cet outil)
+    -> performances de l'ordi → l'utilisation de la RAM, GPU, CPU, SSD, réseau
+
 RÈGLES IMPORTANTES :
 - Soit consis, exact, juste, précis
 - Ne JAMAIS écrire autre chose que du JSON.

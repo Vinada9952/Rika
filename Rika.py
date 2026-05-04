@@ -308,6 +308,11 @@ class NotValidResponse( Exception ):
 
 loadPrint()#c
 
+class FunctionEnd( SystemExit ):
+    pass
+
+loadPrint()#c
+
 class ThreadWithReturnValue( threading.Thread ):
     
     def __init__(self, group=None, target=None, name=None,
@@ -518,14 +523,14 @@ class Sound:
             if type( voice ) == str:
                 communicate = edge_tts.Communicate( text, voice )
                 with sound_mutex:
-                    communicate.save_sync( "./cache/output.mp3" )
+                    communicate.save_sync( f"{CACHE_PATH}output.mp3" )
             else:
                 communicate = edge_tts.Communicate( text, voice["ShortName"] )
                 with sound_mutex:
-                    communicate.save( "./cache/output.mp3" )
+                    communicate.save( f"{CACHE_PATH}output.mp3" )
             
             # Vérifier que le fichier a été créé et n'est pas vide
-            if not os.path.exists( "./cache/output.mp3" ) or os.path.getsize( "./cache/output.mp3" ) == 0:
+            if not os.path.exists( f"{CACHE_PATH}output.mp3" ) or os.path.getsize( f"{CACHE_PATH}output.mp3" ) == 0:
                 pass
             else:
                 is_correctly_generated = True
@@ -537,7 +542,7 @@ class Sound:
         global sound_mutex, VOICE_VOLUME
         try:
             with sound_mutex:
-                pygame.mixer.music.load( "./cache/output.mp3" )
+                pygame.mixer.music.load( f"{CACHE_PATH}output.mp3" )
                 pygame.mixer.music.set_volume( VOICE_VOLUME )
             pygame.mixer.music.play()
         except pygame.error as e:
@@ -545,9 +550,9 @@ class Sound:
                 "Failed to load MP3 file",
                 {
                     "error": str( e ),
-                    "file": "./cache/output.mp3",
-                    "file_exists": os.path.exists( "./cache/output.mp3" ),
-                    "file_size": os.path.getsize( "./cache/output.mp3" ) if os.path.exists( "./cache/output.mp3" ) else 0
+                    "file": f"{CACHE_PATH}output.mp3",
+                    "file_exists": os.path.exists( f"{CACHE_PATH}output.mp3" ),
+                    "file_size": os.path.getsize( f"{CACHE_PATH}output.mp3" ) if os.path.exists( f"{CACHE_PATH}output.mp3" ) else 0
                 },
                 "warning"
             )
@@ -988,6 +993,7 @@ loadPrint()#c
 
 # models settings
 MAIN_MODEL = settings["models"]["main"]
+CODE_MODEL = settings["models"]["code"]
 VISION_MODEL = settings["models"]["vision"]
 ASK_MODEL = settings["models"]["data"]
 WEB_MODEL = settings["models"]["web"]
@@ -1071,6 +1077,18 @@ for element in settings["directories"]["apps-path"]["expand-user"]:
     )
 for element in settings["directories"]["apps-path"]["normal"]:
     SEARCH_DIRS.append( element )
+
+loadPrint()#c
+
+CACHE_PATH = settings["directories"]["cache"]["cache"]
+
+loadPrint()#c
+
+for element in os.listdir( CACHE_PATH ):
+    chemin = os.path.join( CACHE_PATH, element )
+    if os.path.isfile( chemin ):
+        os.remove( chemin )
+        # print( f"Supprimé : {chemin}" )
 
 loadPrint()#c
 
@@ -1442,6 +1460,18 @@ OUTILS DISPONIBLES :
           "groupe 3 (string)": [donnée1, donnée2, donnée3, donnée4],
           "groupe 4 (string)": [donnée1, donnée2, donnée3, donnée4]
         {"}"}
+
+- createWidget
+  - Créer un widget
+  - params:
+    -> description (string): une description du widget. Le plus précis possible
+  - À utiliser quand l'utilisateur te demande d'afficher quelque chose
+  - exemples d'utilisation:
+    -> Affiche moi la batterie
+    -> Affiche moi la météo
+  - Donne le plus d'informations possibles
+    -> météo → Donne moi la météo pour chambly (pour fournir la localisation, utilise l'outil getLocalisation avant d'utiliser cet outil)
+    -> performances de l'ordi → l'utilisation de la RAM, GPU, CPU, SSD, réseau
 
 RÈGLES IMPORTANTES :
 - Essaie de donner le plus souvent possible quelque chose à dire dans la clé "message" tant que cela respecte les autres règles
@@ -3358,6 +3388,153 @@ def createChart( chart: str, title: str, data: dict, x_axis_title: str, y_axis_t
     except Exception as e:
         log( "Error while creating chart", {"error": str( e ), "data": data, "type": chart}, "error" )
         return f"Erreur lors de la création du diagramme : {str( e )}", True
+
+loadPrint()#c
+
+def widget( prompt, model = "openai/gpt-oss-120b", script: str = "script.py" ):
+    config = """
+### Par bibliothèque :
+- **pygame** : `screen.fill((0, 0, 0))` à chaque frame AVANT de dessiner le widget. Ne jamais utiliser `pygame.NOFRAME` seul sans le colorkey.
+- **tkinter** : `root.config(bg='black')` + `root.wm_attributes('-transparentcolor', 'black')` + appeler le bloc win32 ci-dessus APRÈS `root.update()`.
+
+⚠ L'appel win32 doit se faire APRÈS que la fenêtre est affichée (`root.update()` ou après `pygame.display.flip()` du premier frame), sinon le hwnd n'est pas encore valide.
+
+## Règles du widget
+
+- Couleur dominante : RGB(3, 232, 252)
+- Positionné dans un coin supérieur de l'écran (y > 0, jamais à 0)
+- Interface entièrement en français
+- Déplaçable via une barre de titre (haut ou bas du widget)
+- Bouton X fonctionnel pour fermer
+- Animation d'entrée au lancement
+- Widget toujours au premier plan (HWND_TOPMOST)
+- Non click-through : les clics ne passent PAS au travers
+- Interactif (les éléments UI répondent aux interactions)
+- Lever `raise SystemExit("script closed normally by user")` à la fermeture
+- Widget avec un fond transparent et éléments non-transparents
+- Ajoute le plus d'informations utiles possibles dans le widget, tant qu'elles sont en rapport avec le but du widget
+
+## Qualité du code
+
+- Vérifier l'absence d'erreurs avant de retourner le script
+- S'assurer que le déplacement, la fermeture et le z-order (topmost) fonctionnent correctement
+- Aucune clé API requise
+
+## Format de sortie — TOUJOURS retourner ce JSON exact, sans balises ```, tel quel :
+
+{
+    "message": "Réponse à l'utilisateur",
+    "script": "Le script Python complet",
+    "dependencies": ["nom_dep_1", "nom_dep_2"]
+}
+
+Règles du JSON :
+- "dependencies" : noms bruts uniquement (ex: "pywin32"), pas de commandes pip
+- Pas de markdown autour du JSON, pas de ```, retourner le JSON brut directement
+    """
+
+    conversation = [
+        {
+            "role": "system",
+            "content": config
+        }
+    ]
+
+    # prompt = """
+    # Le niveau de la batterie et les performances de l'ordi
+    # """
+
+    conversation.append(
+        {
+            "role": "user",
+            "content": "Fait moi ceci avec un fond transparent :\n" + prompt + "\nAssure toi que le widget soit interactif pour répondre aux demandes des configurations"
+        }
+    )
+    try:
+        while True:
+
+            print( f"asking {model}" )
+            raw_response = Model.askGroqModel( CODE_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+            # if raw_response == "":
+            #     print( "ai finished task, exiting..." )
+            #     raise FunctionEnd( "End of function" )
+            print( f"{raw_response=}" )
+            print( "writing" )
+            try:
+                response = json.loads( raw_response )
+                try:
+                    if response["script-finished"]:
+                        print( "ai finished task, exiting..." )
+                        raise FunctionEnd( "End of function" )
+                except KeyError:
+                    pass
+
+
+                print( json.dumps( response, indent=4 ) )
+
+                conversation.append(
+                    {
+                        "role": "assistant",
+                        "content": raw_response
+                    }
+                )
+                print( response["message"] )
+                with open( script, "w", encoding="utf-8" ) as f:
+                    f.write( "# -*- coding: utf-8 -*-\n" )
+                    f.write( response["script"] )
+
+                try:
+                    _ = response["depedencies"]
+                    # print( "installing" )
+                    for dependecie in response["depedencies"]:
+                        command = f"pip3 install {dependecie}"
+                        print( f"Installing : {command}" )
+                        os.system( command )
+                except KeyError:
+                    pass
+
+                print( "executing" )
+                try:
+                    result = subprocess.run( ["python3", f"./{script}"], capture_output=True, text=True, check=True )
+                    # Vérifier aussi s'il y a des erreurs dans stderr même si l'exécution a réussi
+                    if result.stderr:
+                        prompt = f"Avertissements ou erreurs lors de l'exécution:\n{result.stderr}"
+                        if result.stderr.lower().find( "script closed normally by user" ) != -1:
+                            raise FunctionEnd( "End of function" )
+                        print( result.stderr )
+                except subprocess.CalledProcessError as e:
+                    prompt = f"Erreur lors de l'exécution du script (code {e.returncode}):\n{e.stderr}"
+                    print( e.stderr )
+                    if e.stderr.lower().find( "script closed normally by user" ) != -1:
+                        raise FunctionEnd( "End of function" )
+                except Exception as e:
+                    prompt = str( e )
+                    print( e )
+                    if e.stderr.lower().find( "script closed normally by user" ) != -1:
+                        raise FunctionEnd( "End of function" )
+                
+                conversation.append(
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                )
+                Json.write( conversation, "a.json" )
+            except json.JSONDecodeError:
+                pass
+            except KeyError:
+                pass
+    except FunctionEnd:
+        return
+    except KeyboardInterrupt:
+        Json.write( conversation, "a.json" )
+
+loadPrint()#c
+
+def createWidget( description ):
+    widget_thread = threading.Thread( target=widget, args=( description, CODE_MODEL, f"{CACHE_PATH}{time.time()}.py" ) )
+    widget_thread.start()
+    return "Widget affiché avec succès", False
 
 loadPrint()#c
 
@@ -5406,6 +5583,11 @@ def chat():
                                 result, do_response = "Erreur lors de la création du diagramme, veuillez aller en conversation longue pour l'affichage du diagramme", True
                             else:
                                 result, do_response = createChart( params["type"], params["title"], params["data"], params["x-axis-title"], params["y-axis-title"] )
+                        elif tool["name"] == "createWidget":
+                            if WIFI:
+                                result, do_response = createWidget( params["description"] )
+                            else:
+                                result, do_response =f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "startChrono":
                             result, do_response = startChrono()
                         elif tool["name"] == "stopChrono":

@@ -201,7 +201,8 @@ base_settings = {
         "data": "llama-3.1-8b-instant",
         "vision": "meta-llama/llama-4-scout-17b-16e-instruct",
         "web": "openai/gpt-oss-20b",
-        "ollama": "gemma4"
+        "ollama": "gemma4",
+        "code": "openai/gpt-oss-safeguard-20b"
     },
     "email": {
         "email": email,

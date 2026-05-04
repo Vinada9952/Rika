@@ -22,3 +22,6 @@ tool execute python script
 disable rika after 10 second of inactivity
 optimise Rika
 fix fast_called and diagram
+fix recognition whisper
+fix fuse for recognition (use generic function for fuse model and add model in options)
+add protocols description
