@@ -16,4 +16,3 @@ add sound when user can speak
 tool to entirely close agent (closeSystem tool)
 optimise Rika
 fix fast_called and diagram
-add protocols description
