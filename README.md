@@ -10,6 +10,22 @@ Rika est un assistant intelligent en Python combinant :
 
 ---
 
+## 📦 PRÉREQUIS
+
+Avant de lancer l'installation, assure-toi d'avoir :
+
+- **Python 3.12** (version optimale recommandée)
+  - Téléchargement : https://www.python.org/downloads/release/python-3120/
+- **Ollama** installé et en cours d'exécution
+  - Téléchargement : https://ollama.com
+  - Après installation, démarre le service : `ollama serve`
+- **Dépendances Python** installées via pip :
+```bash
+  pip install -r requirements.txt
+```
+
+---
+
 ## ⚙️ INSTALLATION
 
 - Pour installer, exécuter le script `setup.py`
@@ -29,7 +45,7 @@ Le script `setup.py` :
   - utilisateur
   - email (optionnel)
   - Spotify (optionnel)
-  - nom de l’assistant + calibration vocale
+  - nom de l'assistant + calibration vocale
 
 ---
 

@@ -3535,6 +3535,8 @@ Règles du JSON :
                             raise FunctionEnd( "End of function" )
                         log( "Error for widget execution", {"error": result.stderr, "out": result.stdout}, "warning" )
                         # print( result.stderr )
+                    else:
+                        raise FunctionEnd( "End of function" )
                 except subprocess.CalledProcessError as e:
                     prompt = f"Erreur lors de l'exécution du script (code {e.returncode}):\n{e.stderr}"
                     # print( e.stderr )
