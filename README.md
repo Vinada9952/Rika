@@ -88,14 +88,14 @@ Le script `setup.py` :
   - Ou demander la mise en veille
 
 ⚠️ NOTE :
-L'input clavier ne fonctionne pas dans d'autres applications si le mode conversation est actif
+L'input clavier ne fonctionne pas dans d'autres applications si le mode conversation écrite est actif
 
 ---
 
 ## ⚙️ OPTIONS
 
 - Modifier les paramètres dans `settings.json`
-- Personnaliser l’overlay via les assets
+- Personnaliser l'overlay via les assets
 - Modifier :
   - voix
   - modèles IA
@@ -129,17 +129,17 @@ Commande finale
 ## 📁 STRUCTURE
 
 .
-├── Rika.py  
-├── gui.py  
-├── setup.py  
-├── settings.json  
-├── conversation.json  
-├── log.json  
-├── cache/  
-│   ├── output.mp3  
-│   ├── screenshots/  
-│   └── webcam/  
-└── assets/  
+├── Rika.py
+├── gui.py
+├── setup.py
+├── settings.json
+├── cache/
+│   ├── output.mp3
+│   ├── log.json
+│   ├── screenshots/
+│   └── webcam/
+└── assets/
+    └── conversation.json
 
 ---
 
