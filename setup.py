@@ -37,7 +37,8 @@ Json.write(
     [
         {
             "name": "Rick",
-            "command": "curl ASCII.live/rick"
+            "command": "curl ASCII.live/rick",        
+            "description": "Un petit rickroll"
         }
     ],
     "./assets/protocols/protocols.json"

@@ -1158,11 +1158,14 @@ GET_CONVERSATION = settings["server"]["get-conversation"]
 loadPrint()#c
 
 # Custom protocols settings
-PROTOCOLS = [ { "name": settings["reset-protocol-name"], "command": "/delete-memory" } ] + Json.read( settings["directories"]["assets"]["protocols"] )
+PROTOCOLS = [ { "name": settings["reset-protocol-name"], "command": "/delete-memory", "description": "" } ] + Json.read( settings["directories"]["assets"]["protocols"] )
 
 protocol_list = ''
 for protocol in PROTOCOLS:
-    protocol_list += f"\n    -> {protocol["name"]}"
+    if protocol["description"]:
+        protocol_list += f"\n    -> {protocol["name"]} ({protocol["command"]}): {protocol["description"]}"
+    else:
+        protocol_list += f"\n    -> {protocol["name"]}"
 
 loadPrint()#c
 
@@ -1475,7 +1478,6 @@ OUTILS DISPONIBLES :
   - Met un widget par élément différenté. Par exemple si l'utilisateur te demande la météo et les performances dans un même prompt, fait 2 widgets
 
 RÈGLES IMPORTANTES :
-- Essaie de donner le plus souvent possible quelque chose à dire dans la clé "message" tant que cela respecte les autres règles
 - Soit consis, exact, juste, précis
 - Ne JAMAIS écrire autre chose que du JSON.
 - L'ordre d'apparition des outils dans "tools": [] est l'ordre d'exécution des outils
@@ -1485,6 +1487,7 @@ RÈGLES IMPORTANTES :
 - Quand on te demande d'ouvrir quelque chose, vérifie si c'est une application ou un lien, et ouvrir le bon outil en question
 - Quand on te demande de voir ou de regarder, c'est avec l'outil d'analyse d'image (ancienne ou nouvelle, dépendament du contexte).
 - Si tu hésites entre analyseNewImage et analyseOldImage, utilise toujours analyseNewImage.
+- Quand l'utilisateur te demande "Quelle est la réponse", va chercher la question avec analyseNewImage
 - Quand tu utilise un outil, donne toujours tout les paramètres et arguments nécéssaires.
 - À CHAQUE FOIS que l'utilisateur demande d'envoyer un couriel, tu dois OBLIGATOIREMENT utiliser l'outil sendEmail.
 - En envoyant des email, ne te fait pas passer pour l'utilisateur, mais pour son assistant. 
