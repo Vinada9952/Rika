@@ -129,17 +129,17 @@ Commande finale
 ## 📁 STRUCTURE
 
 .
-├── Rika.py
-├── gui.py
-├── setup.py
-├── settings.json
-├── cache/
-│   ├── output.mp3
-│   ├── log.json
-│   ├── screenshots/
-│   └── webcam/
-└── assets/
-    └── conversation.json
+├── Rika.py  
+├── gui.py  
+├── setup.py  
+├── settings.json  
+├── cache/  
+│   ├── output.mp3  
+│   ├── log.json        
+│   ├── screenshots/  
+│   └── webcam/  
+└── assets/  
+    └── conversation.json   
 
 ---
 
