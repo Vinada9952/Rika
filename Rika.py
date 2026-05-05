@@ -1785,9 +1785,14 @@ class Model:
                 if model == MAIN_MODEL:
                     if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
                         reset_count += 1
-                        if reset_count == client_max:
-                            reset_count = 0
-                            autoEraseConversation()
+                        if client_max - 2 <= 0:
+                            if reset_count == client_max:
+                                reset_count = 0
+                                autoEraseConversation()
+                        else:
+                            if reset_count == client_max - 2:
+                                reset_count = 0
+                                autoEraseConversation()
             except NotValidResponse as e:
                 print( str( e ) )
                 log(
@@ -3463,7 +3468,7 @@ Règles du JSON :
 - Pas de markdown autour du JSON, pas de ```, retourner le JSON brut directement
 """
 
-    conversation = [
+    sub_conversation = [
         {
             "role": "system",
             "content": config
@@ -3474,7 +3479,7 @@ Règles du JSON :
     # Le niveau de la batterie et les performances de l'ordi
     # """
 
-    conversation.append(
+    sub_conversation.append(
         {
             "role": "user",
             "content": "Fait moi ceci avec un fond transparent :\n" + prompt + "\nAssure toi que le widget soit interactif pour répondre aux demandes des configurations"
@@ -3483,7 +3488,7 @@ Règles du JSON :
     try:
         while True:
 
-            raw_response = Model.askGroqModel( CODE_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+            raw_response = Model.askGroqModel( CODE_MODEL, sub_conversation, "high", MAX_RETRIES, Model.Verification.isJson )
             # if raw_response == "":
             #     print( "ai finished task, exiting..." )
             #     raise FunctionEnd( "End of function" )
@@ -3500,7 +3505,7 @@ Règles du JSON :
                 # print( json.dumps( response, indent=4 ) )
                 log( "Widget creation", {"message": "model formatted response", "response": response}, "info" )
 
-                conversation.append(
+                sub_conversation.append(
                     {
                         "role": "assistant",
                         "content": raw_response
@@ -3544,14 +3549,14 @@ Règles du JSON :
                     if e.stderr.lower().find( "script closed normally by user" ) != -1:
                         raise FunctionEnd( "End of function" )
                 
-                conversation.append(
+                sub_conversation.append(
                     {
                         "role": "user",
                         "content": prompt
                     }
                 )
-                # Json.write( conversation, "a.json" )
-                log( "Widget conversation", conversation, "info" )
+                # Json.write( sub_conversation, "a.json" )
+                log( "Widget sub_conversation", sub_conversation, "info" )
             except json.JSONDecodeError:
                 pass
             except KeyError:
@@ -3559,7 +3564,7 @@ Règles du JSON :
     except FunctionEnd:
         return
     except KeyboardInterrupt:
-        Json.write( conversation, "a.json" )
+        Json.write( sub_conversation, "a.json" )
 
 loadPrint()#c
 
