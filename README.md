@@ -157,10 +157,10 @@ Commande finale
 ## 🛠️ TROUBLESHOOTING
 
 - Envoyer les fichiers :
-  - `log.json`
+  - `log.json` (par défaut dans `./cache`)
   - `debug.json` (si présent)
 - Optionnel :
-  - `conversation.json` (historique)
+  - `conversation.json` (historique) (par défaut dans `assets`)
 
 Avec :
 - Description du bug
@@ -170,4 +170,4 @@ Avec :
 
 ## 🧠 AUTEUR
 
-Développé par Vincent Tuê Minh Boucher
+Développé par Vincent Tuê Minh Boucher ©

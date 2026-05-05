@@ -362,7 +362,7 @@ class Sound:
 
                             client = Model.getNextClient()
                             result = client.audio.transcriptions.create(
-                                model="whisper-large-v3",
+                                model=LISTEN_MODEL,
                                 file=("audio.wav", f, "audio/wav"),
                                 language="fr",
                                 response_format="text",
@@ -392,58 +392,46 @@ class Sound:
                 return sr_text
 
             config = """
-        Tu corriges une transcription vocale.
+Tu corriges une transcription vocale.
 
-        IMPORTANT :
-        - SR est souvent faux sur mots rares/tecnhiques
-        - Whisper hallucine souvent
+IMPORTANT :
+- SR est souvent faux sur mots rares/tecnhiques
+- Whisper hallucine souvent
 
-        Ta priorité ABSOLUE :
-        → garder les mots rares de Whisper
-        → garder la structure de SR
+Ta priorité ABSOLUE :
+→ garder les mots rares de Whisper
+→ garder la structure de SR
 
-        Règles STRICTES :
-        - N'invente RIEN
-        - Si un mot est différent entre les deux, choisis celui qui semble le plus adapté au contexte.
-        - Si aucun des 2 mots est adapté au contexte, choisis en un adapté au contexte (ex. Netherite et Minecraft)
-        - Si 2 mots peuvent être valide dans un même contexte, privilégie whisper
-        - Corrige les erreurs évidentes
-        - Phrase courte et naturelle
-        - Aucune explication
+Règles STRICTES :
+- N'invente RIEN
+- Si un mot est différent entre les deux, choisis celui qui semble le plus adapté au contexte.
+- Si aucun des 2 mots est adapté au contexte, choisis en un adapté au contexte (ex. Netherite et Minecraft)
+- Si 2 mots peuvent être valide dans un même contexte, privilégie whisper
+- Corrige les erreurs évidentes
+- Phrase courte et naturelle
+- Aucune explication
 
-        Exemples :
-        - SR: quelle est la meilleure couche dans Minecraft pour trouver de la NASA right
-        - WHISPER: Quelle est la meilleure couche en Minecraft pour trouver de la netherite ?
-        - result : Quelle est la meilleur couche dans Minecraft pour trouver le la netherite ?
+Exemples :
+- SR: quelle est la meilleure couche dans Minecraft pour trouver de la NASA right
+- WHISPER: Quelle est la meilleure couche en Minecraft pour trouver de la netherite ?
+- result : Quelle est la meilleur couche dans Minecraft pour trouver le la netherite ?
         """
 
             prompt = f"""
-        SR:
-        {sr_text}
+SR:
+{sr_text}
 
-        Whisper:
-        {whisper_text}
+Whisper:
+{whisper_text}
 
-        Phrase finale:
+Phrase finale:
         """
 
-            for i in range( MAX_RETRIES ):
-                try:
-                    
-                    client = Model.getNextClient()
-                    completion = client.chat.completions.create(
-                        model="llama-3.1-8b-instant",
-                        messages=[
-                            {"role": "system", "content": config},
-                            {"role": "user", "content": prompt}
-                        ],
-                        temperature=0.2,
-                    )
-
-                    return completion.choices[0].message.content.strip()
-
-                except:
-                    return sr_text or whisper_text or -2
+            try:
+                response = Model.askGroqModel( FUSE_MODEL, [{"role": "system", "content": config}, {"role": "user", "content": prompt}], "low", MAX_RETRIES, Model.Verification.rawResponse )
+                return response
+            except:
+                return sr_text or whisper_text or -2
 
         r = sr.Recognizer()
 
@@ -658,7 +646,7 @@ def log( message, info, level ):
                 "info": info
             }
         )
-    Json.write( logs, "log.json" )
+    Json.write( logs, LOG_PATH )
 
 loadPrint()#c
 
@@ -998,6 +986,8 @@ loadPrint()#c
 
 # models settings
 MAIN_MODEL = settings["models"]["main"]
+LISTEN_MODEL = settings["models"]["listen"]
+FUSE_MODEL = settings["models"]["fuse"]
 CODE_MODEL = settings["models"]["code"]
 VISION_MODEL = settings["models"]["vision"]
 ASK_MODEL = settings["models"]["data"]
@@ -1086,6 +1076,7 @@ for element in settings["directories"]["apps-path"]["normal"]:
 loadPrint()#c
 
 CACHE_PATH = settings["directories"]["cache"]["cache"]
+LOG_PATH = settings["directories"]["cache"]["log"]
 
 loadPrint()#c
 
@@ -1151,6 +1142,10 @@ for playlist in PLAYLISTS:
 
 loadPrint()#c
 
+NOTIFICATIONS = settings["gui"]["notifications"]
+
+loadPrint()#c
+
 THEME_COLOR = settings["gui"]["color"]
 
 loadPrint()#c
@@ -1175,7 +1170,7 @@ loadPrint()#c
 def getAllAppsThread():
     global APPLICATIONS
     APPLICATIONS = getAllApps()
-    sendNotification( "Applications chargées.", "Scan des applications installés terminées" )
+    sendNotification( "Scan des applications installés terminées" )
 
 get_all_apps_thread = threading.Thread( target=getAllAppsThread, name="scanapps" )
 get_all_apps_thread.start()
@@ -1188,7 +1183,7 @@ treating_response = Substitute()
 loadPrint()#c
 
 # Conversation settings
-conversation = Json.read( "./conversation.json" )
+conversation = Json.read( settings["directories"]["assets"]["conversation"] )
 if SERVER_URL:
     data = requests.get( f"{SERVER_URL}/{GET_CONVERSATION}" )
     conversation = data.json()
@@ -1610,13 +1605,14 @@ check_audio_call = threading.Thread( target=checkAudioCall, name="Check voice ca
 
 loadPrint()#c
 
-def sendNotification(title, message):
-    notification.notify(
-        title=title,
-        message=message,
-        app_name='MonApp',
-        timeout=3
-    )
+def sendNotification( message ):
+    if NOTIFICATIONS:
+        notification.notify(
+            title=ASSISTANT_NAME,
+            message=message,
+            app_name='MonApp',
+            timeout=3
+        )
 
 loadPrint()#c
 
@@ -3569,6 +3565,7 @@ Règles du JSON :
 loadPrint()#c
 
 def createWidget( description ):
+    sendNotification( "Widget créé" )
     widget_thread = threading.Thread( target=widget, args=( description, CODE_MODEL, f"{CACHE_PATH}{time.time()}.py" ) )
     widget_thread.start()
     return "Widget affiché avec succès", False
@@ -4072,7 +4069,7 @@ def doProtocol( name ):
                     if SERVER_URL:
                         requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
                     Json.write( conversation, "./conversation.json" )
-                sendNotification( "Mémoire effacée", "Votre historique a été effacé pour alléger la conversation" )
+                sendNotification( "Historique effacé pour alléger la conversation" )
             else:
                 subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
             break
@@ -4311,7 +4308,7 @@ loadPrint()#c
 
 def whenTimerFinished( say, audio ):
     global conversation
-    sendNotification( "Timer terminé", say )
+    sendNotification( say )
     if audio:
         Sound.waitForSoundTofinish()
         Sound.generateVoice( say, VOICE )
@@ -5050,7 +5047,7 @@ def sendEmail( receiver: str, subject: str, text: str ):
             server.starttls()
             server.login( EMAIL, EMAIL_PASSWORD )
             server.sendmail( EMAIL, receiver, msg.as_string() )
-        sendNotification( "Email envoyé", f"email envoyé à {receiver}" )
+        sendNotification( f"email envoyé à {receiver}" )
         log( "Email sent", "", 'info' )
     except Exception as e:
         log( "Email error", str( e ), 'error' )
@@ -5674,7 +5671,7 @@ def chat():
                             incognito = params["value"]
                             if incognito:
                                 result = "Le mode incognito est activé"
-                                sendNotification( "Mode incognito", result )
+                                sendNotification( "Mode incognito : " + str( result ) )
                             else:
                                 with conversation_mutex:
                                     conversation.append(
@@ -5684,7 +5681,7 @@ def chat():
                                         }
                                     )
                                 result = "Le mode incognito est désactivé"
-                                sendNotification( "Mode incognito", result )
+                                sendNotification( "Mode incognito : " + str( result ) )
                                 private_history = []
                             do_response = False
                         elif tool["name"] == "getIncognito":

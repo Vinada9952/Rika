@@ -169,12 +169,14 @@ base_settings = {
             "screenshots": "./cache/screenshots/",
             "cache": "./cache/",
             "webcam": "./cache/captured.jpg",
+            "log": "./cache/log.json"
         },
         "assets": {
             "protocols": "./assets/protocols/protocols.json",
             "contacts": "./assets/contacts.json",
             "playlists": "./assets/playlists.json",
-            "usernote": "./assets/usernote.txt"
+            "usernote": "./assets/usernote.txt",
+            "conversation": "./assets/conversation.json"
         },
         "apps-path": {
             "get-env":[
@@ -202,7 +204,9 @@ base_settings = {
         "vision": "meta-llama/llama-4-scout-17b-16e-instruct",
         "web": "openai/gpt-oss-20b",
         "ollama": "gemma4",
-        "code": "openai/gpt-oss-safeguard-20b"
+        "code": "openai/gpt-oss-safeguard-20b",
+        "fuse": "llama-3.1-8b-instant",
+        "listen": "whisper-large-v3"
     },
     "email": {
         "email": email,
@@ -224,7 +228,8 @@ base_settings = {
     "gui":{
         "color": [ 3, 232, 252 ],
         "font": "./assets/gui/Nasalization Rg.otf",
-        "communication-port": 6789
+        "communication-port": 6789,
+        "notifications": True
     },
     "reset-protocol-name": "Mémoire Saturée",
     "spotify-player": {
