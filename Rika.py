@@ -3413,24 +3413,6 @@ Les éléments UI (barre, boutons, texte) sont dessinés par-dessus en couleurs 
 - Si du noir est nécessaire dans le design, utiliser #010101
 - Le fond apparaîtra transparent à l'écran grâce au colorkey — c'est le comportement voulu
 
-### Gestion des clics (click-through sélectif) :
-Le widget est click-through partout SAUF sur la barre de titre et le bouton X.
-On alterne WS_EX_TRANSPARENT dynamiquement selon la position de la souris :
-
-- Quand la souris entre dans la zone interactive (barre titre + bouton X) :
-  Retirer WS_EX_TRANSPARENT → le widget capte les clics
-
-- Quand la souris quitte la zone interactive :
-  Remettre WS_EX_TRANSPARENT → les clics passent au travers
-
-def set_click_through(hwnd, enabled):
-    style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
-    if enabled:
-        style |= win32con.WS_EX_TRANSPARENT
-    else:
-        style &= ~win32con.WS_EX_TRANSPARENT
-    win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, style)
-
 ### tkinter (ordre STRICT) :
 1. root.config(bg='black')
 2. root.overrideredirect(True)
@@ -3438,29 +3420,25 @@ def set_click_through(hwnd, enabled):
 4. root.wm_attributes('-transparentcolor', 'black')
 5. root.update()
 6. bloc win32 (voir ci-dessous)
-7. Binder <Enter> et <Leave> sur la barre de titre et le bouton X → appeler set_click_through() selon la zone
 
 ### Initialisation win32 (après root.update()) :
 hwnd = int(root.wm_frame(), 16)
 
 win32gui.SetWindowLong(
     hwnd, win32con.GWL_EXSTYLE,
-    (win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED | win32con.WS_EX_TRANSPARENT) & ~win32con.WS_EX_APPWINDOW
+    (win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED) & ~win32con.WS_EX_APPWINDOW
 )
 win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(0, 0, 0), 0, win32con.LWA_COLORKEY)
 win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
-# Le widget démarre en mode click-through, devient interactif quand la souris entre dans une zone active
 
 ## Règles du widget
 
 - Couleur thème : RGB{THEME_COLOR}
 - Le fond (corps) du widget est noir (0,0,0) — transparent grâce au colorkey
-- Positionné dans un coin supérieur de l'écran (y > 0, jamais à 0)
+- Positionné dans un coin supérieur de l'écran (y > 0, x > 0, jamais à 0)
 - Interface entièrement en français
-- Déplaçable via la barre de titre uniquement
-- Bouton X sur la barre de titre pour fermer
-- Barre de titre + bouton X = zones interactives (non click-through)
-- Tout le reste du widget = click-through
+- Déplaçable via une barre de titre en haut du widget
+- Bouton X sur la barre de titre pour fermer le widget
 - Animation d'entrée au lancement
 - Widget toujours au premier plan (HWND_TOPMOST)
 - Lever raise SystemExit("script closed normally by user") à la fermeture avec le bouton X
