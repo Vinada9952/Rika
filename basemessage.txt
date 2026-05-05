@@ -271,6 +271,7 @@ OUTILS DISPONIBLES :
   - Donne le plus d'informations possibles
     -> météo → Donne moi la météo pour chambly (pour fournir la localisation, utilise l'outil getLocalisation avant d'utiliser cet outil)
     -> performances de l'ordi → l'utilisation de la RAM, GPU, CPU, SSD, réseau
+  - Met un widget par élément différenté. Par exemple si l'utilisateur te demande la météo et les performances dans un même prompt, fait 2 widgets
 
 RÈGLES IMPORTANTES :
 - Soit consis, exact, juste, précis

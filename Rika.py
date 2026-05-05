@@ -644,15 +644,20 @@ def hasWifiAccess( url = "http://www.google.com", timeout = 3 ) -> bool:
 
 loadPrint()#c
 
+log_mutex = threading.Lock()
+
+loadPrint()#c
+
 logs = []
 def log( message, info, level ):
-    logs.append(
-        {
-            "level": level,
-            "message": message,
-            "info": info
-        }
-    )
+    with log_mutex:
+        logs.append(
+            {
+                "level": level,
+                "message": message,
+                "info": info
+            }
+        )
     Json.write( logs, "log.json" )
 
 loadPrint()#c
@@ -1472,6 +1477,7 @@ OUTILS DISPONIBLES :
   - Donne le plus d'informations possibles
     -> météo → Donne moi la météo pour chambly (pour fournir la localisation, utilise l'outil getLocalisation avant d'utiliser cet outil)
     -> performances de l'ordi → l'utilisation de la RAM, GPU, CPU, SSD, réseau
+  - Met un widget par élément différenté. Par exemple si l'utilisateur te demande la météo et les performances dans un même prompt, fait 2 widgets
 
 RÈGLES IMPORTANTES :
 - Essaie de donner le plus souvent possible quelque chose à dire dans la clé "message" tant que cela respecte les autres règles
@@ -3392,26 +3398,72 @@ def createChart( chart: str, title: str, data: dict, x_axis_title: str, y_axis_t
 loadPrint()#c
 
 def widget( prompt, model = "openai/gpt-oss-120b", script: str = "script.py" ):
-    config = """
-### Par bibliothèque :
-- **pygame** : `screen.fill((0, 0, 0))` à chaque frame AVANT de dessiner le widget. Ne jamais utiliser `pygame.NOFRAME` seul sans le colorkey.
-- **tkinter** : `root.config(bg='black')` + `root.wm_attributes('-transparentcolor', 'black')` + appeler le bloc win32 ci-dessus APRÈS `root.update()`.
+    config = f"""
+Tu es un expert Python qui génère des widgets graphiques avec tkinter sur Windows 11 (Python 3.12).
 
-⚠ L'appel win32 doit se faire APRÈS que la fenêtre est affichée (`root.update()` ou après `pygame.display.flip()` du premier frame), sinon le hwnd n'est pas encore valide.
+## Mécanisme de transparence — CRITIQUE
+
+Le colorkey fonctionne ainsi : tout pixel RGB(0,0,0) exact = invisible à l'écran.
+Le fond de la fenêtre EST noir (0,0,0) — il sera donc transparent visuellement.
+Les éléments UI (barre, boutons, texte) sont dessinés par-dessus en couleurs non-noires.
+
+### Règles absolues :
+- root.config(bg='black') — le fond DOIT être noir pur
+- Les éléments UI utilisent des couleurs NON-noires (jamais #000000 / (0,0,0) / 'black' sur un élément visible)
+- Si du noir est nécessaire dans le design, utiliser #010101
+- Le fond apparaîtra transparent à l'écran grâce au colorkey — c'est le comportement voulu
+
+### Gestion des clics (click-through sélectif) :
+Le widget est click-through partout SAUF sur la barre de titre et le bouton X.
+On alterne WS_EX_TRANSPARENT dynamiquement selon la position de la souris :
+
+- Quand la souris entre dans la zone interactive (barre titre + bouton X) :
+  Retirer WS_EX_TRANSPARENT → le widget capte les clics
+
+- Quand la souris quitte la zone interactive :
+  Remettre WS_EX_TRANSPARENT → les clics passent au travers
+
+def set_click_through(hwnd, enabled):
+    style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+    if enabled:
+        style |= win32con.WS_EX_TRANSPARENT
+    else:
+        style &= ~win32con.WS_EX_TRANSPARENT
+    win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, style)
+
+### tkinter (ordre STRICT) :
+1. root.config(bg='black')
+2. root.overrideredirect(True)
+3. Tous les Frame/Canvas enfants avec bg NON-noir
+4. root.wm_attributes('-transparentcolor', 'black')
+5. root.update()
+6. bloc win32 (voir ci-dessous)
+7. Binder <Enter> et <Leave> sur la barre de titre et le bouton X → appeler set_click_through() selon la zone
+
+### Initialisation win32 (après root.update()) :
+hwnd = int(root.wm_frame(), 16)
+
+win32gui.SetWindowLong(
+    hwnd, win32con.GWL_EXSTYLE,
+    (win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE) | win32con.WS_EX_LAYERED | win32con.WS_EX_TRANSPARENT) & ~win32con.WS_EX_APPWINDOW
+)
+win32gui.SetLayeredWindowAttributes(hwnd, win32api.RGB(0, 0, 0), 0, win32con.LWA_COLORKEY)
+win32gui.SetWindowPos(hwnd, win32con.HWND_TOPMOST, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE)
+# Le widget démarre en mode click-through, devient interactif quand la souris entre dans une zone active
 
 ## Règles du widget
 
-- Couleur dominante : RGB(3, 232, 252)
+- Couleur thème : RGB{THEME_COLOR}
+- Le fond (corps) du widget est noir (0,0,0) — transparent grâce au colorkey
 - Positionné dans un coin supérieur de l'écran (y > 0, jamais à 0)
 - Interface entièrement en français
-- Déplaçable via une barre de titre (haut ou bas du widget)
-- Bouton X fonctionnel pour fermer
+- Déplaçable via la barre de titre uniquement
+- Bouton X sur la barre de titre pour fermer
+- Barre de titre + bouton X = zones interactives (non click-through)
+- Tout le reste du widget = click-through
 - Animation d'entrée au lancement
 - Widget toujours au premier plan (HWND_TOPMOST)
-- Non click-through : les clics ne passent PAS au travers
-- Interactif (les éléments UI répondent aux interactions)
-- Lever `raise SystemExit("script closed normally by user")` à la fermeture
-- Widget avec un fond transparent et éléments non-transparents
+- Lever raise SystemExit("script closed normally by user") à la fermeture avec le bouton X
 - Ajoute le plus d'informations utiles possibles dans le widget, tant qu'elles sont en rapport avec le but du widget
 
 ## Qualité du code
@@ -3422,16 +3474,16 @@ def widget( prompt, model = "openai/gpt-oss-120b", script: str = "script.py" ):
 
 ## Format de sortie — TOUJOURS retourner ce JSON exact, sans balises ```, tel quel :
 
-{
+{"{"}
     "message": "Réponse à l'utilisateur",
     "script": "Le script Python complet",
     "dependencies": ["nom_dep_1", "nom_dep_2"]
-}
+{"}"}
 
 Règles du JSON :
 - "dependencies" : noms bruts uniquement (ex: "pywin32"), pas de commandes pip
 - Pas de markdown autour du JSON, pas de ```, retourner le JSON brut directement
-    """
+"""
 
     conversation = [
         {
@@ -3453,24 +3505,22 @@ Règles du JSON :
     try:
         while True:
 
-            print( f"asking {model}" )
             raw_response = Model.askGroqModel( CODE_MODEL, conversation, "high", MAX_RETRIES, Model.Verification.isJson )
             # if raw_response == "":
             #     print( "ai finished task, exiting..." )
             #     raise FunctionEnd( "End of function" )
-            print( f"{raw_response=}" )
-            print( "writing" )
+            log( "Widget creation", f"model raw response : {raw_response}", "info" )
             try:
                 response = json.loads( raw_response )
                 try:
                     if response["script-finished"]:
-                        print( "ai finished task, exiting..." )
                         raise FunctionEnd( "End of function" )
                 except KeyError:
                     pass
 
 
-                print( json.dumps( response, indent=4 ) )
+                # print( json.dumps( response, indent=4 ) )
+                log( "Widget creation", {"message": "model formatted response", "response": response}, "info" )
 
                 conversation.append(
                     {
@@ -3478,7 +3528,7 @@ Règles du JSON :
                         "content": raw_response
                     }
                 )
-                print( response["message"] )
+                # print( response["message"] )
                 with open( script, "w", encoding="utf-8" ) as f:
                     f.write( "# -*- coding: utf-8 -*-\n" )
                     f.write( response["script"] )
@@ -3493,23 +3543,26 @@ Règles du JSON :
                 except KeyError:
                     pass
 
-                print( "executing" )
+                # print( "executing" )
                 try:
                     result = subprocess.run( ["python3", f"./{script}"], capture_output=True, text=True, check=True )
                     # Vérifier aussi s'il y a des erreurs dans stderr même si l'exécution a réussi
                     if result.stderr:
-                        prompt = f"Avertissements ou erreurs lors de l'exécution:\n{result.stderr}"
+                        prompt = f"Avertissements ou erreurs lors de l'exécution:\n{result.stderr}\nSortie du programme:\n{result.stdout}"
                         if result.stderr.lower().find( "script closed normally by user" ) != -1:
                             raise FunctionEnd( "End of function" )
-                        print( result.stderr )
+                        log( "Error for widget execution", {"error": result.stderr, "out": result.stdout}, "warning" )
+                        # print( result.stderr )
                 except subprocess.CalledProcessError as e:
                     prompt = f"Erreur lors de l'exécution du script (code {e.returncode}):\n{e.stderr}"
-                    print( e.stderr )
+                    # print( e.stderr )
+                    log( "Error for widget execution", {"error": str( e ), "info": e.stderr}, "warning" )
                     if e.stderr.lower().find( "script closed normally by user" ) != -1:
                         raise FunctionEnd( "End of function" )
                 except Exception as e:
-                    prompt = str( e )
-                    print( e )
+                    prompt = f"Erreur lors de l'exécution du script (code {e.returncode}):\n{e.stderr}"
+                    # print( e )
+                    log( "Error for widget execution", {"error": str( e ), "info": e.stderr}, "warning" )
                     if e.stderr.lower().find( "script closed normally by user" ) != -1:
                         raise FunctionEnd( "End of function" )
                 
@@ -3519,7 +3572,8 @@ Règles du JSON :
                         "content": prompt
                     }
                 )
-                Json.write( conversation, "a.json" )
+                # Json.write( conversation, "a.json" )
+                log( "Widget conversation", conversation, "info" )
             except json.JSONDecodeError:
                 pass
             except KeyError:
