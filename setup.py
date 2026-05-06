@@ -201,12 +201,11 @@ base_settings = {
     },
     "models": {
         "main": "openai/gpt-oss-120b",
-        "data": "llama-3.1-8b-instant",
+        "simple": "llama-3.1-8b-instant",
         "vision": "meta-llama/llama-4-scout-17b-16e-instruct",
         "web": "openai/gpt-oss-20b",
         "ollama": "gemma4",
         "code": "openai/gpt-oss-safeguard-20b",
-        "fuse": "llama-3.1-8b-instant",
         "listen": "whisper-large-v3"
     },
     "email": {

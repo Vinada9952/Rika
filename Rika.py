@@ -299,12 +299,20 @@ def loadPrint():
 loadPrint()#c
 
 class ExitAgent( Exception ):
-    pass
+    def __init__(self, message):
+        log( "ExitAgent", message, "error" )
 
 loadPrint()#c
 
 class NotValidResponse( Exception ):
-    pass
+    def __init__(self, message):
+        log( "NotValidResponse", message, "error" )
+
+loadPrint()#c
+
+class NoResponseError( Exception ):
+    def __init__(self, message):
+        log( "NoResponseError", message, "error" )
 
 loadPrint()#c
 
@@ -428,7 +436,7 @@ Phrase finale:
         """
 
             try:
-                response = Model.askGroqModel( FUSE_MODEL, [{"role": "system", "content": config}, {"role": "user", "content": prompt}], "low", MAX_RETRIES, Model.Verification.rawResponse )
+                response = Model.askGroqModel( SIMPLE_MODEL, [{"role": "system", "content": config}, {"role": "user", "content": prompt}], "low", MAX_RETRIES, Model.Verification.rawResponse )
                 return response
             except:
                 return sr_text or whisper_text or -2
@@ -638,15 +646,18 @@ loadPrint()#c
 
 logs = []
 def log( message, info, level ):
+    global logs
+    item = {
+        "level": level,
+        "message": message,
+        "info": info,
+        "moment": time.time()
+    }
     with log_mutex:
-        logs.append(
-            {
-                "level": level,
-                "message": message,
-                "info": info
-            }
-        )
-    Json.write( logs, LOG_PATH )
+        logs.append( item )
+        tmp = logs.copy()
+    tmp = sorted(tmp, key=lambda x: x['moment'])
+    Json.write( tmp, LOG_PATH )
 
 loadPrint()#c
 
@@ -987,10 +998,9 @@ loadPrint()#c
 # models settings
 MAIN_MODEL = settings["models"]["main"]
 LISTEN_MODEL = settings["models"]["listen"]
-FUSE_MODEL = settings["models"]["fuse"]
+SIMPLE_MODEL = settings["models"]["simple"]
 CODE_MODEL = settings["models"]["code"]
 VISION_MODEL = settings["models"]["vision"]
-ASK_MODEL = settings["models"]["data"]
 WEB_MODEL = settings["models"]["web"]
 OLLAMA_MODEL = settings["models"]["ollama"]
 MAX_RETRIES = settings["api"]["max-api-retries"]
@@ -1473,9 +1483,10 @@ OUTILS DISPONIBLES :
     -> Affiche moi la batterie
     -> Affiche moi la météo
   - Donne le plus d'informations possibles
-    -> météo → Donne moi la météo pour chambly (pour fournir la localisation, utilise l'outil getLocalisation avant d'utiliser cet outil)
-    -> performances de l'ordi → l'utilisation de la RAM, GPU, CPU, SSD, réseau
-  - Met un widget par élément différenté. Par exemple si l'utilisateur te demande la météo et les performances dans un même prompt, fait 2 widgets
+  - Exemples:
+    -> utilisateur: affiche moi la météo → description: widget météo pour (localisation, à chercher avec getLocalisation)
+    -> utilisateur: quelles sont les performances de l'ordi → description: utilisation RAM, GPU, CPU, SSD, réseau
+  - Met un widget pour chaque éléments différents. Par exemple si l'utilisateur te demande la météo et les performances dans un même prompt, fait 2 widgets
 
 RÈGLES IMPORTANTES :
 - Soit consis, exact, juste, précis
@@ -1679,7 +1690,6 @@ class Model:
         )
         # log( f"Asking model", f"{model=}, {message=}, {thinking=}, {max_retries=}, {verification.__name__}", "info" )
         global clients, WIFI
-        # openai/gpt-oss-120b ne supporte pas reasoning_effort, ne pas l'utiliser
         can_think = False
         can_web_search = True if model == WEB_MODEL else False
         # print( f"{model=}, {can_web_search=}" )
@@ -1806,7 +1816,7 @@ class Model:
         if ans and ans.strip():
             return ans
         # Si toutes les tentatives échouent, retourner la dernière réponse ou un message d'erreur
-        return "Erreur: Le modèle n'a pas pu générer une réponse valide après " + str(max_retries) + " tentatives."
+        raise NoResponseError( f"Le modèle n'a pas répondu de réponse valide après {max_retries} essais" )
     
     def getNextClient():
         global client_max, client_index, clients
@@ -1852,25 +1862,28 @@ def image_to_base64( path ):
 loadPrint()#c
 
 def webSearch( query: str ):
-    result = Model.askGroqModel(
-        WEB_MODEL,
-        [
-            {
-                "role": "system",
-                "content": """
-Va chercher sur internet la réponse à la question de l'utilisateur.
-"""
-            },
-            {
-                "role": "user",
-                "content": query
-            }
-        ],
-        "high",
-        MAX_RETRIES,
-        Model.Verification.rawResponse
-    )
-    print( result )
+    for i in range( MAX_RETRIES ):
+        try:
+            result = Model.askGroqModel(
+                WEB_MODEL,
+                [
+                    {
+                        "role": "system",
+                        "content": "Va chercher sur internet la réponse à la question de l'utilisateur."
+                    },
+                    {
+                        "role": "user",
+                        "content": query
+                    }
+                ],
+                "high",
+                MAX_RETRIES,
+                Model.Verification.rawResponse
+            )
+            print( result )
+            return result, True
+        except NoResponseError as e:
+            result = str( e )
     return result, True
 
 loadPrint()#c
@@ -3486,8 +3499,8 @@ Règles du JSON :
     )
     try:
         while True:
-
             raw_response = Model.askGroqModel( CODE_MODEL, sub_conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+            
             # if raw_response == "":
             #     print( "ai finished task, exiting..." )
             #     raise FunctionEnd( "End of function" )
@@ -3565,7 +3578,9 @@ Règles du JSON :
     except FunctionEnd:
         return
     except KeyboardInterrupt:
-        Json.write( sub_conversation, "a.json" )
+        Json.write( sub_conversation, "debug.json" )
+    except NoResponseError as e:
+        Json.write( sub_conversation, "debug.json" )
 
 loadPrint()#c
 
@@ -3944,29 +3959,34 @@ def openLink( query: str, is_direct_link ):
         if success:
             return f"ouverture de {query} réussie", False
         return f"ouverture de {query} raté", True
-    link = Model.askGroqModel(
-        WEB_MODEL,
-        [
-            {
-                "role": "system",
-                "content": """
-Ton role est de donner un lien web à entrer dans un navigateur.
-Tu dois uniquement donner le lien web et rien d'autre.
-Le lien que tu vas donner doit corresprondre le plus possible à la demande de l'utilisateur
-"""
-            },
-            {
-                "role": "user",
-                "content": query
-            }
-        ],
-        "high",
-        MAX_RETRIES,
-        Model.Verification.isLink
-    )
-    success = webbrowser.open( link )
-    if success:
-        return f"ouverture de {link} réussie", False
+    
+    for i in range( MAX_RETRIES ):
+        try:
+            link = Model.askGroqModel(
+                WEB_MODEL,
+                [
+                    {
+                        "role": "system",
+                        "content": """
+        Ton role est de donner un lien web à entrer dans un navigateur.
+        Tu dois uniquement donner le lien web et rien d'autre.
+        Le lien que tu vas donner doit corresprondre le plus possible à la demande de l'utilisateur
+        """
+                    },
+                    {
+                        "role": "user",
+                        "content": query
+                    }
+                ],
+                "high",
+                MAX_RETRIES,
+                Model.Verification.isLink
+            )
+            success = webbrowser.open( link )
+            if success:
+                return f"ouverture de {link} réussie", False
+        except NoResponseError as e:
+            pass
     return f"ouverture de {link} raté", True
 
 loadPrint()#c
@@ -3999,39 +4019,42 @@ loadPrint()#c
 def appPath( apps, app: str ):
     print( f"{apps=}" )
     for i in range( MAX_RETRIES ):
-        path = Model.askGroqModel(
-            "llama-3.1-8b-instant",
-            [
-                {
-                    "role": "system",
-                    "content": f"""
-Voici une liste d'applications :
-{json.dumps(apps, indent=4, ensure_ascii=False)}
-L'utilisateur va te donner un nom d'application, et tu dois UNIQUEMENT ressortir le nom de l'application.
-Tu dois ressortir UNIQUEMENT le nom, rien d'autre.
-Le nom de l'application doit correspondre à un des noms dans la liste avec la clé "name".
-Les applications n'ont pas tout le temps le même nom, tu dois donc choisir l'application qui correspond le mieux à la demande de l'utilisateur, en te basant sur la liste d'applications que je t'ai donnée.
-Ne ressort RIEN D'AUTRE que le nom, absolument rien d'autre, pas ton raisonnement, par tes doutes, uniquement un nom valide pour l'exécution de l'application demandée par l'utilisateur.
-Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésites
-"""
-                },
-                {
-                    "role": "user",
-                    "content": app
-                }
-            ],
-            "high",
-            MAX_RETRIES,
-            Model.Verification.rawResponse
-        )
-        print( f"Found path: {path}" )
-        found = False
-        for i in range( len( apps ) ):
-            if apps[i]["name"] == path:
-                found = True
-                return launchApp( apps[i] )
-        if found:
-            break
+        try:
+            path = Model.askGroqModel(
+                SIMPLE_MODEL,
+                [
+                    {
+                        "role": "system",
+                        "content": f"""
+    Voici une liste d'applications :
+    {json.dumps(apps, indent=4, ensure_ascii=False)}
+    L'utilisateur va te donner un nom d'application, et tu dois UNIQUEMENT ressortir le nom de l'application.
+    Tu dois ressortir UNIQUEMENT le nom, rien d'autre.
+    Le nom de l'application doit correspondre à un des noms dans la liste avec la clé "name".
+    Les applications n'ont pas tout le temps le même nom, tu dois donc choisir l'application qui correspond le mieux à la demande de l'utilisateur, en te basant sur la liste d'applications que je t'ai donnée.
+    Ne ressort RIEN D'AUTRE que le nom, absolument rien d'autre, pas ton raisonnement, par tes doutes, uniquement un nom valide pour l'exécution de l'application demandée par l'utilisateur.
+    Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésites
+    """
+                    },
+                    {
+                        "role": "user",
+                        "content": app
+                    }
+                ],
+                "high",
+                MAX_RETRIES,
+                Model.Verification.rawResponse
+            )
+            print( f"Found path: {path}" )
+            found = False
+            for i in range( len( apps ) ):
+                if apps[i]["name"] == path:
+                    found = True
+                    return launchApp( apps[i] )
+            if found:
+                break
+        except NoResponseError as e:
+            pass
     return f"Impossible de trouver l'application {app}", True
 
 loadPrint()#c
@@ -5239,7 +5262,10 @@ def analyseImage( type, prompt, renew ):
         return "Type invalide", True
 
     print( "ask model for vision" )
-    response = Model.askGroqModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
+    try:
+        response = Model.askGroqModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
+    except NoResponseError as e:
+        return f"Erreur lors de l'anaylse de l'image", True
 
     return f"voici le contenu de image. Ne te concentre que sur l'essentiel que {USERNAME} t'a demandé. Fait ce que {USERNAME} te demande de faire avec : " + response, True
 
@@ -5309,12 +5335,14 @@ def summarized( response: str ):
     if len( response.split( ' ' ) ) < 50:
         return response
     print( "ask model for summary" )
-    summary = Model.askGroqModel(
-        ASK_MODEL,
-        [
-            {
-                "role": "system",
-                "content": """
+    for i in range( MAX_RETRIES ):
+        try:
+            summary = Model.askGroqModel(
+                SIMPLE_MODEL,
+                [
+                    {
+                        "role": "system",
+                        "content": """
 Ressort moi uniquement du Json avec ce format exact, sans rien d'autre :
 {
     "message": "résumé du texte à dire à l'utilisateur, en français, concis. Garde le contenu général pour le raccourcir",
@@ -5325,18 +5353,20 @@ Ne coupe pas les phrases au milieu, garde les phrases entières.
 Raccourcis le message d'origine sans omettre d'informations importantes.
 Le résultat doit OBLIGATOIREMENT avoir moins de 50 mots
 Garde le plus d'informations importantes possible en respectant la limite de mots
-""",
-                "name": "instructions"
-            },
-            {
-                "role": "user",
-                "content": response
-            }
-        ],
-        "none",
-        MAX_RETRIES,
-        Model.Verification.isJson
-    )
+        """,
+                        "name": "instructions"
+                    },
+                    {
+                        "role": "user",
+                        "content": response
+                    }
+                ],
+                "none",
+                MAX_RETRIES,
+                Model.Verification.isJson
+            )
+        except NoResponseError as e:
+            return response
 
     try:
         return json.loads( summary )["message"]
@@ -5534,7 +5564,15 @@ def chat():
             if incognito:
                 print( "using private conversation" )
                 tmp.extend( private_history )
-            response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+            try:
+                response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+            except NoResponseError as e:
+                response = json.dumps(
+                    {
+                        "message": str( e ),
+                        "tools": []
+                    }
+                )
 
             content = json.loads( response )
             
@@ -5766,7 +5804,15 @@ def chat():
                         if incognito:
                             print( "using private conversation" )
                             tmp.extend( private_history )
-                        response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+                        try:
+                            response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+                        except NoResponseError as e:
+                            response = json.dumps(
+                                {
+                                    "message": str( e ),
+                                    "tools": []
+                                }
+                            )
                         content = json.loads( response )
                         try:
                             _ = content["tools"]

@@ -17,3 +17,4 @@ tool to entirely close agent (closeSystem tool)
 optimise Rika
 fix fast_called and diagram
 when widget close or something, it overloads the API
+add debug repo
