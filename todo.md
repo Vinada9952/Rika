@@ -2,7 +2,6 @@ upload files
 add output diagram in Json
 connect to school portal
 time for the user to refuse a prompt or the ai to find unintended prompts
-notifications
 make assistant resum video screenshot or webcam
 assistant can send documents in mails
 fix webcam index
@@ -16,5 +15,3 @@ add sound when user can speak
 tool to entirely close agent (closeSystem tool)
 optimise Rika
 fix fast_called and diagram
-when widget close or something, it overloads the API
-add debug repo

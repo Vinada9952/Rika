@@ -172,11 +172,8 @@ Commande finale
 
 ## 🛠️ TROUBLESHOOTING
 
-- Envoyer les fichiers :
-  - `log.json` (par défaut dans `./cache`)
-  - `debug.json` (si présent)
-- Optionnel :
-  - `conversation.json` (historique) (par défaut dans `assets`)
+Envoyez le contenu de `debug`, ainsi que `conversation.json` (généralement dans `assets`)
+VOUS ENVOYEREZ L'HISTORIQUE DE VOTRE CONVERSATION, FAITES ATTENTIONS SI VOUS AVEZ DES DONNÉES SENSIBLES
 
 Avec :
 - Description du bug

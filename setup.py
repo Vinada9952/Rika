@@ -172,6 +172,7 @@ base_settings = {
             "webcam": "./cache/captured.jpg",
             "log": "./cache/log.json"
         },
+        "debug": "./debug/",
         "assets": {
             "protocols": "./assets/protocols/protocols.json",
             "contacts": "./assets/contacts.json",

@@ -657,7 +657,7 @@ def log( message, info, level ):
         logs.append( item )
         tmp = logs.copy()
     tmp = sorted(tmp, key=lambda x: x['moment'])
-    Json.write( tmp, LOG_PATH )
+    Json.write( tmp, f"{DEBUG_PATH}log.json" )
 
 loadPrint()#c
 
@@ -1086,7 +1086,8 @@ for element in settings["directories"]["apps-path"]["normal"]:
 loadPrint()#c
 
 CACHE_PATH = settings["directories"]["cache"]["cache"]
-LOG_PATH = settings["directories"]["cache"]["log"]
+DEBUG_PATH = settings["directories"]["debug"]
+
 
 loadPrint()#c
 
@@ -3578,9 +3579,9 @@ Règles du JSON :
     except FunctionEnd:
         return
     except KeyboardInterrupt:
-        Json.write( sub_conversation, "debug.json" )
+        Json.write( sub_conversation, f"{DEBUG_PATH}conversation-debug-widget-{script}.json" )
     except NoResponseError as e:
-        Json.write( sub_conversation, "debug.json" )
+        Json.write( sub_conversation, f"{DEBUG_PATH}conversation-debug-widget-{script}.json" )
 
 loadPrint()#c
 
@@ -5898,8 +5899,8 @@ except KeyboardInterrupt:
     for message in conversation:
         if message["role"] == "assistant":
             message["content"] = json.loads( message["content"] )
-    Json.write( conversation, "./debug.json" )
-    
+    Json.write( conversation, f"{DEBUG_PATH}conversation-debug.json" )
+
 
     # Affichage formaté dans la console
     print( "\n📝 Debug conversation ( KeyboardInterrupt )\n" )
