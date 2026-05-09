@@ -33,6 +33,7 @@ class Json:
 os.makedirs( "./cache", exist_ok=True )
 os.makedirs( "./cache/screenshots", exist_ok=True )
 os.makedirs( "./assets/protocols/", exist_ok=True )
+os.makedirs( "./debug", exist_ok=True )
 Json.write(
     [
         {
