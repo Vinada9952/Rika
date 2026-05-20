@@ -2,6 +2,8 @@ import os
 import json
 import speech_recognition as sr
 
+os.system( "winget install ffmpeg" )
+
 def listen( language: str = "fr-FR" ):
         r = sr.Recognizer()
         with sr.Microphone() as source:
