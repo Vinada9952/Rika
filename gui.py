@@ -486,7 +486,13 @@ class TextInputSprite(pygame.sprite.Sprite):
         "¨i": "ï",
         "¨e": "ë",
         "¨a": "ä",
-        "~n": "ñ"
+        "~n": "ñ",
+        "^a": "â",
+        "^i": "î",
+        "^o": "ô",
+        "^u": "û",
+        "`u": "ù",
+        "`a": "à"
     }
 
     def __init__(self, pos: tuple, size: tuple):
