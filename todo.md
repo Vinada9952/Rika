@@ -17,4 +17,3 @@ optimise Rika
 fix fast_called and diagram
 agent can take note
 make real tool usage for token optimisation
-make difference between white and yellow ducks
