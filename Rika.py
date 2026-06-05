@@ -356,6 +356,7 @@ class Sound:
                 return ""
 
         def _recognize_whisper(audio_data, result_container):
+            tmp_path = None
             try:
                 wav_bytes = audio_data.get_wav_data()
 
@@ -363,11 +364,9 @@ class Sound:
                     tmp.write(wav_bytes)
                     tmp_path = tmp.name
 
-                
-                for i in range( MAX_RETRIES ):
+                for i in range(MAX_RETRIES):
                     try:
                         with open(tmp_path, "rb") as f:
-
                             client = Model.getNextClient()
                             result = client.audio.transcriptions.create(
                                 model=LISTEN_MODEL,
@@ -376,15 +375,15 @@ class Sound:
                                 response_format="text",
                                 prompt="Transcription de commandes vocales générales, langage naturel."
                             )
-
                         result_container["text"] = str(result).strip()
+                        break
                     except:
                         pass
-                    finally:
-                        os.unlink(tmp_path)
-
             except:
                 result_container["text"] = ""
+            finally:
+                if tmp_path and os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
 
         def _fuse_with_llm(sr_text, whisper_text):
             # Cas critiques
