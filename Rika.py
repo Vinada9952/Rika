@@ -1603,7 +1603,19 @@ def checkAudioCall():
                 for call_name in call_names:
                     for call in calls:
                         if call.lower() == call_name.lower():
-                            log( "call name found", json.dumps( {"full": question, "detected": call_name, "all": call_names, "agent": ASSISTANT_NAME}, indent=4 ), "info" )
+                            log(
+                                "call name found",
+                                json.dumps(
+                                    {
+                                        "full": question,
+                                        "detected": call_name,
+                                        "all": call_names,
+                                        "agent": ASSISTANT_NAME
+                                    },
+                                    indent=4
+                                ),
+                                "info"
+                            )
                             prompt = question.lower().replace( call_name.lower(), ASSISTANT_NAME )
                             if len( calls ) > 1:
                                 fast_called = True
