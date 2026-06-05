@@ -14,6 +14,6 @@ auto update wifi
 add sound when user can speak
 tool to entirely close agent (closeSystem tool)
 optimise Rika
-fix fast_called and diagram
+fix fast_called with diagram
 agent can take note
 make real tool usage for token optimisation
