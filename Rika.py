@@ -1123,6 +1123,11 @@ log( "Wifi connexion", WIFI, "info" )
 
 loadPrint()#c
 
+os.makedirs( "./cache", exist_ok=True )
+os.makedirs( "./cache/screenshots", exist_ok=True )
+
+loadPrint()#c
+
 # Spotify settings
 SPOTIFY_CLIENT_ID = settings["spotify-player"]["client-id"]
 SPOTIFY_CLIENT_SECRET = settings["spotify-player"]["client-secret"]
