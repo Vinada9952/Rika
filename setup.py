@@ -136,9 +136,11 @@ ask = getYesNoInput( "Voulez vous mettre un email pour l'agent ? (o/n) : ", "cho
 if ask.lower() == 'o':
     email = input( "Email de L'agent : " )
     pwd = input( "Mot de passe de l'agent pour l'email (https://myaccount.google.com/apppasswords)" )
+    user_pwd = input( "Mot de passe de votre email pour l'agent (https://myaccount.google.com/apppasswords)" )
 else:
     email = "No Email Available"
     pwd = "No Email Available"
+    user_pwd = "No Email Available"
 
 ask = getYesNoInput( "Voulez vous autoriser l'accès à spotify ? (o/n) : ", "choix invalide", ['o', 'n'] )
 if ask == 'o':
@@ -213,15 +215,18 @@ base_settings = {
         "listen": "whisper-large-v3"
     },
     "email": {
-        "email": email,
-        "pwd": pwd,
         "smtp": {
             "server": "smtp.gmail.com",
             "port": 587
         },
         "user-email": {
             "name": name,
-            "email": user
+            "email": user,
+            "pwd": user_pwd
+        },
+        "agent-email": {
+            "email": email,
+            "pwd": pwd
         }
     },
     "server": {

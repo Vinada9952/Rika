@@ -1049,8 +1049,8 @@ loadPrint()#c
 # Email settings
 SMTP_SERVER = settings["email"]["smtp"]["server"]
 SMTP_PORT = settings["email"]["smtp"]["port"]
-EMAIL = settings["email"]["email"]
-EMAIL_PASSWORD = settings["email"]["pwd"]
+EMAIL = settings["email"]["agent-email"]["email"]
+EMAIL_PASSWORD = settings["email"]["agent-email"]["pwd"]
 IMAP_SERVERS = {
     "gmail.com":      ("imap.gmail.com", 993),
     "googlemail.com": ("imap.gmail.com", 993),
@@ -1101,6 +1101,7 @@ loadPrint()#c
 # User info settings
 USERNAME = settings["email"]["user-email"]["name"]
 USER_EMAIL = settings["email"]["user-email"]["email"]
+PASSWORD = settings["email"]["user-email"]["pwd"]
 CONTACT_LIST = Json.read( settings["directories"]["assets"]["contacts"] )
 USERNOTE_DIRECTORY = settings["directories"]["assets"]["usernote"]
 
@@ -1593,6 +1594,10 @@ prompt = ""
 
 loadPrint()#c
 
+poncuation = '''!()-[]{};:'"\\,<>./?@#$%^&*_~'''
+
+loadPrint()#c
+
 def checkAudioCall():
     global called, fast_called, prompt
     while True:
@@ -1603,7 +1608,8 @@ def checkAudioCall():
             question = Sound.listenSRWhisper()
 
             if type( question ) == str:
-                calls = question.lower().split( ' ' )
+                formatted = question.translate( str.maketrans( '', '', poncuation ) )
+                calls = formatted.lower().split( ' ' )
                 for call_name in call_names:
                     for call in calls:
                         if call.lower() == call_name.lower():
@@ -1644,7 +1650,7 @@ def sendNotification( message ):
         notification.notify(
             title=ASSISTANT_NAME,
             message=message,
-            app_name='MonApp',
+            app_name=ASSISTANT_NAME,
             timeout=3
         )
 
@@ -5511,8 +5517,11 @@ def chat():
         # print( "getting emails" )
 
         if WIFI:
-            email_thread = ThreadWithReturnValue( target=getEmail, args=( EMAIL, EMAIL_PASSWORD ), name="read emails" )
-            email_thread.start()
+            agent_email_thread = ThreadWithReturnValue( target=getEmail, args=( EMAIL, EMAIL_PASSWORD ), name="read emails" )
+            agent_email_thread.start()
+
+            user_email_thread = ThreadWithReturnValue( target=getEmail, args=( USER_EMAIL, PASSWORD ), name="read user emails" )
+            user_email_thread.start()
         
         # print( "asking user" )
         treating_response.join()
@@ -5529,7 +5538,8 @@ def chat():
             user_input = getUserInput()
         # WIFI = hasWifiAccess()
         if WIFI:
-            emails = email_thread.join()
+            emails = agent_email_thread.join()
+            user_emails = user_email_thread.join()
             for email in emails:
                 if not incognito:
                     # print( "adding to regular conversation" )
@@ -5537,7 +5547,7 @@ def chat():
                         conversation.append(
                             {
                                 "role": "user",
-                                "content": "Email reçu :\n\n" + json.dumps( email, indent=4 ),
+                                "content": "Email reçu sur l'adresse de l'agent :\n\n" + json.dumps( email, indent=4 ),
                                 "name": "getEmail tool"
                             }
                         )
@@ -5546,7 +5556,27 @@ def chat():
                     private_history.append(
                         {
                             "role": "user",
-                            "content": "Email reçu :\n\n" + json.dumps( email, indent=4 ),
+                            "content": "Email reçu sur l'adresse de l'agent :\n\n" + json.dumps( email, indent=4 ),
+                            "name": "getEmail tool"
+                        }
+                    )
+            for email in user_emails:
+                if not incognito:
+                    # print( "adding to regular conversation" )
+                    with conversation_mutex:
+                        conversation.append(
+                            {
+                                "role": "user",
+                                "content": "Email reçu sur l'adresse de l'utilisateur :\n\n" + json.dumps( email, indent=4 ),
+                                "name": "getEmail tool"
+                            }
+                        )
+                else:
+                    # print( "adding to private conversation" )
+                    private_history.append(
+                        {
+                            "role": "user",
+                            "content": "Email reçu sur l'adresse de l'utilisateur :\n\n" + json.dumps( email, indent=4 ),
                             "name": "getEmail tool"
                         }
                     )
