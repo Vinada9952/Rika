@@ -435,7 +435,21 @@ Phrase finale:
         """
 
             try:
-                response = Model.askGroqModel( SIMPLE_MODEL, [{"role": "system", "content": config}, {"role": "user", "content": prompt}], "low", MAX_RETRIES, Model.Verification.rawResponse )
+                # response = Model.askGroqModel( SIMPLE_MODEL, [{"role": "system", "content": config}, {"role": "user", "content": prompt}], "low", MAX_RETRIES, Model.Verification.rawResponse )
+                response = Model.askModel(
+                    SIMPLE_MODEL,
+                    [
+                        {
+                            "role": "system",
+                            "content": config
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    verification=Model.Verification.rawResponse
+                )
                 return response
             except:
                 return sr_text or whisper_text or -2
@@ -1660,6 +1674,21 @@ client_index = 0
 client_max = len( clients )
 
 class Model:
+    def askModel(model: str, message, thinking: str = "high", max_retries: int = MAX_RETRIES, verification=None) -> str:
+        """
+        Interface unique pour interroger un modèle.
+        Détermine si l'appel doit passer par Groq ou Ollama.
+        """
+        if verification is None:
+            verification = Model.Verification.rawResponse
+
+        if model == OLLAMA_MODEL:
+            if not isinstance(message, list):
+                message = [message]
+            return Model.askOllamaModel(model, message)
+
+        return Model.askGroqModel(model, message, thinking, max_retries, verification)
+
     def askOllamaModel(model: str, conversation: List[Dict[str, str]]) -> str:
         # print( "asking ollama" )
         global ollama_client
@@ -1841,6 +1870,43 @@ class Model:
                 )
         if ans and ans.strip():
             return ans
+
+        # Si toutes les tentatives Groq échouent, tenter un fallback vers Ollama.
+        if model != OLLAMA_MODEL:
+            log(
+                "Groq fallback",
+                {
+                    "model": model,
+                    "message": message,
+                    "attempts": max_retries
+                },
+                "warning"
+            )
+            ollama_conversation = message if isinstance(message, list) else [message]
+            ollama_ans = Model.askOllamaModel(OLLAMA_MODEL, ollama_conversation)
+            if ollama_ans and ollama_ans.strip():
+                if verification.__name__ == "isJson":
+                    ollama_ans = ollama_ans.replace("```json", "").replace("```", "")
+                if verification(ollama_ans):
+                    return ollama_ans
+                log(
+                    "Ollama fallback response failed verification",
+                    {
+                        "response": ollama_ans,
+                        "verification": verification.__name__
+                    },
+                    "warning"
+                )
+            else:
+                log(
+                    "Ollama fallback returned empty response",
+                    {
+                        "response": ollama_ans,
+                        "model": OLLAMA_MODEL
+                    },
+                    "warning"
+                )
+
         # Si toutes les tentatives échouent, retourner la dernière réponse ou un message d'erreur
         raise NoResponseError( f"Le modèle n'a pas répondu de réponse valide après {max_retries} essais" )
     
@@ -1890,7 +1956,7 @@ loadPrint()#c
 def webSearch( query: str ):
     for i in range( MAX_RETRIES ):
         try:
-            result = Model.askGroqModel(
+            result = Model.askModel(
                 WEB_MODEL,
                 [
                     {
@@ -3525,7 +3591,7 @@ Règles du JSON :
     )
     try:
         while True:
-            raw_response = Model.askGroqModel( CODE_MODEL, sub_conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+            raw_response = Model.askModel( CODE_MODEL, sub_conversation, "high", MAX_RETRIES, Model.Verification.isJson )
             
             # if raw_response == "":
             #     print( "ai finished task, exiting..." )
@@ -3988,7 +4054,7 @@ def openLink( query: str, is_direct_link ):
     
     for i in range( MAX_RETRIES ):
         try:
-            link = Model.askGroqModel(
+            link = Model.askModel(
                 WEB_MODEL,
                 [
                     {
@@ -4046,7 +4112,7 @@ def appPath( apps, app: str ):
     print( f"{apps=}" )
     for i in range( MAX_RETRIES ):
         try:
-            path = Model.askGroqModel(
+            path = Model.askModel(
                 SIMPLE_MODEL,
                 [
                     {
@@ -5289,7 +5355,7 @@ def analyseImage( type, prompt, renew ):
 
     print( "ask model for vision" )
     try:
-        response = Model.askGroqModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
+        response = Model.askModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
     except NoResponseError as e:
         return f"Erreur lors de l'anaylse de l'image", True
 
@@ -5363,7 +5429,7 @@ def summarized( response: str ):
     print( "ask model for summary" )
     for i in range( MAX_RETRIES ):
         try:
-            summary = Model.askGroqModel(
+            summary = Model.askModel(
                 SIMPLE_MODEL,
                 [
                     {
@@ -5615,7 +5681,7 @@ def chat():
                 print( "using private conversation" )
                 tmp.extend( private_history )
             try:
-                response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+                response = Model.askModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
             except NoResponseError as e:
                 response = json.dumps(
                     {
@@ -5855,7 +5921,7 @@ def chat():
                             print( "using private conversation" )
                             tmp.extend( private_history )
                         try:
-                            response = Model.askGroqModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+                            response = Model.askModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
                         except NoResponseError as e:
                             response = json.dumps(
                                 {
