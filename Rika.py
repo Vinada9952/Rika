@@ -61,7 +61,7 @@ print( "Starting GUI..." )
 
 class Json:
     def write( informations: dict, json_name: str ):
-        json_object = json.dumps( informations, indent=4 )
+        json_object = json.dumps( informations, indent=4, default=str )
         with open( json_name, 'w', encoding="utf-8" ) as outfile:
             outfile.write( json_object )
     def read( json_name: str ):
@@ -1235,6 +1235,436 @@ conversation_mutex = threading.Lock()
 
 loadPrint()#c
 
+# TOOLS = [
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "getTime",
+#             "description": "Retourne la date et l'heure courante du système.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {},
+#                 "required": [],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "getLocalisation",
+#             "description": "Retourne la localisation de l'utilisateur.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {},
+#                 "required": [],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "getWeather",
+#             "description": "Retourne la météo de la localisation actuelle de l'utilisateur.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {},
+#                 "required": [],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "startChrono",
+#             "description": "Partir un chronomètre.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {},
+#                 "required": [],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "stopChrono",
+#             "description": "Arrêter le chronomètre et retourner le temps mesuré.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {},
+#                 "required": [],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "startTimer",
+#             "description": "Partir un timer.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "duration": {
+#                         "type": "integer",
+#                         "description": "Temps du timer, en secondes."
+#                     },
+#                     "message": {
+#                         "type": "string",
+#                         "description": "Message à dire à la fin du timer."
+#                     }
+#                 },
+#                 "required": ["duration", "message"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "getRemainingTime",
+#             "description": "Retourne le temps restant du timer en cours.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {},
+#                 "required": [],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "sleepSystem",
+#             "description": "Met l'assistant en veille lorsque l'utilisateur n'a plus besoin de lui.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {},
+#                 "required": [],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "analyseNewImage",
+#             "description": "Analyse une nouvelle image depuis une capture d'écran ou une webcam.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "source": {
+#                         "type": "string",
+#                         "enum": ["screenshot", "webcam"]
+#                     },
+#                     "prompt": {
+#                         "type": "string",
+#                         "description": "Ce que tu veux savoir de l'image."
+#                     }
+#                 },
+#                 "required": ["source", "prompt"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "analyseOldImage",
+#             "description": "Analyse une image précédemment capturée dans la conversation.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "source": {
+#                         "type": "string",
+#                         "enum": ["screenshot", "webcam"]
+#                     },
+#                     "prompt": {
+#                         "type": "string",
+#                         "description": "Ce que tu veux savoir de l'image."
+#                     }
+#                 },
+#                 "required": ["source", "prompt"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "openApp",
+#             "description": "Ouvre une application installée sur l'ordinateur.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "app": {
+#                         "type": "string",
+#                         "description": "Nom de l'application à ouvrir."
+#                     }
+#                 },
+#                 "required": ["app"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "openLink",
+#             "description": "Ouvre un lien internet ou effectue une recherche web.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "query": {
+#                         "type": "string",
+#                         "description": "Description ou lien à ouvrir."
+#                     },
+#                     "link": {
+#                         "type": "string",
+#                         "description": "Lien direct à ouvrir si nécessaire."
+#                     }
+#                 },
+#                 "required": ["query"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "sendEmail",
+#             "description": "Envoie un courriel à un destinataire. Liste de contacts disponible : " + CONTACT_NAMES,
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "receiver": {
+#                         "type": "string",
+#                         "description": "Destinataire de l'email.",
+#                         "enum": [contact["name"] for contact in CONTACT_LIST]
+#                     },
+#                     "subject": {
+#                         "type": "string",
+#                         "description": "Sujet de l'email."
+#                     },
+#                     "content": {
+#                         "type": "string",
+#                         "description": "Contenu de l'email."
+#                     }
+#                 },
+#                 "required": ["receiver", "subject", "content"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "doProtocol",
+#             "description": "Exécute un protocole prévu par le système. Liste des protocoles disponibles : " + protocol_list,
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "protocol": {
+#                         "type": "string",
+#                         "description": "Nom du protocole à utiliser.",
+#                         "enum": [protocol["name"] for protocol in PROTOCOLS]
+#                     }
+#                 },
+#                 "required": ["protocol"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "saveFile",
+#             "description": "Sauvegarde un fichier texte ou un script.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "name": {
+#                         "type": "string",
+#                         "description": "Nom du fichier à créer."
+#                     },
+#                     "content": {
+#                         "type": "string",
+#                         "description": "Contenu du fichier."
+#                     }
+#                 },
+#                 "required": ["name", "content"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "webSearch",
+#             "description": "Effectue une recherche sur le web.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "query": {
+#                         "type": "string",
+#                         "description": "Terme ou question à rechercher."
+#                     }
+#                 },
+#                 "required": ["query"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "playMusic",
+#             "description": "Joue de la musique sur Spotify. Liste des appareils disponibles : " + formatted_devices + ". Liste des playlists disponibles : " + playlists_formatted + "Volume par défaut : " + str( DEFAULT_VOLUME ) + "%",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "search": {
+#                         "type": "string",
+#                         "description": "Recherche à effectuer sur Spotify."
+#                     },
+#                     "type": {
+#                         "type": "string",
+#                         "description": "Type de contenu: track, album, artist ou playlist.",
+#                         "enum": ["track", "album", "artist", "playlist"]
+#                     },
+#                     "device": {
+#                         "type": "string",
+#                         "description": "Appareil sur lequel jouer la musique.",
+#                         "enum": DEVICES
+#                     },
+#                     "volume": {
+#                         "type": "integer",
+#                         "description": "Volume de lecture."
+#                     }
+#                 },
+#                 "required": ["search", "type", "device", "volume"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "setMusicState",
+#             "description": "Met la lecture de musique en pause ou reprend la lecture.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "state": {
+#                         "type": "boolean",
+#                         "description": "false pour mettre en pause, true pour reprendre."
+#                     }
+#                 },
+#                 "required": ["state"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "changeMusicTrack",
+#             "description": "Change la piste Spotify en cours.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "target": {
+#                         "type": "string",
+#                         "description": "next ou previous.",
+#                         "enum": ["next", "previous"]
+#                     }
+#                 },
+#                 "required": ["target"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "recognizeMusic",
+#             "description": "Reconnaît la musique qui joue.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {},
+#                 "required": [],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "setIncognito",
+#             "description": "Active ou désactive le mode incognito.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "value": {
+#                         "type": "boolean",
+#                         "description": "true pour activer, false pour désactiver."
+#                     }
+#                 },
+#                 "required": ["value"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "getIncognito",
+#             "description": "Retourne l'état actuel du mode incognito.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {},
+#                 "required": [],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "createChart",
+#             "description": "Crée un diagramme graphique à partir de données. Utilise cet outil pour répondre avec un graphique quand il y a des données, au lieu de les afficher directement. Exemples de format JSON : bandChart et lineChart utilisent un objet clef-valeur, pieChart utilise un objet de proportions, boxChart utilise un objet de listes de valeurs.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "type": {
+#                         "type": "string",
+#                         "description": "Type de diagramme: bandChart, pieChart, lineChart ou boxChart.",
+#                         "enum": ["barChart", "pieChart", "lineChart", "boxChart"]
+#                     },
+#                     "title": {
+#                         "type": "string",
+#                         "description": "Titre du diagramme."
+#                     },
+#                     "x_axis_title": {
+#                         "type": "string",
+#                         "description": "Titre de l'axe X du diagramme, si présent. Met le vide si pas nécessaire. Mets les unités de mesure s'il y en a."
+#                     },
+#                     "y_axis_title": {
+#                         "type": "string",
+#                         "description": "Titre de l'axe Y du diagramme, si présent. Met le vide si pas nécessaire. Mets les unités de mesure s'il y en a."
+#                     },
+#                     "data": {
+#                         "type": "object",
+#                         "description": "Données pour le diagramme. Le format dépend du type de diagramme :\n- bandChart : {\"A\": 10, \"B\": 20}\n- pieChart : {\"Partie 1\": 30, \"Partie 2\": 70}\n- lineChart : {\"Jour 1\": 5, \"Jour 2\": 15}\n- boxChart : {\"Groupe 1\": [1, 2, 3, 4], \"Groupe 2\": [2, 3, 5, 6]}.",
+#                     }
+#                 },
+#                 "required": ["type", "title", "x_axis_title", "y_axis_title", "data"],
+#             }
+#         }
+#     },
+#     {
+#         "type": "function",
+#         "function": {
+#             "name": "createWidget",
+#             "description": "Crée un widget affichable dans l'interface.",
+#             "parameters": {
+#                 "type": "object",
+#                 "properties": {
+#                     "description": {
+#                         "type": "string",
+#                         "description": "Description du widget à créer."
+#                     }
+#                 },
+#                 "required": ["description"],
+#             }
+#         }
+#     }
+# ]
+
+loadPrint()#c
+
 base_message = f"""
 Tu t'appelles {ASSISTANT_NAME}.
 
@@ -1883,7 +2313,7 @@ class Model:
                 "warning"
             )
             ollama_conversation = message if isinstance(message, list) else [message]
-            ollama_ans = Model.askOllamaModel(OLLAMA_MODEL, ollama_conversation)
+            ollama_ans = Model.askOllamaModel(OLLAMA_MODEL, ollama_conversation, max_retries, verification)
             if ollama_ans and ollama_ans.strip():
                 if verification.__name__ == "isJson":
                     ollama_ans = ollama_ans.replace("```json", "").replace("```", "")
