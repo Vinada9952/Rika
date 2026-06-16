@@ -879,85 +879,6 @@ def _get_apps_windows() -> list[dict]:
 
 loadPrint()#c
 
-# ── macOS ─────────────────────────────────────────────────────────────────────
-
-def _get_apps_macos() -> list[dict]:
-    apps = []
-    search_dirs = ["/Applications", os.path.expanduser("~/Applications")]
-
-    for directory in search_dirs:
-        if not os.path.isdir(directory):
-            continue
-        for entry in os.scandir(directory):
-            if not entry.name.endswith(".app"):
-                continue
-
-            name = entry.name.removesuffix(".app")
-            macos_dir = os.path.join(entry.path, "Contents", "MacOS")
-            exe_path = entry.path  # fallback = le bundle .app
-
-            if os.path.isdir(macos_dir):
-                for exe in os.scandir(macos_dir):
-                    if os.access(exe.path, os.X_OK):
-                        exe_path = exe.path
-                        break
-
-            apps.append({"name": name, "path": exe_path})
-
-    return sorted(apps, key=lambda x: x["name"].lower())
-
-loadPrint()#c
-
-# ── Linux ─────────────────────────────────────────────────────────────────────
-
-def _get_apps_linux() -> list[dict]:
-    import configparser
-
-    apps = []
-    seen = set()
-    desktop_dirs = [
-        "/usr/share/applications",
-        "/usr/local/share/applications",
-        os.path.expanduser("~/.local/share/applications"),
-        "/var/lib/snapd/desktop/applications",
-        "/var/lib/flatpak/exports/share/applications",
-        os.path.expanduser("~/.local/share/flatpak/exports/share/applications"),
-    ]
-
-    for directory in desktop_dirs:
-        if not os.path.isdir(directory):
-            continue
-        for entry in os.scandir(directory):
-            if not entry.name.endswith(".desktop"):
-                continue
-
-            config = configparser.ConfigParser(strict=False)
-            try:
-                config.read(entry.path, encoding="utf-8")
-            except Exception:
-                continue
-
-            if "Desktop Entry" not in config:
-                continue
-
-            section = config["Desktop Entry"]
-            if section.get("NoDisplay", "false").lower() == "true":
-                continue
-            if section.get("Type", "") != "Application":
-                continue
-
-            name = section.get("Name", "").strip()
-            exec_cmd = section.get("Exec", "").strip()
-
-            if not name or name in seen:
-                continue
-
-            exe_path = exec_cmd.split("%")[0].strip().split()[0] if exec_cmd else ""
-            seen.add(name)
-            apps.append({"name": name, "path": exe_path})
-
-    return sorted(apps, key=lambda x: x["name"].lower())
-
 def getAllApps() -> list[dict]:
     """
     Retourne la liste de toutes les applications installées sur l'ordinateur.
@@ -968,12 +889,7 @@ def getAllApps() -> list[dict]:
     """
     platform = sys.platform
 
-    if platform == "win32":
-        return _get_apps_windows()
-    elif platform == "darwin":
-        return _get_apps_macos()
-    else:
-        return _get_apps_linux()
+    return _get_apps_windows()
 
 loadPrint()#c
 
@@ -1203,6 +1119,8 @@ loadPrint()#c
 def getAllAppsThread():
     global APPLICATIONS
     APPLICATIONS = getAllApps()
+    Json.write( APPLICATIONS, f"{CACHE_PATH}applications.json" )
+    APPLICATIONS = None
     sendNotification( "Scan des applications installés terminées" )
 
 get_all_apps_thread = threading.Thread( target=getAllAppsThread, name="scanapps" )
@@ -1220,11 +1138,11 @@ CONVERSATION_PATH = settings["directories"]["assets"]["conversation"]
 loadPrint()#c
 
 # Conversation settings
-conversation = Json.read( CONVERSATION_PATH )
-if SERVER_URL:
-    data = requests.get( f"{SERVER_URL}/{GET_CONVERSATION}" )
-    conversation = data.json()
-    del data
+# conversation = Json.read( CONVERSATION_PATH )
+# if SERVER_URL:
+#     data = requests.get( f"{SERVER_URL}/{GET_CONVERSATION}" )
+#     conversation = data.json()
+#     del data
 
 conversation_mutex = threading.Lock()
 # data = Json.read( "./conversation.json" )
@@ -1973,24 +1891,6 @@ RÈGLES IMPORTANTES :
 - Essaie de faire les messages les plus courts possibles
 - Ta réponse est fait pour être dite à l'oral. Garde des caractères normaux pouvant être dit par un module TTS. C'est à dire, ne met pas de parenthèses et autres trucs du genre
 """
-
-while len( conversation ) < 2:
-    conversation.append( 0 )
-
-conversation[0] = {
-    "role": "system",
-    "name": "instructions",
-    "content": base_message
-}
-
-with open( USERNOTE_DIRECTORY, "r", encoding="utf-8" ) as f:
-    user_note = f.read()
-
-conversation[1] = {
-    "role": "user",
-    "name": USERNAME,
-    "content": user_note
-}
 
 loadPrint()#c
 
@@ -4548,14 +4448,14 @@ def appPath( apps, app: str ):
                     {
                         "role": "system",
                         "content": f"""
-    Voici une liste d'applications :
-    {json.dumps(apps, indent=4, ensure_ascii=False)}
-    L'utilisateur va te donner un nom d'application, et tu dois UNIQUEMENT ressortir le nom de l'application.
-    Tu dois ressortir UNIQUEMENT le nom, rien d'autre.
-    Le nom de l'application doit correspondre à un des noms dans la liste avec la clé "name".
-    Les applications n'ont pas tout le temps le même nom, tu dois donc choisir l'application qui correspond le mieux à la demande de l'utilisateur, en te basant sur la liste d'applications que je t'ai donnée.
-    Ne ressort RIEN D'AUTRE que le nom, absolument rien d'autre, pas ton raisonnement, par tes doutes, uniquement un nom valide pour l'exécution de l'application demandée par l'utilisateur.
-    Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésites
+Voici une liste d'applications :
+{json.dumps(apps, indent=4, ensure_ascii=False)}
+L'utilisateur va te donner un nom d'application, et tu dois UNIQUEMENT ressortir le nom de l'application.
+Tu dois ressortir UNIQUEMENT le nom, rien d'autre.
+Le nom de l'application doit correspondre à un des noms dans la liste avec la clé "name".
+Les applications n'ont pas tout le temps le même nom, tu dois donc choisir l'application qui correspond le mieux à la demande de l'utilisateur, en te basant sur la liste d'applications que je t'ai donnée.
+Ne ressort RIEN D'AUTRE que le nom, absolument rien d'autre, pas ton raisonnement, par tes doutes, uniquement un nom valide pour l'exécution de l'application demandée par l'utilisateur.
+Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésites
     """
                     },
                     {
@@ -4582,11 +4482,13 @@ def appPath( apps, app: str ):
 loadPrint()#c
 
 def openApp( app ):
-    global get_all_apps_thread
+    global get_all_apps_thread, APPLICATIONS
     print( f"searching for {app}..." )
     get_all_apps_thread.join()
     get_all_apps_thread = Substitute()
+    APPLICATIONS = Json.read( f"{CACHE_PATH}applications.json" )
     search = searchApp( APPLICATIONS, app )
+    APPLICATIONS = None
     return appPath( search, app ), False
 
 # def openApp( app: str ):
@@ -5630,6 +5532,7 @@ def sleepSystem( exception, audio ):
         if SERVER_URL:
             requests.post( f"{SERVER_URL}/{SET_CONVERSATION}", json=conversation )
         Json.write( conversation, CONVERSATION_PATH )
+        conversation = None
     if audio:
         Sound.playFile( CONFIRMATION_SOUND, True )
     if exception:
@@ -6430,6 +6333,31 @@ try:
             if called:
                 try:
                     GUI.displayRika( True )
+                    with conversation_mutex:
+                        conversation = Json.read( CONVERSATION_PATH )
+                        if SERVER_URL:
+                            data = requests.get( f"{SERVER_URL}/{GET_CONVERSATION}" )
+                            conversation = data.json()
+                            del data
+                        
+                        while len( conversation ) < 2:
+                            conversation.append( 0 )
+
+                        conversation[0] = {
+                            "role": "system",
+                            "name": "instructions",
+                            "content": base_message
+                        }
+
+                        with open( USERNOTE_DIRECTORY, "r", encoding="utf-8" ) as f:
+                            user_note = f.read()
+
+                        conversation[1] = {
+                            "role": "user",
+                            "name": USERNAME,
+                            "content": user_note
+                        }
+
                     chat()
                 except ExitAgent:
                     GUI.displayRika( False )
