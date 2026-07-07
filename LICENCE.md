@@ -1,7 +1,7 @@
 Personal Use Only License
 =========================
 
-Copyright © 2026, Vincent Boucher
+Copyright © 2026, Vincent Tuê Minh Boucher
 
 This software is provided for personal, non-commercial use only.
 
