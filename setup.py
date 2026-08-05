@@ -3,6 +3,7 @@ import json
 import speech_recognition as sr
 
 os.system( "winget install ffmpeg" )
+print( "please install omniroute with npm install -g omniroute" )
 
 def listen( language: str = "fr-FR" ):
         r = sr.Recognizer()
@@ -80,7 +81,7 @@ Json.write(
 with open( "./assets/usernote.txt", 'w' ) as f:
     f.write( "" )
 
-api_key = input( "Clé API groq (https://console.groq.com/keys) : " )
+api_key = input( "Clé API omniroute (Vous pouvez la configurer en lançant/installant omniroute https://github.com/diegosouzapw/OmniRoute) : " )
 name = input( "Votre nom : " )
 user = input( "Votre email : " )
 
@@ -115,16 +116,25 @@ else:
         "reka",
         "rica",
         "richard",
-        "chrétien",
-        "fréquence",
+        "fr\u00e9quence",
         "rika",
+        "précaire",
+        "érika",
+        "erika",
         "requin",
         "rita",
-        "gta",
         "ricardo",
+        "carte",
+        "ria",
+        "récarme",
+        "Grécia",
+        "cartes",
+        "réca",
+        "réka",
+        "reca",
+        "regarde",
         "rik",
         "recap",
-        "regarde",
         "riga",
         "richelieu",
         "robert",
@@ -153,9 +163,7 @@ else:
 base_settings = {
     "assistant-name": "Rika",
     "api": {
-        "api-keys": [
-            api_key
-        ],
+        "api-key": api_key,
         "max-api-retries": 10
     },
     "call": {
@@ -204,15 +212,6 @@ base_settings = {
             ],
             "normal": []
         }
-    },
-    "models": {
-        "main": "openai/gpt-oss-120b",
-        "simple": "llama-3.1-8b-instant",
-        "vision": "meta-llama/llama-4-scout-17b-16e-instruct",
-        "web": "openai/gpt-oss-20b",
-        "ollama": "gemma4",
-        "code": "openai/gpt-oss-safeguard-20b",
-        "listen": "whisper-large-v3"
     },
     "email": {
         "smtp": {

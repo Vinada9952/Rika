@@ -1,4 +1,5 @@
 SpeechRecognition
+duckduckgo-search
 opencv-python
 pyaudiowpatch
 sounddevice

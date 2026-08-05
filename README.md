@@ -151,6 +151,7 @@ Commande finale
 - Web requests
 - Ollama (local)
 - Groq (cloud)
+- OmniRoute : https://github.com/diegosouzapw/OmniRoute
 
 ---
 

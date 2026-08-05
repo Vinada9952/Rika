@@ -1,5 +1,6 @@
 print( "importing librairies..." )
 from requests.exceptions import ConnectionError, Timeout, RequestException
+from urllib.parse import unquote, urlparse, parse_qs
 from pygrabber.dshow_graph import FilterGraph
 from email.utils import parsedate_to_datetime
 from spotipy.oauth2 import SpotifyOAuth
@@ -11,12 +12,14 @@ from groq import APIStatusError
 import speech_recognition as sr
 from plyer import notification
 from typing import List, Dict
+from bs4 import BeautifulSoup
 from shazamio import Shazam
 from tkinter import font
 import soundfile as sf
 import win32clipboard
 from PIL import Image
 from groq import Groq
+from ddgs import DDGS
 import pyaudiowpatch
 import tkinter as tk
 import numpy as np
@@ -357,6 +360,7 @@ class Sound:
 
         def _recognize_whisper(audio_data, result_container):
             tmp_path = None
+
             try:
                 wav_bytes = audio_data.get_wav_data()
 
@@ -364,23 +368,39 @@ class Sound:
                     tmp.write(wav_bytes)
                     tmp_path = tmp.name
 
-                for i in range(MAX_RETRIES):
+                for _ in range(MAX_RETRIES):
                     try:
                         with open(tmp_path, "rb") as f:
-                            client = Model.getNextClient()
-                            result = client.audio.transcriptions.create(
-                                model=LISTEN_MODEL,
-                                file=("audio.wav", f, "audio/wav"),
-                                language="fr",
-                                response_format="text",
-                                prompt="Transcription de commandes vocales générales, langage naturel."
+                            response = requests.post(
+                                "http://localhost:20128/v1/audio/transcriptions",
+                                headers={
+                                    "Authorization": f"Bearer {OMNIROUTE_API_KEY}",
+                                },
+                                files={
+                                    "file": ("audio.wav", f, "audio/wav")
+                                },
+                                data={
+                                    "model": "auto",
+                                    "language": "fr",
+                                    "response_format": "text",
+                                    "prompt": "Transcription de commandes vocales générales, langage naturel."
+                                },
+                                timeout=60
                             )
-                        result_container["text"] = str(result).strip()
-                        break
-                    except:
+
+                        response.raise_for_status()
+
+                        result_container["text"] = response.text.strip()
+                        return
+
+                    except Exception:
                         pass
-            except:
+
                 result_container["text"] = ""
+
+            except Exception:
+                result_container["text"] = ""
+
             finally:
                 if tmp_path and os.path.exists(tmp_path):
                     os.unlink(tmp_path)
@@ -436,8 +456,21 @@ Phrase finale:
 
             try:
                 # response = Model.askGroqModel( SIMPLE_MODEL, [{"role": "system", "content": config}, {"role": "user", "content": prompt}], "low", MAX_RETRIES, Model.Verification.rawResponse )
+                # response = Model.askModel(
+                #     SIMPLE_MODEL,
+                #     [
+                #         {
+                #             "role": "system",
+                #             "content": config
+                #         },
+                #         {
+                #             "role": "user",
+                #             "content": prompt
+                #         }
+                #     ],
+                #     verification=Model.Verification.rawResponse
+                # )
                 response = Model.askModel(
-                    SIMPLE_MODEL,
                     [
                         {
                             "role": "system",
@@ -448,7 +481,7 @@ Phrase finale:
                             "content": prompt
                         }
                     ],
-                    verification=Model.Verification.rawResponse
+                    Model.Verification.rawResponse
                 )
                 return response
             except:
@@ -693,7 +726,7 @@ class SpotifyPlayer:
 
     def openSpotify(self):
         """Lance Spotify sur l'ordinateur."""
-        subprocess.Popen( ["spotify.exe"], creationflags=subprocess.DETACHED_PROCESS, shell=True)
+        subprocess.Popen( ["C:\\Users\\Vincent Boucher\\AppData\\Roaming\\Spotify\\Spotify.exe"], creationflags=subprocess.DETACHED_PROCESS, shell=True)
         time.sleep( 5 )
         
 
@@ -893,6 +926,26 @@ def getAllApps() -> list[dict]:
 
 loadPrint()#c
 
+def omnirouteServer():
+    os.system( "omniroute" )
+
+loadPrint()#c
+
+def ollamaServer():
+    os.system( "ollama serve" )
+
+loadPrint()#c
+
+ollama_server = threading.Thread( target=ollamaServer, name="RIKA-OLLAMA-SERVER" )
+omniroute_server = threading.Thread( target=omnirouteServer, name="RIKA-OMNIROUTE-SERVER" )
+
+loadPrint()#c
+
+# ollama_server.start()
+# omniroute_server.start()
+
+loadPrint()#c
+
 # =====================
 # CONFIG
 # =====================
@@ -901,13 +954,7 @@ settings = Json.read( "settings.json" )
 
 loadPrint()#c
 
-# groq API
-API_KEYS = settings["api"]["api-keys"]
-clients = [
-    Groq( api_key=n )
-    for n in API_KEYS
-]
-del API_KEYS
+OMNIROUTE_API_KEY = settings["api"]["api-key"]
 
 loadPrint()#c
 
@@ -925,13 +972,6 @@ CALL_HOTKEY = settings["call"]["hotkey"]
 loadPrint()#c
 
 # models settings
-MAIN_MODEL = settings["models"]["main"]
-LISTEN_MODEL = settings["models"]["listen"]
-SIMPLE_MODEL = settings["models"]["simple"]
-CODE_MODEL = settings["models"]["code"]
-VISION_MODEL = settings["models"]["vision"]
-WEB_MODEL = settings["models"]["web"]
-OLLAMA_MODEL = settings["models"]["ollama"]
 MAX_RETRIES = settings["api"]["max-api-retries"]
 ASSISTANT_NAME = settings["assistant-name"]
 
@@ -2000,254 +2040,150 @@ def sendNotification( message ):
 
 loadPrint()#c
 
-client_index = 0
-client_max = len( clients )
 
 class Model:
-    def askModel(model: str, message, thinking: str = "high", max_retries: int = MAX_RETRIES, verification=None) -> str:
-        """
-        Interface unique pour interroger un modèle.
-        Détermine si l'appel doit passer par Groq ou Ollama.
-        """
-        if verification is None:
-            verification = Model.Verification.rawResponse
+    def askModel( conversation, verification ):
+        # if WIFI:
+        for i in range( MAX_RETRIES ):
+            response = requests.post(
+                "http://localhost:20128/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OMNIROUTE_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "auto",
+                    "messages": conversation,
+                    "stream": False
+                }
+            )
 
-        if model == OLLAMA_MODEL:
-            if not isinstance(message, list):
-                message = [message]
-            return Model.askOllamaModel(model, message)
+            response.raise_for_status()
 
-        return Model.askGroqModel(model, message, thinking, max_retries, verification)
-
-    def askOllamaModel(model: str, conversation: List[Dict[str, str]]) -> str:
-        # print( "asking ollama" )
-        global ollama_client
-        """
-        Envoie une requête de chat à un modèle Ollama local en utilisant l'historique de la conversation.
-
-        Args:
-            model (str): Le nom du modèle à utiliser (ex: "llama2", "mistral").
-            conversation (List[Dict[str, str]]): La liste des messages de conversation.
-                Chaque élément doit être un dictionnaire avec 'role' et 'content'.
-                Exemple: [{"role": "user", "content": "Bonjour"}, {"role": "assistant", "content": "Salut !"}]
-
-        Returns:
-            str: La réponse générée par le modèle, ou un message d'erreur.
-        """
-        if ollama_client is None:
-            return "ERREUR: Impossible de se connecter au client Ollama. Veuillez vérifier que le serveur est lancé."
+            if verification( response.json()["choices"][0]["message"]["content"] ):
+                break
         
-        if model is None:
-            return "ERREUR: Veuillez spécifier un modèle."
+        return response.json()["choices"][0]["message"]["content"]
 
-        # print(f"\n🤖 Envoi de la requête au modèle '{model}'...")
+    def askVisionModel(image: str, prompt: str, model: str = "qwen3.6") -> str:
 
         try:
-            # Utilisation de client.chat() pour envoyer l'historique complet
-            response = ollama_client.chat(
+            response = ollama.chat(
                 model=model,
-                messages=conversation
-            )
-            
-            # Extraction du contenu de la réponse
-            return response['message']['content']
-
-        except Exception as e:
-            if "model not found" in str(e):
-                return f"ERREUR: Le modèle '{model}' n'est pas trouvé ou n'est pas téléchargé. Veuillez exécuter 'ollama pull {model}'."
-            elif "connection error" in str(e) or "connection refused" in str(e):
-                return "ERREUR DE CONNEXION: Le serveur Ollama semble être arrêté. Veuillez le relancer."
-            else:
-                return f"Une erreur inattendue est survenue: {e}"
-
-    def askGroqModel( model: str, message: dict, thinking: str, max_retries: int, verification ):
-        reset_count = 0
-        log(
-            f"asking model",
-            {
-                "model": model,
-                "message": message,
-                "thinking": thinking,
-                "max_retries": max_retries,
-                "verification": verification.__name__
-            },
-            "info"
-        )
-        # log( f"Asking model", f"{model=}, {message=}, {thinking=}, {max_retries=}, {verification.__name__}", "info" )
-        global clients, WIFI
-        can_think = False
-        can_web_search = True if model == WEB_MODEL else False
-        # print( f"{model=}, {can_web_search=}" )
-        if not WIFI:
-            log( "No internet connection", "Asking ollama model instead of groq", "warning" )
-            can_web_search = False
-        ans = ""
-        for i in range( max_retries ):
-            try:
-                if WIFI:
-                    client = Model.getNextClient()
-                    log( "Asking client groq", {"api-key": client.api_key}, "info" )
-                    
-                    # Préparer les paramètres de la requête
-                    request_params = {
-                        "model": model,
-                        "messages": message
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                        "images": [image]
                     }
-                    
-                    # Ajouter les paramètres optionnels selon les conditions
-                    if can_think:
-                        request_params["reasoning_effort"] = thinking
-                    if can_web_search:
-                        request_params["tools"] = [{"type": "browser_search"}]
-                    
-                    # Faire l'appel à l'API
-                    # print( "asking groq" )
-                    response = client.chat.completions.create(**request_params)
-                    print( "response given" )
-                    
-                    # Logger la réponse complète pour déboguer
-                    log(
-                        "Full API response",
-                        {
-                            "choices_count": len(response.choices) if response.choices else 0,
-                            "first_choice": str(response.choices[0]) if response.choices else None,
-                            "message": str(response.choices[0].message) if response.choices else None,
-                            "content": response.choices[0].message.content if response.choices and response.choices[0].message else None
-                        },
-                        "debug"
-                    )
-                    
-                    ans = response.choices[0].message.content
-                    # print( "logged" )
-                else:
-                    # print( "asking ollama..." )
-                    ans = Model.askOllamaModel( OLLAMA_MODEL, message )
-                    # print( "response given" )
-                # print( "verification" )
-                # Vérifier si la réponse est vide et logger les détails
-                if not ans or ans.strip() == "":
-                    log(
-                        "Empty response from model",
-                        {
-                            "model": model,
-                            "response": ans,
-                            "response_length": len(ans) if ans else 0
-                        },
-                        "warning"
-                    )
-                if verification.__name__ == "isJson":
-                    ans = ans.replace( "```json", '' ).replace( "```", '' )
-                log(
-                    "Verifying if response is correct",
-                    {
-                        "response": ans,
-                        "verification": verification.__name__
-                    },
-                    "info"
-                )
-                # print( "final verification" )
-                if not verification( ans ):
-                    print( "verification didn't match" )
-                    raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__}, response is {ans}" )
-                # print( "return..." )
-                return ans
-            except BadRequestError as e:
-                log(
-                    f"Wrong request for model",
-                    {
-                        "error": str( e ),
-                        "response": ans,
-                        "message": message
-                    },
-                    "warning"
-                )
-                print( str( e ) )
-                can_web_search = False
-            except APIStatusError as e:
-                log(
-                    f"Invalid response from API",
-                    {
-                        "error": str( e ),
-                        "response": ans,
-                        "message": message
-                    },
-                    "error"
-                )
-                print( str( e ) )
-                if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
-                    can_think = False
-                if model == MAIN_MODEL:
-                    if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
-                        reset_count += 1
-                        if client_max - 2 <= 0:
-                            if reset_count == client_max:
-                                reset_count = 0
-                                autoEraseConversation()
-                        else:
-                            if reset_count == client_max - 2:
-                                reset_count = 0
-                                autoEraseConversation()
-            except NotValidResponse as e:
-                print( str( e ) )
-                log(
-                    f"Invalid response from model",
-                    {
-                        "error": str( e ),
-                        "response": ans,
-                        "message": message
-                    },
-                    "warning"
-                )
-        if ans and ans.strip():
-            return ans
-
-        # Si toutes les tentatives Groq échouent, tenter un fallback vers Ollama.
-        if model != OLLAMA_MODEL:
-            log(
-                "Groq fallback",
-                {
-                    "model": model,
-                    "message": message,
-                    "attempts": max_retries
-                },
-                "warning"
+                ]
             )
-            ollama_conversation = message if isinstance(message, list) else [message]
-            ollama_ans = Model.askOllamaModel(OLLAMA_MODEL, ollama_conversation, max_retries, verification)
-            if ollama_ans and ollama_ans.strip():
-                if verification.__name__ == "isJson":
-                    ollama_ans = ollama_ans.replace("```json", "").replace("```", "")
-                if verification(ollama_ans):
-                    return ollama_ans
-                log(
-                    "Ollama fallback response failed verification",
-                    {
-                        "response": ollama_ans,
-                        "verification": verification.__name__
-                    },
-                    "warning"
-                )
-            else:
-                log(
-                    "Ollama fallback returned empty response",
-                    {
-                        "response": ollama_ans,
-                        "model": OLLAMA_MODEL
-                    },
-                    "warning"
-                )
 
-        # Si toutes les tentatives échouent, retourner la dernière réponse ou un message d'erreur
-        raise NoResponseError( f"Le modèle n'a pas répondu de réponse valide après {max_retries} essais" )
+            return response["message"]["content"]
+        except Exception as e:
+            log(
+                "askVisionModel error",
+                json.dumps(
+                    {
+                        "error": str(e),
+                        "prompt": prompt,
+                        "model": model
+                    },
+                    indent=4
+                ),
+                "error"
+            )
+            return "Erreur lors de l'analyse de l'image."
+
+
+    def askWebModel(query: str, max_pages: int = 5):
+        """
+        Boucle recherche (DuckDuckGo via ddgs, gratuit/illimité) -> visite de
+        pages comme un navigateur -> évaluation par le modèle (via Omniroute)
+        -> synthèse finale.
+        """
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/120.0 Safari/537.36"
+        }
+
+        # --- Recherche ---
+        try:
+            raw_results = DDGS().text(query, max_results=max_pages)
+        except Exception as e:
+            raise NoResponseError(f"askWebModel: recherche échouée pour '{query}' ({e})")
+
+        candidates = [
+            {"title": r.get("title", ""), "url": r.get("href", "")}
+            for r in raw_results if r.get("href")
+        ]
+
+        if not candidates:
+            raise NoResponseError(f"askWebModel: aucun résultat pour '{query}'")
+
+        # --- Boucle visite + évaluation ---
+        visited = []
+
+        for candidate in candidates:
+            try:
+                page_response = requests.get(candidate["url"], headers=headers, timeout=8)
+                page_response.raise_for_status()
+            except requests.RequestException:
+                continue
+
+            page_soup = BeautifulSoup(page_response.text, "html.parser")
+            for tag in page_soup(["script", "style", "nav", "footer", "header", "noscript"]):
+                tag.decompose()
+
+            page_text = " ".join(page_soup.get_text(separator=" ").split())[:3000]
+            if not page_text:
+                continue
+
+            visited.append({
+                "title": candidate["title"],
+                "url": candidate["url"],
+                "text": page_text
+            })
+
+            judge_prompt = f"""
+Demande de l'utilisateur : {query}
+
+Pages visitées jusqu'ici :
+{chr(10).join(f"- {p['title']} ({p['url']}): {p['text'][:500]}" for p in visited)}
+
+Réponds UNIQUEMENT par "OUI" si ces informations suffisent pour répondre
+correctement et complètement à la demande, sinon réponds UNIQUEMENT "NON".
+"""
+            verdict = Model.askModel(
+                [{"role": "user", "content": judge_prompt}],
+                lambda r: r.strip().upper() in ("OUI", "NON")
+            )
+
+            if "OUI" in verdict.strip().upper():
+                break
+
+        if not visited:
+            raise NoResponseError(f"askWebModel: aucune page accessible pour '{query}'")
+
+        # --- Synthèse finale ---
+        final_prompt = f"""
+Demande de l'utilisateur : {query}
+
+Informations collectées en visitant plusieurs pages web :
+{chr(10).join(f"- {p['title']} ({p['url']}): {p['text']}" for p in visited)}
+
+Réponds à la demande de l'utilisateur en te basant uniquement sur ces
+informations. Cite la source (URL) quand c'est pertinent.
+"""
+        return Model.askModel(
+            [{"role": "user", "content": final_prompt}],
+            Model.Verification.rawResponse
+        )
+
     
-    def getNextClient():
-        global client_max, client_index, clients
-        client = clients[client_index]
-        client_index += 1
-        if client_index == client_max:
-            client_index = 0
-        return client
 
+    
     class Verification:
         def isJson( object ):
             try:
@@ -2271,6 +2207,251 @@ class Model:
             return False
 
 
+    # def askModel(model: str, message, thinking: str = "high", max_retries: int = MAX_RETRIES, verification=None) -> str:
+    #     """
+    #     Interface unique pour interroger un modèle.
+    #     Détermine si l'appel doit passer par Groq ou Ollama.
+    #     """
+    #     if verification is None:
+    #         verification = Model.Verification.rawResponse
+
+    #     if model == OLLAMA_MODEL:
+    #         if not isinstance(message, list):
+    #             message = [message]
+    #         return Model.askOllamaModel(model, message)
+
+    #     return Model.askGroqModel(model, message, thinking, max_retries, verification)
+
+    # def askOllamaModel(model: str, conversation: List[Dict[str, str]]) -> str:
+    #     # print( "asking ollama" )
+    #     global ollama_client
+    #     """
+    #     Envoie une requête de chat à un modèle Ollama local en utilisant l'historique de la conversation.
+
+    #     Args:
+    #         model (str): Le nom du modèle à utiliser (ex: "llama2", "mistral").
+    #         conversation (List[Dict[str, str]]): La liste des messages de conversation.
+    #             Chaque élément doit être un dictionnaire avec 'role' et 'content'.
+    #             Exemple: [{"role": "user", "content": "Bonjour"}, {"role": "assistant", "content": "Salut !"}]
+
+    #     Returns:
+    #         str: La réponse générée par le modèle, ou un message d'erreur.
+    #     """
+    #     if ollama_client is None:
+    #         return "ERREUR: Impossible de se connecter au client Ollama. Veuillez vérifier que le serveur est lancé."
+        
+    #     if model is None:
+    #         return "ERREUR: Veuillez spécifier un modèle."
+
+    #     # print(f"\n🤖 Envoi de la requête au modèle '{model}'...")
+
+    #     try:
+    #         # Utilisation de client.chat() pour envoyer l'historique complet
+    #         response = ollama_client.chat(
+    #             model=model,
+    #             messages=conversation
+    #         )
+            
+    #         # Extraction du contenu de la réponse
+    #         return response['message']['content']
+
+    #     except Exception as e:
+    #         if "model not found" in str(e):
+    #             return f"ERREUR: Le modèle '{model}' n'est pas trouvé ou n'est pas téléchargé. Veuillez exécuter 'ollama pull {model}'."
+    #         elif "connection error" in str(e) or "connection refused" in str(e):
+    #             return "ERREUR DE CONNEXION: Le serveur Ollama semble être arrêté. Veuillez le relancer."
+    #         else:
+    #             return f"Une erreur inattendue est survenue: {e}"
+
+    # def askGroqModel( model: str, message: dict, thinking: str, max_retries: int, verification ):
+    #     reset_count = 0
+    #     log(
+    #         f"asking model",
+    #         {
+    #             "model": model,
+    #             "message": message,
+    #             "thinking": thinking,
+    #             "max_retries": max_retries,
+    #             "verification": verification.__name__
+    #         },
+    #         "info"
+    #     )
+    #     # log( f"Asking model", f"{model=}, {message=}, {thinking=}, {max_retries=}, {verification.__name__}", "info" )
+    #     global clients, WIFI
+    #     can_think = False
+    #     can_web_search = True if model == WEB_MODEL else False
+    #     # print( f"{model=}, {can_web_search=}" )
+    #     if not WIFI:
+    #         log( "No internet connection", "Asking ollama model instead of groq", "warning" )
+    #         can_web_search = False
+    #     ans = ""
+    #     for i in range( max_retries ):
+    #         try:
+    #             if WIFI:
+    #                 client = Model.getNextClient()
+    #                 log( "Asking client groq", {"api-key": client.api_key}, "info" )
+                    
+    #                 # Préparer les paramètres de la requête
+    #                 request_params = {
+    #                     "model": model,
+    #                     "messages": message
+    #                 }
+                    
+    #                 # Ajouter les paramètres optionnels selon les conditions
+    #                 if can_think:
+    #                     request_params["reasoning_effort"] = thinking
+    #                 if can_web_search:
+    #                     request_params["tools"] = [{"type": "browser_search"}]
+                    
+    #                 # Faire l'appel à l'API
+    #                 # print( "asking groq" )
+    #                 response = client.chat.completions.create(**request_params)
+    #                 print( "response given" )
+                    
+    #                 # Logger la réponse complète pour déboguer
+    #                 log(
+    #                     "Full API response",
+    #                     {
+    #                         "choices_count": len(response.choices) if response.choices else 0,
+    #                         "first_choice": str(response.choices[0]) if response.choices else None,
+    #                         "message": str(response.choices[0].message) if response.choices else None,
+    #                         "content": response.choices[0].message.content if response.choices and response.choices[0].message else None
+    #                     },
+    #                     "debug"
+    #                 )
+                    
+    #                 ans = response.choices[0].message.content
+    #                 # print( "logged" )
+    #             else:
+    #                 # print( "asking ollama..." )
+    #                 ans = Model.askOllamaModel( OLLAMA_MODEL, message )
+    #                 # print( "response given" )
+    #             # print( "verification" )
+    #             # Vérifier si la réponse est vide et logger les détails
+    #             if not ans or ans.strip() == "":
+    #                 log(
+    #                     "Empty response from model",
+    #                     {
+    #                         "model": model,
+    #                         "response": ans,
+    #                         "response_length": len(ans) if ans else 0
+    #                     },
+    #                     "warning"
+    #                 )
+    #             if verification.__name__ == "isJson":
+    #                 ans = ans.replace( "```json", '' ).replace( "```", '' )
+    #             log(
+    #                 "Verifying if response is correct",
+    #                 {
+    #                     "response": ans,
+    #                     "verification": verification.__name__
+    #                 },
+    #                 "info"
+    #             )
+    #             # print( "final verification" )
+    #             if not verification( ans ):
+    #                 print( "verification didn't match" )
+    #                 raise NotValidResponse( f"The ai's response doesn't match or respect the output specifications. Verification : {verification.__name__}, response is {ans}" )
+    #             # print( "return..." )
+    #             return ans
+    #         except BadRequestError as e:
+    #             log(
+    #                 f"Wrong request for model",
+    #                 {
+    #                     "error": str( e ),
+    #                     "response": ans,
+    #                     "message": message
+    #                 },
+    #                 "warning"
+    #             )
+    #             print( str( e ) )
+    #             can_web_search = False
+    #         except APIStatusError as e:
+    #             log(
+    #                 f"Invalid response from API",
+    #                 {
+    #                     "error": str( e ),
+    #                     "response": ans,
+    #                     "message": message
+    #                 },
+    #                 "error"
+    #             )
+    #             print( str( e ) )
+    #             if str( e ).find( "reasoning_effort" ) != -1 and str( e ).find( "not supported" ) != -1:
+    #                 can_think = False
+    #             if model == MAIN_MODEL:
+    #                 if e.status_code == 413 and str( e ).lower().find( "request too large for model" ) != -1:
+    #                     reset_count += 1
+    #                     if client_max - 2 <= 0:
+    #                         if reset_count == client_max:
+    #                             reset_count = 0
+    #                             autoEraseConversation()
+    #                     else:
+    #                         if reset_count == client_max - 2:
+    #                             reset_count = 0
+    #                             autoEraseConversation()
+    #         except NotValidResponse as e:
+    #             print( str( e ) )
+    #             log(
+    #                 f"Invalid response from model",
+    #                 {
+    #                     "error": str( e ),
+    #                     "response": ans,
+    #                     "message": message
+    #                 },
+    #                 "warning"
+    #             )
+    #     if ans and ans.strip():
+    #         return ans
+
+    #     # Si toutes les tentatives Groq échouent, tenter un fallback vers Ollama.
+    #     if model != OLLAMA_MODEL:
+    #         log(
+    #             "Groq fallback",
+    #             {
+    #                 "model": model,
+    #                 "message": message,
+    #                 "attempts": max_retries
+    #             },
+    #             "warning"
+    #         )
+    #         ollama_conversation = message if isinstance(message, list) else [message]
+    #         ollama_ans = Model.askOllamaModel(OLLAMA_MODEL, ollama_conversation, max_retries, verification)
+    #         if ollama_ans and ollama_ans.strip():
+    #             if verification.__name__ == "isJson":
+    #                 ollama_ans = ollama_ans.replace("```json", "").replace("```", "")
+    #             if verification(ollama_ans):
+    #                 return ollama_ans
+    #             log(
+    #                 "Ollama fallback response failed verification",
+    #                 {
+    #                     "response": ollama_ans,
+    #                     "verification": verification.__name__
+    #                 },
+    #                 "warning"
+    #             )
+    #         else:
+    #             log(
+    #                 "Ollama fallback returned empty response",
+    #                 {
+    #                     "response": ollama_ans,
+    #                     "model": OLLAMA_MODEL
+    #                 },
+    #                 "warning"
+    #             )
+
+    #     # Si toutes les tentatives échouent, retourner la dernière réponse ou un message d'erreur
+    #     raise NoResponseError( f"Le modèle n'a pas répondu de réponse valide après {max_retries} essais" )
+    
+    # def getNextClient():
+    #     global client_max, client_index, clients
+    #     client = clients[client_index]
+    #     client_index += 1
+    #     if client_index == client_max:
+    #         client_index = 0
+    #     return client
+
+
 loadPrint()#c
 
 # =====================
@@ -2283,30 +2464,67 @@ def image_to_base64( path ):
 
 loadPrint()#c
 
-def webSearch( query: str ):
-    for i in range( MAX_RETRIES ):
-        try:
-            result = Model.askModel(
-                WEB_MODEL,
-                [
-                    {
-                        "role": "system",
-                        "content": "Va chercher sur internet la réponse à la question de l'utilisateur."
-                    },
-                    {
-                        "role": "user",
-                        "content": query
-                    }
-                ],
-                "high",
-                MAX_RETRIES,
-                Model.Verification.rawResponse
-            )
-            print( result )
-            return result, True
-        except NoResponseError as e:
-            result = str( e )
-    return result, True
+# def webSearch( query: str ):
+#     for i in range( MAX_RETRIES ):
+#         try:
+#             result = Model.askModel(
+#                 WEB_MODEL,
+#                 [
+#                     {
+#                         "role": "system",
+#                         "content": "Va chercher sur internet la réponse à la question de l'utilisateur."
+#                     },
+#                     {
+#                         "role": "user",
+#                         "content": query
+#                     }
+#                 ],
+#                 "high",
+#                 MAX_RETRIES,
+#                 Model.Verification.rawResponse
+#             )
+#             print( result )
+#             return result, True
+#         except NoResponseError as e:
+#             result = str( e )
+#     return result, True
+
+def webSearch(query):
+    """
+    Recherche web pour une IA.
+
+    Args:
+        query (str): Recherche à effectuer
+        max_results (int): Nombre de résultats retournés
+
+    Returns:
+        list: Résultats avec titre, lien et description
+    """
+
+    return Model.askWebModel( query ), True
+
+    # results = []
+
+    # try:
+    #     with DDGS() as ddgs:
+    #         search_results = ddgs.text(
+    #             query,
+    #             max_results=max_results
+    #         )
+
+    #         for r in search_results:
+    #             results.append({
+    #                 "title": r.get("title"),
+    #                 "url": r.get("href"),
+    #                 "content": r.get("body")
+    #             })
+
+    # except Exception as e:
+    #     return {
+    #         "error": str(e)
+    #     }
+
+    # return results
 
 loadPrint()#c
 
@@ -3836,7 +4054,7 @@ def createChart( chart: str, title: str, data: dict, x_axis_title: str, y_axis_t
 
 loadPrint()#c
 
-def widget( prompt, model = "openai/gpt-oss-120b", script: str = "script.py" ):
+def widget( prompt, script: str = "script.py" ):
     config = f"""
 Tu es un expert Python qui génère des widgets graphiques avec tkinter sur Windows 11 (Python 3.12).
 
@@ -3921,7 +4139,8 @@ Règles du JSON :
     )
     try:
         while True:
-            raw_response = Model.askModel( CODE_MODEL, sub_conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+            # raw_response = Model.askModel( CODE_MODEL, sub_conversation, "high", MAX_RETRIES, Model.Verification.isJson )
+            raw_response = Model.askModel( sub_conversation, Model.Verification.isJson )
             
             # if raw_response == "":
             #     print( "ai finished task, exiting..." )
@@ -4008,7 +4227,7 @@ loadPrint()#c
 
 def createWidget( description ):
     sendNotification( "Widget créé" )
-    widget_thread = threading.Thread( target=widget, args=( description, CODE_MODEL, f"{CACHE_PATH}{time.time()}.py" ) )
+    widget_thread = threading.Thread( target=widget, args=( description, f"{CACHE_PATH}{time.time()}.py" ) )
     widget_thread.start()
     return "Widget affiché avec succès", False
 
@@ -4384,26 +4603,45 @@ def openLink( query: str, is_direct_link ):
     
     for i in range( MAX_RETRIES ):
         try:
+#             link = Model.askModel(
+#                 WEB_MODEL,
+#                 [
+#                     {
+#                         "role": "system",
+#                         "content": """
+# Ton role est de donner un lien web à entrer dans un navigateur.
+# Tu dois uniquement donner le lien web et rien d'autre.
+# Le lien que tu vas donner doit corresprondre le plus possible à la demande de l'utilisateur
+# """
+#                     },
+#                     {
+#                         "role": "user",
+#                         "content": query
+#                     }
+#                 ],
+#                 "high",
+#                 MAX_RETRIES,
+#                 Model.Verification.isLink
+#             )
+            # FIXME : Make ai search for real link, not just guess
             link = Model.askModel(
-                WEB_MODEL,
                 [
                     {
                         "role": "system",
                         "content": """
-        Ton role est de donner un lien web à entrer dans un navigateur.
-        Tu dois uniquement donner le lien web et rien d'autre.
-        Le lien que tu vas donner doit corresprondre le plus possible à la demande de l'utilisateur
-        """
+Ton role est de donner un lien web à entrer dans un navigateur.
+Tu dois uniquement donner le lien web et rien d'autre.
+Le lien que tu vas donner doit corresprondre le plus possible à la demande de l'utilisateur
+"""
                     },
                     {
                         "role": "user",
                         "content": query
                     }
                 ],
-                "high",
-                MAX_RETRIES,
                 Model.Verification.isLink
             )
+
             success = webbrowser.open( link )
             if success:
                 return f"ouverture de {link} réussie", False
@@ -4442,8 +4680,33 @@ def appPath( apps, app: str ):
     print( f"{apps=}" )
     for i in range( MAX_RETRIES ):
         try:
+#             path = Model.askModel(
+#                 SIMPLE_MODEL,
+#                 [
+#                     {
+#                         "role": "system",
+#                         "content": f"""
+# Voici une liste d'applications :
+# {json.dumps(apps, indent=4, ensure_ascii=False)}
+# L'utilisateur va te donner un nom d'application, et tu dois UNIQUEMENT ressortir le nom de l'application.
+# Tu dois ressortir UNIQUEMENT le nom, rien d'autre.
+# Le nom de l'application doit correspondre à un des noms dans la liste avec la clé "name".
+# Les applications n'ont pas tout le temps le même nom, tu dois donc choisir l'application qui correspond le mieux à la demande de l'utilisateur, en te basant sur la liste d'applications que je t'ai donnée.
+# Ne ressort RIEN D'AUTRE que le nom, absolument rien d'autre, pas ton raisonnement, par tes doutes, uniquement un nom valide pour l'exécution de l'application demandée par l'utilisateur.
+# Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésites
+#     """
+#                     },
+#                     {
+#                         "role": "user",
+#                         "content": app
+#                     }
+#                 ],
+#                 "high",
+#                 MAX_RETRIES,
+#                 Model.Verification.rawResponse
+#             )
+
             path = Model.askModel(
-                SIMPLE_MODEL,
                 [
                     {
                         "role": "system",
@@ -4463,8 +4726,6 @@ Si tu hésite entre plusieurs, donne uniquement UN nom entre ceux que tu hésite
                         "content": app
                     }
                 ],
-                "high",
-                MAX_RETRIES,
                 Model.Verification.rawResponse
             )
             print( f"Found path: {path}" )
@@ -5544,7 +5805,6 @@ loadPrint()#c
 # =====================
 # TOOL: getImage
 # =====================
-cap = cv2.VideoCapture( getCameraIndex( "USB" ) )
 # cap.release()
 def getImage( type ):
     if type == "screenshot":
@@ -5582,9 +5842,11 @@ def getImage( type ):
         return f"Screenshot capturé de l'écran {i}"
 
     if type == "webcam":
+        cap = cv2.VideoCapture( getCameraIndex( "USB" ) )
         ret, frame = cap.read()
         if not ret:
             return "Erreur webcam"
+        cap.release()
         cv2.imwrite( WEBCAM_PATH, frame )
         return "Image webcam capturée"
 
@@ -5600,6 +5862,8 @@ def analyseImage( type, prompt, renew ):
     if renew:
         getImage( type )
 
+    log( "analyseImage", {"type": type, "prompt": prompt, "renew": renew}, "debug" )
+
     if type == "screenshot":
         files = sorted( 
             f for f in os.listdir( SCREENSHOT_DIR )
@@ -5611,84 +5875,25 @@ def analyseImage( type, prompt, renew ):
                 return "Aucun screenshot disponible", True
             else:
                 return analyseImage( type, prompt, True )
-        if WIFI:
-            content = [
-                {
-                    "type": "text",
-                    "text": prompt
-                }
-            ]
-
-            for file in files:
-                path = os.path.join( SCREENSHOT_DIR, file )
-                image_b64 = image_to_base64( path )
-                content.append(
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{image_b64}"
-                        }
-                    }
-                )
-
-            messages.append(
-                {
-                    "role": "user",
-                    "content": content
-                }
-            )
-        else:
-            images = []
-            for file in files:
-                path = os.path.join( SCREENSHOT_DIR, file )
-                image_b64 = image_to_base64( path )
-                images.append( image_b64 )
-            messages = [
-                {
-                    "role": "user",
-                    "content": prompt,
-                    "images": images
-                }
-            ]
+        images = []
+        for file in files:
+            path = os.path.join( SCREENSHOT_DIR, file )
+            image_b64 = image_to_base64( path )
+            images.append( image_b64 )
 
     elif type == "webcam":
         if not os.path.exists( WEBCAM_PATH ):
             return "Aucune image webcam disponible", True
 
         image_b64 = image_to_base64( WEBCAM_PATH )
-        if WIFI:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": prompt
-                        },
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{image_b64}"
-                            }
-                        }
-                    ]
-                }
-            )
-        else:
-            messages = [
-                {
-                    "role": "user",
-                    "content": prompt,
-                    "images": [image_b64]
-                }
-            ]
 
     else:
         return "Type invalide", True
 
     print( "ask model for vision" )
     try:
-        response = Model.askModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
+        # response = Model.askModel( VISION_MODEL, messages, "high", MAX_RETRIES, Model.Verification.rawResponse )
+        response = Model.askVisionModel( image_b64, prompt )
     except NoResponseError as e:
         return f"Erreur lors de l'anaylse de l'image", True
 
@@ -5762,8 +5967,35 @@ def summarized( response: str ):
     print( "ask model for summary" )
     for i in range( MAX_RETRIES ):
         try:
+#             summary = Model.askModel(
+#                 SIMPLE_MODEL,
+#                 [
+#                     {
+#                         "role": "system",
+#                         "content": """
+# Ressort moi uniquement du Json avec ce format exact, sans rien d'autre :
+# {
+#     "message": "résumé du texte à dire à l'utilisateur, en français, concis. Garde le contenu général pour le raccourcir",
+# }
+# Ne met pas de caractères de mise en forme dans le message, comme des astérisques, des accents, ou des emojis.
+# Juste du texte brut, sans retour à la ligne.
+# Ne coupe pas les phrases au milieu, garde les phrases entières.
+# Raccourcis le message d'origine sans omettre d'informations importantes.
+# Le résultat doit OBLIGATOIREMENT avoir moins de 50 mots
+# Garde le plus d'informations importantes possible en respectant la limite de mots
+#         """,
+#                         "name": "instructions"
+#                     },
+#                     {
+#                         "role": "user",
+#                         "content": response
+#                     }
+#                 ],
+#                 "none",
+#                 MAX_RETRIES,
+#                 Model.Verification.isJson
+#             )
             summary = Model.askModel(
-                SIMPLE_MODEL,
                 [
                     {
                         "role": "system",
@@ -5786,8 +6018,6 @@ Garde le plus d'informations importantes possible en respectant la limite de mot
                         "content": response
                     }
                 ],
-                "none",
-                MAX_RETRIES,
                 Model.Verification.isJson
             )
         except NoResponseError as e:
@@ -6014,7 +6244,8 @@ def chat():
                 print( "using private conversation" )
                 tmp.extend( private_history )
             try:
-                response = Model.askModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+                # response = Model.askModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+                response = Model.askModel( tmp, Model.Verification.isJson )
             except NoResponseError as e:
                 response = json.dumps(
                     {
@@ -6254,7 +6485,8 @@ def chat():
                             print( "using private conversation" )
                             tmp.extend( private_history )
                         try:
-                            response = Model.askModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+                            # response = Model.askModel( MAIN_MODEL, tmp, "high", MAX_RETRIES, Model.Verification.isJson )
+                            response = Model.askModel( tmp, Model.Verification.isJson )
                         except NoResponseError as e:
                             response = json.dumps(
                                 {
