@@ -941,8 +941,8 @@ omniroute_server = threading.Thread( target=omnirouteServer, name="RIKA-OMNIROUT
 
 loadPrint()#c
 
-# ollama_server.start()
-# omniroute_server.start()
+ollama_server.start()
+omniroute_server.start()
 
 loadPrint()#c
 

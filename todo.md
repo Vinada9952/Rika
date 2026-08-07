@@ -23,4 +23,3 @@ if groq doesn't response, ask ollama
 if ollama not open, open it
 if ollama not available, make error message if trying to access it
 secure passwords with encryption
-add list of ollama and groq models
