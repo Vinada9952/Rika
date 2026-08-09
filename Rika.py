@@ -932,25 +932,6 @@ def omnirouteServer():
 
 loadPrint()#c
 
-def ollamaServer():
-    os.system( "ollama serve" )
-    # subprocess.Popen( ["ollama", "serve"], creationflags=subprocess.DETACHED_PROCESS, shell=False )
-
-loadPrint()#c
-
-# ollamaServer()
-# omnirouteServer()
-
-ollama_server = threading.Thread( target=ollamaServer, name="RIKA-OLLAMA-SERVER" )
-omniroute_server = threading.Thread( target=omnirouteServer, name="RIKA-OMNIROUTE-SERVER" )
-
-loadPrint()#c
-
-ollama_server.start()
-omniroute_server.start()
-
-loadPrint()#c
-
 # =====================
 # CONFIG
 # =====================

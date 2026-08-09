@@ -5,6 +5,7 @@ import pyautogui
 import win32gui
 import win32con
 import win32api
+import win32clipboard
 import pygame
 import socket
 import json
@@ -117,23 +118,55 @@ def wrapText( text, font, max_width ):
     """Découpe le texte en lignes selon la largeur max en pixels."""
     if text == -1 or text == -2:
         return [""]
-    words = text.split()
+
     lines = []
-    current_line = ""
 
-    for word in words:
-        test_line = current_line + ( " " if current_line else "" ) + word
-        if font.size( test_line )[0] > max_width:
-            if current_line:
-                lines.append( current_line )
-            current_line = word
-        else:
-            current_line = test_line
+    # Respect explicit newlines by splitting into paragraphs first
+    paragraphs = text.split('\n')
+    for p_idx, para in enumerate(paragraphs):
+        if para == "":
+            # preserve empty line
+            lines.append("")
+            continue
 
-    if current_line:
-        lines.append( current_line )
+        words = para.split()
+        current_line = ""
+
+        for word in words:
+            test_line = current_line + ( " " if current_line else "" ) + word
+            if font.size( test_line )[0] > max_width:
+                if current_line:
+                    lines.append( current_line )
+                current_line = word
+            else:
+                current_line = test_line
+
+        if current_line:
+            lines.append( current_line )
 
     return lines
+
+
+def _get_clipboard_text():
+    try:
+        win32clipboard.OpenClipboard()
+        try:
+            data = win32clipboard.GetClipboardData(win32con.CF_UNICODETEXT)
+        except TypeError:
+            data = None
+        finally:
+            win32clipboard.CloseClipboard()
+        return data
+    except Exception:
+        try:
+            import tkinter as tk
+            r = tk.Tk()
+            r.withdraw()
+            data = r.clipboard_get()
+            r.destroy()
+            return data
+        except Exception:
+            return None
 
 def forceTopmost():
     win32gui.SetWindowPos( 
@@ -515,9 +548,30 @@ class TextInputSprite(pygame.sprite.Sprite):
             self._listener.stop()
 
     def _start_listener(self):
+        shift_held = [False]
+        ctrl_held  = [False]
+
         def on_press(key):
             if not self.visible:
                 return
+            # modifier keys
+            if key in (keyboard.Key.shift, keyboard.Key.shift_r):
+                shift_held[0] = True
+                return
+            if key in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+                ctrl_held[0] = True
+                return
+
+            # paste on Ctrl+V
+            try:
+                if ctrl_held[0] and hasattr(key, 'char') and key.char and key.char.lower() == 'v':
+                    clip = _get_clipboard_text()
+                    if clip and isinstance(clip, str):
+                        self.input_text += clip
+                    return
+            except Exception:
+                pass
+
             try:
                 char = key.char
                 if char:
@@ -526,24 +580,35 @@ class TextInputSprite(pygame.sprite.Sprite):
                 if key == keyboard.Key.backspace:
                     self.input_text = self.input_text[:-1]
                 elif key == keyboard.Key.enter:
-                    self.submitted_text = self.input_text
-                    self.input_text     = ""
+                    if shift_held[0]:
+                        self.input_text += "\n"
+                    else:
+                        self.submitted_text = self.input_text
+                        self.input_text     = ""
                 elif key == keyboard.Key.space:
                     self.input_text += " "
 
+        def on_release(key):
+            if key in (keyboard.Key.shift, keyboard.Key.shift_r):
+                shift_held[0] = False
+            if key in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+                ctrl_held[0] = False
+
         self._listener = keyboard.Listener(
             on_press = on_press,
+            on_release = on_release,
             suppress = False
         )
         self._listener.start()
 
     def _restart_listener(self, suppress: bool):
         shift_held = [False]
-
+        ctrl_held  = [False]
         shift_map = {
             '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
             '6': '?', '7': '&', '8': '*', '9': '( ', '0': ' )',
-            '-': '_', '=': '+', '/': '\\', ';': ':', '.': '"', ',': '\'',
+            '-': '_', '=': '+', '/': '\\', ';': ':', '.': '"',
+            ',': '\'', 'enter': '\n'
         }
 
         def on_press(key):
@@ -552,15 +617,28 @@ class TextInputSprite(pygame.sprite.Sprite):
             if key in (keyboard.Key.shift, keyboard.Key.shift_r):
                 shift_held[0] = True
                 return
+            if key in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+                ctrl_held[0] = True
+                return
             if key == keyboard.Key.backspace:
                 self.input_text = self.input_text[:-1]
             elif key == keyboard.Key.enter:
-                self.submitted_text = self.input_text
-                self.input_text = ""
+                if shift_held[0]:
+                    self.input_text += "\n"
+                else:
+                    self.submitted_text = self.input_text
+                    self.input_text = ""
             elif key == keyboard.Key.space:
                 self.input_text += " "
             else:
                 try:
+                    # paste on Ctrl+V
+                    if ctrl_held[0] and hasattr(key, 'char') and key.char and key.char.lower() == 'v':
+                        clip = _get_clipboard_text()
+                        if clip and isinstance(clip, str):
+                            self.input_text += clip
+                        return
+
                     char = key.char
                     if char:
                         if shift_held[0]:
@@ -572,6 +650,8 @@ class TextInputSprite(pygame.sprite.Sprite):
         def on_release(key):
             if key in (keyboard.Key.shift, keyboard.Key.shift_r):
                 shift_held[0] = False
+            if key in (keyboard.Key.ctrl, keyboard.Key.ctrl_l, keyboard.Key.ctrl_r):
+                ctrl_held[0] = False
 
         if self._listener and self._listener.is_alive():
             self._listener.stop()
