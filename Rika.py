@@ -4770,7 +4770,7 @@ def doProtocol( name ):
                     Json.write( conversation, CONVERSATION_PATH )
                 sendNotification( "Historique effacé pour alléger la conversation" )
             else:
-                subprocess.Popen( PROTOCOLS[i]["command"].split( ' ' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
+                subprocess.Popen( PROTOCOLS[i]["command"].split( '|' ), creationflags=subprocess.DETACHED_PROCESS, shell=True)
             break
     return f"protocol {name} execution success", False
 
