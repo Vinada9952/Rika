@@ -123,6 +123,7 @@ def send():
             if not message.endswith( "\n" ):
                 message += "\n"
             client_socket.sendall( message.encode('utf-8') )
+            time.sleep( 0.001 )
         else:
             time.sleep( 0.1 )
 
@@ -155,7 +156,7 @@ class GUI:
         global serveur_socket, client_socket, socket_send_thread, socket_receive_thread
         # thread_gui = threading.Thread( target=gui )
         # thread_gui.start()
-        subprocess.Popen( ["python3", "./gui.py"], creationflags=subprocess.DETACHED_PROCESS, shell=False)
+        # subprocess.Popen( ["python3", "./gui.py"], creationflags=subprocess.DETACHED_PROCESS, shell=False)
         serveur_socket.listen()
         client_socket, _ = serveur_socket.accept()
         socket_send_thread.start()
@@ -180,6 +181,7 @@ class GUI:
 
 
     def setInit( state: bool ):
+        time.sleep( 0.1 )
         sendDataSocket(
             json.dumps(
                 {
@@ -190,14 +192,26 @@ class GUI:
         )
 
     def setLoading( load ):
-        sendDataSocket(
-            json.dumps(
-                {
-                    "function": "setLoading",
-                    "args": (int( load ))
-                }
+        if load == 100:
+            for i in range( 10 ):
+                sendDataSocket(
+                    json.dumps(
+                        {
+                            "function": "setLoading",
+                            "args": (int( load ))
+                        }
+                    )
+                )
+                time.sleep( 0.1 )
+        else:
+            sendDataSocket(
+                json.dumps(
+                    {
+                        "function": "setLoading",
+                        "args": (int( load ))
+                    }
+                )
             )
-        )
 
     def displayRika( value ):
         sendDataSocket(
@@ -4797,7 +4811,7 @@ def saveFile( name, content ):
     try:
         if os.path.exists( f"{os.path.expanduser("~")}/Downloads/{name}" ):
             return f"Le fichier {name} existe déjà", True
-        file = open( f"{os.path.expanduser("~")}/Downloads/{name}", 'w' )
+        file = open( f"{os.path.expanduser("~")}/Downloads/{name}", 'w', encoding="utf-8" )
         file.write( content )
         file.close()
         subprocess.Popen( ["notepad", f"{os.path.expanduser("~")}/Downloads/{name}"], creationflags=subprocess.DETACHED_PROCESS, shell=True)

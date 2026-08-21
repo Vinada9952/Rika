@@ -13,6 +13,8 @@ import time
 import sys
 import cv2
 
+time.sleep( 30 )
+
 charged = 0
 def charge():
     global charged
