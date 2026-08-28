@@ -153,10 +153,29 @@ OUTILS DISPONIBLES :
     -> protocol (string): Nom du protocol
   - liste de protocol:{protocol_list}
 
+- getFileList
+  - Obtenir la liste de fichiers dont la modification ou la lecture est autorisé
+  - À utiliser avant getFileContent et modifyFileContent et attendre la réponse de l'outil avant de procéder à l'utilisation des autres outils
+
+- modifyFileContent
+  - Modifier le contenu d'un fichier dont la modification ou la lecture est autorisé
+  - Utiliser getFileList et getFileContent avant pour vérifier que le fichier existe et attendre la réponse de l'outil avant de procéder à l'utilisation des autres outils
+  - params:
+    -> name (string): nom du fichier à modifier
+    -> content (string): contenu du fichier après modification
+
+- getFileContent
+  - Obtenir le contenu d'un fichier dont la modification ou la lecture est autorisé
+  - À utiliser avant modifyFileContent pour savoir le contenu précédent du fichier avant modification et attendre la réponse de l'outil avant de procéder à l'utilisation des autres outils
+  - Utiliser getFileList avant pour vérifier que le fichier existe
+  - params:
+    -> name (string): nom du fichier à lire
+
 - saveFile
   - Sauvegarder un fichier texte
   - À utiliser pour sauvegarder un fichier texte, un gros contenu texte ou un script
   - Donne toujours le résultat d'une réponse, qui n'est pas simplement une information ou la confirmation d'un outil, dans l'outil saveFile
+  - Utiliser getFileList avant pour vérifier si le fichier existe déjà et attendre la réponse de l'outil avant de procéder à l'utilisation des autres outils
   - params:
     -> name (string): Nom du fichier
     -> content (string): Contenu du fichier

@@ -1776,10 +1776,29 @@ OUTILS DISPONIBLES :
     -> protocol (string): Nom du protocol
   - liste de protocol:{protocol_list}
 
+- getFileList
+  - Obtenir la liste de fichiers dont la modification ou la lecture est autorisé
+  - À utiliser avant getFileContent et modifyFileContent et attendre la réponse de l'outil avant de procéder à l'utilisation des autres outils
+
+- modifyFileContent
+  - Modifier le contenu d'un fichier dont la modification ou la lecture est autorisé
+  - Utiliser getFileList et getFileContent avant pour vérifier que le fichier existe et attendre la réponse de l'outil avant de procéder à l'utilisation des autres outils
+  - params:
+    -> name (string): nom du fichier à modifier
+    -> content (string): contenu du fichier après modification
+
+- getFileContent
+  - Obtenir le contenu d'un fichier dont la modification ou la lecture est autorisé
+  - À utiliser avant modifyFileContent pour savoir le contenu précédent du fichier avant modification et attendre la réponse de l'outil avant de procéder à l'utilisation des autres outils
+  - Utiliser getFileList avant pour vérifier que le fichier existe
+  - params:
+    -> name (string): nom du fichier à lire
+
 - saveFile
   - Sauvegarder un fichier texte
   - À utiliser pour sauvegarder un fichier texte, un gros contenu texte ou un script
   - Donne toujours le résultat d'une réponse, qui n'est pas simplement une information ou la confirmation d'un outil, dans l'outil saveFile
+  - Utiliser getFileList avant pour vérifier si le fichier existe déjà et attendre la réponse de l'outil avant de procéder à l'utilisation des autres outils
   - params:
     -> name (string): Nom du fichier
     -> content (string): Contenu du fichier
@@ -4807,6 +4826,51 @@ def autoEraseConversation():
 
 loadPrint()#c
 
+authorized_extensions = [
+    ".txt", ".py", ".json", ".csv", ".md", ".html", ".css", ".js", ".ts", ".java",
+    ".c", ".cpp", ".h", ".hpp", ".cs", ".rb", ".php", ".xml", ".yml", ".yaml", ".ini", ".bat", ".sh", ".ps1",
+    ".rtf", ".tex", ".log", ".conf", ".cfg", ".pl", ".go", ".swift", ".rs", ".dart", ".lua", ".r", ".jl", ".sql", ".asm"
+]
+
+def getFileList():
+    try:
+        files = os.listdir( f"{os.path.expanduser("~")}/Downloads" )
+        for files in files:
+            if not any( files.endswith(ext) for ext in authorized_extensions ):
+                files.remove( files )
+        return files, True
+    except Exception as e:
+        log( "Error while getting file list", str( e ), "error" )
+        return "Erreur lors de la récupération de la liste des fichiers", True
+
+loadPrint()#cà
+
+def getFileContent( name ):
+    try:
+        if not any( name.endswith(ext) for ext in authorized_extensions ):
+            return "Extension de fichier non autorisée", True
+        with open( f"{os.path.expanduser("~")}/Downloads/{name}", 'r', encoding="utf-8" ) as f:
+            content = f.read()
+        return content, True
+    except Exception as e:
+        log( "Error while getting file content", str( e ), "error" )
+        return "Erreur lors de la récupération du contenu du fichier", True
+
+loadPrint()#c
+
+def modifyFileContent( name, content ):
+    try:
+        if not any( name.endswith(ext) for ext in authorized_extensions ):
+            return "Extension de fichier non autorisée", True
+        with open( f"{os.path.expanduser("~")}/Downloads/{name}", 'w', encoding="utf-8" ) as f:
+            f.write( content )
+        return f"Le fichier {name} a bien été modifié", False
+    except Exception as e:
+        log( "Error while modifying file content", str( e ), "error" )
+        return "Erreur lors de la modification du contenu du fichier", True
+
+loadPrint()#c
+
 def saveFile( name, content ):
     try:
         if os.path.exists( f"{os.path.expanduser("~")}/Downloads/{name}" ):
@@ -6385,6 +6449,12 @@ def chat():
                                 result, do_response = f"Aucune connexion internet, impossible d'accéder à l'outil {tool["name"]}", True
                         elif tool["name"] == "saveFile":
                             result, do_response = saveFile( params["name"], params["content"] )
+                        elif tool["name"] == "getFileList":
+                            result, do_response = getFileList()
+                        elif tool["name"] == "getFileContent":
+                            result, do_response = getFileContent( params["name"] )
+                        elif tool["name"] == "modifyFileContent":
+                            result, do_response = modifyFileContent( params["name"], params["content"] )
                         elif tool["name"] == "webSearch":
                             if WIFI:
                                 result, do_response = webSearch( params["query"] )
