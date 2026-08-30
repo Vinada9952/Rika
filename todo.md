@@ -1,5 +1,4 @@
 upload files
-add output diagram in Json
 connect to school portal
 time for the user to refuse a prompt or the ai to find unintended prompts
 make assistant resum video screenshot or webcam
@@ -9,12 +8,9 @@ fix notUnderstand
 make web version
 Add alarms
 add reminders
-auto update wifi
-add sound when user can speak
-tool to entirely close agent (closeSystem tool)
+add sound/image indicator when user can speak
 fix fast_called with diagram
 agent can take note
-make email list for each one to check, not only one
 optimise Rika with RAM
 if groq doesn't response, ask ollama
 if ollama not available, make error message if trying to access it
