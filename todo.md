@@ -12,6 +12,4 @@ add sound/image indicator when user can speak
 fix fast_called with diagram
 agent can take note
 optimise Rika with RAM
-if groq doesn't response, ask ollama
-if ollama not available, make error message if trying to access it
 secure passwords with encryption
