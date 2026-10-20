@@ -2079,6 +2079,17 @@ class Model:
 
             response.raise_for_status()
 
+            log(
+                "askModel response",
+                json.dumps(
+                    {
+                        "response": response.json()
+                    },
+                    indent=4
+                ),
+                "info"
+            )
+
             if verification( response.json()["choices"][0]["message"]["content"] ):
                 break
         
